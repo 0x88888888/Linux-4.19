@@ -152,6 +152,16 @@ struct mpage_readpage_args {
  * We pass a buffer_head back and forth and use its buffer_mapped() flag to
  * represent the validity of its disk mapping and to decide when to do the next
  * get_block() call.
+ *
+ * ext2_lookup()
+ *	ext2_inode_by_name() 
+ *	 ext2_find_entry()
+ *	  ext2_get_page()
+ *     read_cache_page(filler==ext2_readpage)
+ *      do_read_cache_page(filler==ext2_readpage)
+ *       ext2_readpage()
+ *        mpage_readpage(get_block==ext2_get_block)
+ *         do_mpage_readpage(args.get_block == ext2_get_block)
  */
 static struct bio *do_mpage_readpage(struct mpage_readpage_args *args)
 {
@@ -186,7 +196,9 @@ static struct bio *do_mpage_readpage(struct mpage_readpage_args *args)
 	if (page_has_buffers(page))
 		goto confused;
 
+    //要读取的数据在文件中的block位置值
 	block_in_file = (sector_t)page->index << (PAGE_SHIFT - blkbits);
+	
 	last_block = block_in_file + args->nr_pages * blocks_per_page;
 	last_block_in_file = (i_size_read(inode) + blocksize - 1) >> blkbits;
 	if (last_block > last_block_in_file)
@@ -200,16 +212,20 @@ static struct bio *do_mpage_readpage(struct mpage_readpage_args *args)
 	if (buffer_mapped(map_bh) &&
 			block_in_file > args->first_logical_block &&
 			block_in_file < (args->first_logical_block + nblocks)) {
+			
 		unsigned map_offset = block_in_file - args->first_logical_block;
 		unsigned last = nblocks - map_offset;
 
 		for (relative_block = 0; ; relative_block++) {
+			
 			if (relative_block == last) {
 				clear_buffer_mapped(map_bh);
 				break;
 			}
+			
 			if (page_block == blocks_per_page)
 				break;
+			
 			blocks[page_block] = map_bh->b_blocknr + map_offset +
 						relative_block;
 			page_block++;
@@ -228,6 +244,7 @@ static struct bio *do_mpage_readpage(struct mpage_readpage_args *args)
 
 		if (block_in_file < last_block) {
 			map_bh->b_size = (last_block-block_in_file) << blkbits;
+			//ext2_get_block去从磁盘读取block_in_file这个block
 			if (args->get_block(inode, block_in_file, map_bh, 0))
 				goto confused;
 			args->first_logical_block = block_in_file;
@@ -414,6 +431,15 @@ EXPORT_SYMBOL(mpage_readpages);
 
 /*
  * This isn't called much at all
+ *
+ * ext2_lookup()
+ *	ext2_inode_by_name() 
+ *	 ext2_find_entry()
+ *	  ext2_get_page()
+ *     read_cache_page(filler==ext2_readpage)
+ *      do_read_cache_page(filler==ext2_readpage)
+ *       ext2_readpage()
+ *        mpage_readpage(get_block==ext2_get_block)
  */
 int mpage_readpage(struct page *page, get_block_t get_block)
 {
@@ -426,6 +452,7 @@ int mpage_readpage(struct page *page, get_block_t get_block)
 	args.bio = do_mpage_readpage(&args);
 	if (args.bio)
 		mpage_bio_submit(REQ_OP_READ, 0, args.bio);
+	
 	return 0;
 }
 EXPORT_SYMBOL(mpage_readpage);

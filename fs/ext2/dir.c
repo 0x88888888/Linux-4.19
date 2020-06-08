@@ -195,7 +195,12 @@ fail:
 	SetPageError(page);
 	return false;
 }
-
+/*
+ * ext2_lookup()
+ *  ext2_inode_by_name() 
+ *   ext2_find_entry()
+ *    ext2_get_page()
+ */
 static struct page * ext2_get_page(struct inode *dir, unsigned long n,
 				   int quiet)
 {
@@ -359,6 +364,10 @@ ext2_readdir(struct file *file, struct dir_context *ctx)
  * returns the page in which the entry was found (as a parameter - res_page),
  * and the entry itself. Page is returned mapped and unlocked.
  * Entry is guaranteed to be valid.
+ *
+ * ext2_lookup()
+ *  ext2_inode_by_name() 
+ *   ext2_find_entry()
  */
 struct ext2_dir_entry_2 *ext2_find_entry (struct inode *dir,
 			const struct qstr *child, struct page **res_page)
@@ -437,12 +446,17 @@ struct ext2_dir_entry_2 * ext2_dotdot (struct inode *dir, struct page **p)
 	return de;
 }
 
+/*
+ * ext2_lookup()
+ *  ext2_inode_by_name()
+ */
 ino_t ext2_inode_by_name(struct inode *dir, const struct qstr *child)
 {
 	ino_t res = 0;
 	struct ext2_dir_entry_2 *de;
 	struct page *page;
-	
+
+	//得到child所在的 page
 	de = ext2_find_entry (dir, child, &page);
 	if (de) {
 		res = le32_to_cpu(de->inode);

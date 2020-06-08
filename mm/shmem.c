@@ -2201,7 +2201,7 @@ static struct inode *shmem_get_inode(struct super_block *sb, const struct inode 
 		cache_no_acl(inode);
 
 		switch (mode & S_IFMT) {
-		default:
+		default: //
 			inode->i_op = &shmem_special_inode_operations;
 			init_special_inode(inode, mode, dev);
 			break;

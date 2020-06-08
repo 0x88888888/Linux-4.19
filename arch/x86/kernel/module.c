@@ -98,6 +98,13 @@ void *module_alloc(unsigned long size)
 }
 
 #ifdef CONFIG_X86_32
+
+/*
+ * SYSCALL_DEFINE3(init_module)
+ *  load_module()
+ *   apply_relocations()
+ *    apply_relocate()
+ */
 int apply_relocate(Elf32_Shdr *sechdrs,
 		   const char *strtab,
 		   unsigned int symindex,
@@ -105,12 +112,15 @@ int apply_relocate(Elf32_Shdr *sechdrs,
 		   struct module *me)
 {
 	unsigned int i;
+	//需要relocate的符号所在的地址
 	Elf32_Rel *rel = (void *)sechdrs[relsec].sh_addr;
 	Elf32_Sym *sym;
 	uint32_t *location;
 
 	DEBUGP("Applying relocate section %u to %u\n",
 	       relsec, sechdrs[relsec].sh_info);
+	
+	//循环所有需要relocate的符号
 	for (i = 0; i < sechdrs[relsec].sh_size / sizeof(*rel); i++) {
 		/* This is where to make the change */
 		location = (void *)sechdrs[sechdrs[relsec].sh_info].sh_addr
@@ -138,6 +148,9 @@ int apply_relocate(Elf32_Shdr *sechdrs,
 	return 0;
 }
 #else /*X86_64*/
+/*
+ * 
+ */
 int apply_relocate_add(Elf64_Shdr *sechdrs,
 		   const char *strtab,
 		   unsigned int symindex,

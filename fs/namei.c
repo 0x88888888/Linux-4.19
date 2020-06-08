@@ -1551,6 +1551,25 @@ static struct dentry *__lookup_hash(const struct qstr *name,
 	return dentry;
 }
 
+/*
+ * SYSCALL_DEFINE3(open)
+ *	do_sys_open()
+ *	 do_filp_open()
+ *	  path_openat()
+ *	   link_path_walk()
+ *		walk_component()
+ *       lookup_fast()
+ *
+ * SYSCALL_DEFINE3(open)
+ *	do_sys_open()
+ *	 do_filp_open()
+ *	  path_openat()
+ *	   do_o_path()
+ *		path_lookupat()
+ *		 link_path_walk()
+ *		  walk_component()
+ *         lookup_fast()
+ */
 static int lookup_fast(struct nameidata *nd,
 		       struct path *path, struct inode **inode,
 		       unsigned *seqp)
@@ -1638,7 +1657,28 @@ static int lookup_fast(struct nameidata *nd,
 	return err;
 }
 
-/* Fast lookup failed, do it the slow way */
+/* Fast lookup failed, do it the slow way
+ *
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ *    path_openat()
+ *     link_path_walk()
+ *      walk_component()
+ *       lookup_slow()
+ *        __lookup_slow()
+ *
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ *    path_openat()
+ *     do_o_path()
+ *      path_lookupat()
+ *       link_path_walk()
+ *        walk_component()
+ *         lookup_slow()
+ *          __lookup_slow()
+ */
 static struct dentry *__lookup_slow(const struct qstr *name,
 				    struct dentry *dir,
 				    unsigned int flags)
@@ -1668,6 +1708,7 @@ again:
 			}
 		}
 	} else {
+	          //ext2_lookup()
 		old = inode->i_op->lookup(inode, dentry, flags);
 		d_lookup_done(dentry);
 		if (unlikely(old)) {
@@ -1678,6 +1719,26 @@ again:
 	return dentry;
 }
 
+/*
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ *    path_openat()
+ *     link_path_walk()
+ *      walk_component()
+ *       lookup_slow()
+ *
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ *    path_openat()
+ *     do_o_path()
+ *      path_lookupat()
+ *       link_path_walk()
+ *        walk_component()
+ *         lookup_slow()
+ *
+ */
 static struct dentry *lookup_slow(const struct qstr *name,
 				  struct dentry *dir,
 				  unsigned int flags)
@@ -1786,6 +1847,24 @@ static inline int step_into(struct nameidata *nd, struct path *path,
 	return pick_link(nd, path, inode, seq);
 }
 
+/*
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ *    path_openat()
+ *     link_path_walk()
+ *      walk_component()
+ *
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ *    path_openat()
+ *     do_o_path()
+ *      path_lookupat()
+ *       link_path_walk()
+ *        walk_component()
+ *
+ */
 static int walk_component(struct nameidata *nd, int flags)
 {
 	struct path path;
@@ -1798,15 +1877,16 @@ static int walk_component(struct nameidata *nd, int flags)
 	 * parent relationships.
 	 */
 	if (unlikely(nd->last_type != LAST_NORM)) {
-		err = handle_dots(nd, nd->last_type);
+		err = handle_dots(nd, nd->last_type);//处理路径中的. 和..
 		if (!(flags & WALK_MORE) && nd->depth)
 			put_link(nd);
 		return err;
 	}
 	err = lookup_fast(nd, &path, &inode, &seq);
 	if (unlikely(err <= 0)) {
-		if (err < 0)
+		if (err < 0) //上一步出错了
 			return err;
+		
 		path.dentry = lookup_slow(&nd->last, nd->path.dentry,
 					  nd->flags);
 		if (IS_ERR(path.dentry))
@@ -2064,6 +2144,20 @@ static inline u64 hash_name(const void *salt, const char *name)
  *
  * Returns 0 and nd will have valid dentry and mnt on success.
  * Returns error and drops reference to input namei data on failure.
+ *
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ *    path_openat()
+ *     link_path_walk()
+ *
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ *    path_openat()
+ *     do_o_path()
+ *      path_lookupat()
+ *       link_path_walk()
  */
 static int link_path_walk(const char *name, struct nameidata *nd)
 {
@@ -2302,7 +2396,16 @@ static int handle_lookup_down(struct nameidata *nd)
 	return 0;
 }
 
-/* Returns 0 and nd will be valid on success; Retuns error, otherwise. */
+/*
+ * Returns 0 and nd will be valid on success; Retuns error, otherwise. 
+ *
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ *    path_openat()
+ *     do_o_path()
+ *      path_lookupat()
+ */
 static int path_lookupat(struct nameidata *nd, unsigned flags, struct path *path)
 {
 	const char *s = path_init(nd, flags);
@@ -3123,6 +3226,13 @@ static int atomic_open(struct nameidata *nd, struct dentry *dentry,
  * hadn't been specified.
  *
  * An error code is returned on failure.
+ *
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ *    path_openat()
+ *     do_last()
+ *      lookup_open()
  */
 static int lookup_open(struct nameidata *nd, struct path *path,
 			struct file *file,
@@ -3141,9 +3251,11 @@ static int lookup_open(struct nameidata *nd, struct path *path,
 		return -ENOENT;
 
 	file->f_mode &= ~FMODE_CREATED;
+	//在dentry_hashtable中查找
 	dentry = d_lookup(dir, &nd->last);
 	for (;;) {
 		if (!dentry) {
+			
 			dentry = d_alloc_parallel(dir, &nd->last, &wq);
 			if (IS_ERR(dentry))
 				return PTR_ERR(dentry);
@@ -3173,8 +3285,11 @@ static int lookup_open(struct nameidata *nd, struct path *path,
 	 *
 	 * Another problem is returing the "right" error value (e.g. for an
 	 * O_EXCL open we want to return EEXIST not EROFS).
+	 *
+	 * 创建
 	 */
 	if (open_flag & O_CREAT) {
+		
 		if (!IS_POSIXACL(dir->d_inode))
 			mode &= ~current_umask();
 		if (unlikely(!got_write)) {
@@ -3253,6 +3368,12 @@ out_dput:
 
 /*
  * Handle the last step of open()
+ *
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ *    path_openat()
+ *     do_last()
  */
 static int do_last(struct nameidata *nd,
 		   struct file *file, const struct open_flags *op)
@@ -3271,7 +3392,7 @@ static int do_last(struct nameidata *nd,
 	nd->flags |= op->intent;
 
 	if (nd->last_type != LAST_NORM) {
-		error = handle_dots(nd, nd->last_type);
+		error = handle_dots(nd, nd->last_type); //处理 .和..
 		if (unlikely(error))
 			return error;
 		goto finish_open;
@@ -3321,6 +3442,7 @@ static int do_last(struct nameidata *nd,
 		inode_lock(dir->d_inode);
 	else
 		inode_lock_shared(dir->d_inode);
+	
 	error = lookup_open(nd, &path, file, op, got_write);
 	if (open_flag & O_CREAT)
 		inode_unlock(dir->d_inode);
@@ -3502,6 +3624,13 @@ out:
 	return error;
 }
 
+/*
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ *    path_openat()
+ *     do_o_path()
+ */
 static int do_o_path(struct nameidata *nd, unsigned flags, struct file *file)
 {
 	struct path path;
@@ -3514,6 +3643,12 @@ static int do_o_path(struct nameidata *nd, unsigned flags, struct file *file)
 	return error;
 }
 
+/*
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ *    path_openat()
+ */
 static struct file *path_openat(struct nameidata *nd,
 			const struct open_flags *op, unsigned flags)
 {
@@ -3532,6 +3667,7 @@ static struct file *path_openat(struct nameidata *nd,
 		const char *s = path_init(nd, flags);
 		while (!(error = link_path_walk(s, nd)) &&
 			(error = do_last(nd, file, op)) > 0) {
+			
 			nd->flags &= ~(LOOKUP_OPEN|LOOKUP_CREATE|LOOKUP_EXCL);
 			s = trailing_symlink(nd);
 		}
@@ -3553,6 +3689,11 @@ static struct file *path_openat(struct nameidata *nd,
 	return ERR_PTR(error);
 }
 
+/*
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ */
 struct file *do_filp_open(int dfd, struct filename *pathname,
 		const struct open_flags *op)
 {
@@ -3562,10 +3703,13 @@ struct file *do_filp_open(int dfd, struct filename *pathname,
 
 	set_nameidata(&nd, dfd, pathname);
 	filp = path_openat(&nd, op, flags | LOOKUP_RCU);
+	
 	if (unlikely(filp == ERR_PTR(-ECHILD)))
 		filp = path_openat(&nd, op, flags);
+	
 	if (unlikely(filp == ERR_PTR(-ESTALE)))
 		filp = path_openat(&nd, op, flags | LOOKUP_REVAL);
+	
 	restore_nameidata();
 	return filp;
 }

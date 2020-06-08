@@ -35,9 +35,19 @@
  * when a file system is mounted (see ext2_fill_super).
  */
 
+/*
+ * 在ext2文件系统中，块的管理是通过位图来实现的，一个文件系统包含若干个block group,
+ * 每个一个block group有一个针对数据块的位图，还有一个针对inode的位图，
+ * 文件系统的组描述符在超级块的后边，每一个组描述符都有空闲块的数目记录，
+ * 组描述符都会在挂载文件系统的时候读到内存里。
+ */
 
 #define in_range(b, first, len)	((b) >= (first) && (b) <= (first) + (len) - 1)
 
+/*
+ * 获得组描述符，block_group代表是第几个组，
+ * bh参数如果不为空,就把buffer_head形式的组描述符放在bh里
+ */
 struct ext2_group_desc * ext2_get_group_desc(struct super_block * sb,
 					     unsigned int block_group,
 					     struct buffer_head ** bh)
@@ -45,8 +55,15 @@ struct ext2_group_desc * ext2_get_group_desc(struct super_block * sb,
 	unsigned long group_desc;
 	unsigned long offset;
 	struct ext2_group_desc * desc;
+	/*
+	 * 从super_block里获得ext2_sb_info结构体，
+	 * super_block是vfs便于管理设置的统一的超级块结构体，
+	 * ext2_sb_info是ext2文件系统的放在内存里的超级块结构体，
+	 * super_block的s_fs_info字段就是ext2_sb_info结构体
+	 */
 	struct ext2_sb_info *sbi = EXT2_SB(sb);
 
+    /*如果参数大于组的数目，说明参数有问题，报错，返回NULL*/
 	if (block_group >= sbi->s_groups_count) {
 		ext2_error (sb, "ext2_get_group_desc",
 			    "block_group >= groups_count - "
@@ -56,8 +73,18 @@ struct ext2_group_desc * ext2_get_group_desc(struct super_block * sb,
 		return NULL;
 	}
 
+    /*
+     * EXT2_DESC_PER_BLOCK_BITS宏返回块拥有组描述符的数目转换成二进制位的位数,
+     * 右移这些位就等于是除以一个块拥有组描述符的数目
+     */
 	group_desc = block_group >> EXT2_DESC_PER_BLOCK_BITS(sb);
+	/* 这里的offset就是在块内的第几个描述符 */
 	offset = block_group & (EXT2_DESC_PER_BLOCK(sb) - 1);
+
+	/*
+	 * sbi->s_group_desc就存放着块组描述符好几个块，
+	 * 如果为空，就说明ext2出问题了，并且很严重，报错
+	 */
 	if (!sbi->s_group_desc[group_desc]) {
 		ext2_error (sb, "ext2_get_group_desc",
 			    "Group descriptor not loaded - "
@@ -66,9 +93,16 @@ struct ext2_group_desc * ext2_get_group_desc(struct super_block * sb,
 		return NULL;
 	}
 
+	/* 
+	 * 描述符指针指向对应的buffer_head->b_data就
+	 * 是组描述符所在组的第一个组描述符
+	 */
 	desc = (struct ext2_group_desc *) sbi->s_group_desc[group_desc]->b_data;
+	/*如果参数bh不为空，就赋值组描述符的buffer_head给bh*/
 	if (bh)
 		*bh = sbi->s_group_desc[group_desc];
+	
+	/*返回想要的组描述符*/
 	return desc + offset;
 }
 
@@ -121,6 +155,9 @@ err_out:
  * bits for block/inode/inode tables are set in the bitmaps
  *
  * Return buffer_head on success or NULL in case of failure.
+ *
+ * 
+ * 读给定的块组的数据块位图，如果成功，返回位图的buffer_head，失败返回NULL
  */
 static struct buffer_head *
 read_block_bitmap(struct super_block *sb, unsigned int block_group)
@@ -129,10 +166,16 @@ read_block_bitmap(struct super_block *sb, unsigned int block_group)
 	struct buffer_head * bh = NULL;
 	ext2_fsblk_t bitmap_blk;
 
+    
+	/* 根据block_group得到块组描述符 */
 	desc = ext2_get_group_desc(sb, block_group, NULL);
 	if (!desc)
 		return NULL;
+	
 	bitmap_blk = le32_to_cpu(desc->bg_block_bitmap);
+	/*
+	 * 从address_space或者per_cpu_var(bh_lrus)中去读取
+	 */
 	bh = sb_getblk(sb, bitmap_blk);
 	if (unlikely(!bh)) {
 		ext2_error(sb, __func__,
@@ -144,6 +187,7 @@ read_block_bitmap(struct super_block *sb, unsigned int block_group)
 	if (likely(bh_uptodate_or_lock(bh)))
 		return bh;
 
+    //去底层读
 	if (bh_submit_read(bh) < 0) {
 		brelse(bh);
 		ext2_error(sb, __func__,

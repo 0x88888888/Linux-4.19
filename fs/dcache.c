@@ -2128,6 +2128,26 @@ static inline bool d_same_name(const struct dentry *dentry,
  *
  * NOTE! The caller *has* to check the resulting dentry against the sequence
  * number we've returned before using any of the resulting dentry state!
+ *
+ * SYSCALL_DEFINE3(open)
+ *	do_sys_open()
+ *	 do_filp_open()
+ *	  path_openat()
+ *	   link_path_walk()
+ *		walk_component()
+ *       lookup_fast()
+ *        __d_lookup_rcu()
+ *
+ * SYSCALL_DEFINE3(open)
+ *	do_sys_open()
+ *	 do_filp_open()
+ *	  path_openat()
+ *	   do_o_path()
+ *		path_lookupat()
+ *		 link_path_walk()
+ *		  walk_component()
+ *         lookup_fast()
+ *          __d_lookup_rcu()
  */
 struct dentry *__d_lookup_rcu(const struct dentry *parent,
 				const struct qstr *name,
@@ -2223,6 +2243,8 @@ seqretry:
  * question. If the dentry is found its reference count is incremented and the
  * dentry is returned. The caller must use dput to free the entry when it has
  * finished using it. %NULL is returned if the dentry does not exist.
+ *
+ * 在dentry_hashtable中查找name对应的dentry
  */
 struct dentry *d_lookup(const struct dentry *parent, const struct qstr *name)
 {
@@ -2431,6 +2453,15 @@ static void d_wait_lookup(struct dentry *dentry)
 	}
 }
 
+/*
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ *    path_openat()
+ *     do_last()
+ *      lookup_open()
+ *       d_alloc_parallel()
+ */
 struct dentry *d_alloc_parallel(struct dentry *parent,
 				const struct qstr *name,
 				wait_queue_head_t *wq)

@@ -301,6 +301,7 @@ static inline void bforget(struct buffer_head *bh)
 		__bforget(bh);
 }
 
+//读取一个block
 static inline struct buffer_head *
 sb_bread(struct super_block *sb, sector_t block)
 {

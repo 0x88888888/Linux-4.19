@@ -163,9 +163,14 @@ static inline int verify_chain(Indirect *from, Indirect *to)
 static int ext2_block_to_path(struct inode *inode,
 			long i_block, int offsets[4], int *boundary)
 {
-	int ptrs = EXT2_ADDR_PER_BLOCK(inode->i_sb);
+    /*
+     * inode->i_sb->s_blocksize / sizeof(__u32)
+     *
+     */
+	int ptrs = EXT2_ADDR_PER_BLOCK(inode->i_sb); 
+	
 	int ptrs_bits = EXT2_ADDR_PER_BLOCK_BITS(inode->i_sb);
-	const long direct_blocks = EXT2_NDIR_BLOCKS,
+	const long direct_blocks = EXT2_NDIR_BLOCKS /* 12 */, 
 		indirect_blocks = ptrs,
 		double_blocks = (1 << (ptrs_bits * 2));
 	int n = 0;
@@ -174,10 +179,11 @@ static int ext2_block_to_path(struct inode *inode,
 	if (i_block < 0) {
 		ext2_msg(inode->i_sb, KERN_WARNING,
 			"warning: %s: block < 0", __func__);
-	} else if (i_block < direct_blocks) {
+	} else if (i_block < direct_blocks) { //i_block < 12
 		offsets[n++] = i_block;
 		final = direct_blocks;
 	} else if ( (i_block -= direct_blocks) < indirect_blocks) {
+		// 12 < iblock < indirect_blocks
 		offsets[n++] = EXT2_IND_BLOCK;
 		offsets[n++] = i_block;
 		final = ptrs;
@@ -617,6 +623,18 @@ static void ext2_splice_branch(struct inode *inode,
  * return > 0, # of blocks mapped or allocated.
  * return = 0, if plain lookup failed.
  * return < 0, error case.
+ *
+ * ext2_lookup()
+ *	ext2_inode_by_name() 
+ *	 ext2_find_entry()
+ *	  ext2_get_page()
+ *     read_cache_page(filler==ext2_readpage)
+ *      do_read_cache_page(filler==ext2_readpage)
+ *       ext2_readpage()
+ *        mpage_readpage(get_block==ext2_get_block)
+ *         do_mpage_readpage(args.get_block == ext2_get_block)
+ *          ext2_get_block()
+ *           ext2_get_blocks()
  */
 static int ext2_get_blocks(struct inode *inode,
 			   sector_t iblock, unsigned long maxblocks,
@@ -637,11 +655,13 @@ static int ext2_get_blocks(struct inode *inode,
 
 	BUG_ON(maxblocks == 0);
 
+    //offsets[]保存着到最后block的路径,depth就是offsets[]中有效元素的数量
 	depth = ext2_block_to_path(inode,iblock,offsets,&blocks_to_boundary);
 
 	if (depth == 0)
 		return -EIO;
 
+	//根据offsets[],depth 从磁盘读取各个间接的block
 	partial = ext2_get_branch(inode, depth, offsets, chain, &err);
 	/* Simplest case - block found, no allocation needed */
 	if (!partial) {
@@ -774,6 +794,18 @@ cleanup:
 	return err;
 }
 
+/*
+ * ext2_lookup()
+ *	ext2_inode_by_name() 
+ *	 ext2_find_entry()
+ *	  ext2_get_page()
+ *     read_cache_page(filler==ext2_readpage)
+ *      do_read_cache_page(filler==ext2_readpage)
+ *       ext2_readpage()
+ *        mpage_readpage(get_block==ext2_get_block)
+ *         do_mpage_readpage(args.get_block == ext2_get_block)
+ *          ext2_get_block()
+ */
 int ext2_get_block(struct inode *inode, sector_t iblock,
 		struct buffer_head *bh_result, int create)
 {
@@ -782,6 +814,7 @@ int ext2_get_block(struct inode *inode, sector_t iblock,
 	u32 bno;
 	int ret;
 
+    
 	ret = ext2_get_blocks(inode, iblock, max_blocks, &bno, &new, &boundary,
 			create);
 	if (ret <= 0)
@@ -867,6 +900,15 @@ static int ext2_writepage(struct page *page, struct writeback_control *wbc)
 	return block_write_full_page(page, ext2_get_block, wbc);
 }
 
+/*
+ * ext2_lookup()
+ *	ext2_inode_by_name() 
+ *	 ext2_find_entry()
+ *	  ext2_get_page()
+ *     read_cache_page(filler==ext2_readpage)
+ *      do_read_cache_page(filler==ext2_readpage)
+ *       ext2_readpage()
+ */
 static int ext2_readpage(struct file *file, struct page *page)
 {
 	return mpage_readpage(page, ext2_get_block);
@@ -1318,6 +1360,33 @@ static int ext2_setsize(struct inode *inode, loff_t newsize)
 	return 0;
 }
 
+/* 
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ *    path_openat()
+ *     link_path_walk()
+ *      walk_component()
+ *       lookup_slow()
+ *        __lookup_slow()
+ *         ext2_lookup()
+ *          ext2_iget()
+ *           ext2_get_inode()
+ *
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ *    path_openat()
+ *     do_o_path()
+ *      path_lookupat()
+ *       link_path_walk()
+ *        walk_component()
+ *         lookup_slow()
+ *          __lookup_slow()
+ *           ext2_lookup()
+ *            ext2_iget()
+ *             ext2_get_inode()
+ */
 static struct ext2_inode *ext2_get_inode(struct super_block *sb, ino_t ino,
 					struct buffer_head **p)
 {
@@ -1332,7 +1401,10 @@ static struct ext2_inode *ext2_get_inode(struct super_block *sb, ino_t ino,
 	    ino > le32_to_cpu(EXT2_SB(sb)->s_es->s_inodes_count))
 		goto Einval;
 
+    //ino 所在的block_group 
 	block_group = (ino - 1) / EXT2_INODES_PER_GROUP(sb);
+
+	//得到block group desc
 	gdp = ext2_get_group_desc(sb, block_group, NULL);
 	if (!gdp)
 		goto Egdp;
@@ -1342,6 +1414,7 @@ static struct ext2_inode *ext2_get_inode(struct super_block *sb, ino_t ino,
 	offset = ((ino - 1) % EXT2_INODES_PER_GROUP(sb)) * EXT2_INODE_SIZE(sb);
 	block = le32_to_cpu(gdp->bg_inode_table) +
 		(offset >> EXT2_BLOCK_SIZE_BITS(sb));
+	//读取super_block对应的block_device的一个block
 	if (!(bh = sb_bread(sb, block)))
 		goto Eio;
 
@@ -1393,6 +1466,31 @@ void ext2_set_file_ops(struct inode *inode)
 		inode->i_mapping->a_ops = &ext2_aops;
 }
 
+/* 
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ *    path_openat()
+ *     link_path_walk()
+ *      walk_component()
+ *       lookup_slow()
+ *        __lookup_slow()
+ *         ext2_lookup()
+ *          ext2_iget()
+ *
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ *    path_openat()
+ *     do_o_path()
+ *      path_lookupat()
+ *       link_path_walk()
+ *        walk_component()
+ *         lookup_slow()
+ *          __lookup_slow()
+ *           ext2_lookup()
+ *            ext2_iget()
+ */
 struct inode *ext2_iget (struct super_block *sb, unsigned long ino)
 {
 	struct ext2_inode_info *ei;
@@ -1407,12 +1505,14 @@ struct inode *ext2_iget (struct super_block *sb, unsigned long ino)
 	inode = iget_locked(sb, ino);
 	if (!inode)
 		return ERR_PTR(-ENOMEM);
+	
 	if (!(inode->i_state & I_NEW))
 		return inode;
 
 	ei = EXT2_I(inode);
 	ei->i_block_alloc_info = NULL;
 
+    // 从磁盘上读取ext2_inode
 	raw_inode = ext2_get_inode(inode->i_sb, ino, &bh);
 	if (IS_ERR(raw_inode)) {
 		ret = PTR_ERR(raw_inode);
@@ -1430,6 +1530,7 @@ struct inode *ext2_iget (struct super_block *sb, unsigned long ino)
 	i_gid_write(inode, i_gid);
 	set_nlink(inode, le16_to_cpu(raw_inode->i_links_count));
 	inode->i_size = le32_to_cpu(raw_inode->i_size);
+	//设置时间
 	inode->i_atime.tv_sec = (signed)le32_to_cpu(raw_inode->i_atime);
 	inode->i_ctime.tv_sec = (signed)le32_to_cpu(raw_inode->i_ctime);
 	inode->i_mtime.tv_sec = (signed)le32_to_cpu(raw_inode->i_mtime);
@@ -1446,6 +1547,7 @@ struct inode *ext2_iget (struct super_block *sb, unsigned long ino)
 		ret = -ESTALE;
 		goto bad_inode;
 	}
+	
 	inode->i_blocks = le32_to_cpu(raw_inode->i_blocks);
 	ei->i_flags = le32_to_cpu(raw_inode->i_flags);
 	ext2_set_inode_flags(inode);
@@ -1464,10 +1566,11 @@ struct inode *ext2_iget (struct super_block *sb, unsigned long ino)
 		goto bad_inode;
 	}
 
-	if (S_ISREG(inode->i_mode))
+	if (S_ISREG(inode->i_mode))//普通文件
 		inode->i_size |= ((__u64)le32_to_cpu(raw_inode->i_size_high)) << 32;
 	else
 		ei->i_dir_acl = le32_to_cpu(raw_inode->i_dir_acl);
+	
 	if (i_size_read(inode) < 0) {
 		ret = -EFSCORRUPTED;
 		goto bad_inode;
@@ -1475,6 +1578,7 @@ struct inode *ext2_iget (struct super_block *sb, unsigned long ino)
 	ei->i_dtime = 0;
 	inode->i_generation = le32_to_cpu(raw_inode->i_generation);
 	ei->i_state = 0;
+	//ext2_inode所在的group
 	ei->i_block_group = (ino - 1) / EXT2_INODES_PER_GROUP(inode->i_sb);
 	ei->i_dir_start_lookup = 0;
 
@@ -1482,20 +1586,22 @@ struct inode *ext2_iget (struct super_block *sb, unsigned long ino)
 	 * NOTE! The in-memory inode i_data array is in little-endian order
 	 * even on big-endian machines: we do NOT byteswap the block numbers!
 	 */
-	for (n = 0; n < EXT2_N_BLOCKS; n++)
+	for (n = 0; n < EXT2_N_BLOCKS /* 15 */; n++)
 		ei->i_data[n] = raw_inode->i_block[n];
 
-	if (S_ISREG(inode->i_mode)) {
+	if (S_ISREG(inode->i_mode)) { //普通文件
 		ext2_set_file_ops(inode);
-	} else if (S_ISDIR(inode->i_mode)) {
+	} else if (S_ISDIR(inode->i_mode)) { //目录
 		inode->i_op = &ext2_dir_inode_operations;
 		inode->i_fop = &ext2_dir_operations;
 		if (test_opt(inode->i_sb, NOBH))
 			inode->i_mapping->a_ops = &ext2_nobh_aops;
 		else
 			inode->i_mapping->a_ops = &ext2_aops;
-	} else if (S_ISLNK(inode->i_mode)) {
-		if (ext2_inode_is_fast_symlink(inode)) {
+		
+	} else if (S_ISLNK(inode->i_mode)) { //符号链接
+	
+		if (ext2_inode_is_fast_symlink(inode)) { //快速符号链接
 			inode->i_link = (char *)ei->i_data;
 			inode->i_op = &ext2_fast_symlink_inode_operations;
 			nd_terminate_link(ei->i_data, inode->i_size,
@@ -1508,7 +1614,7 @@ struct inode *ext2_iget (struct super_block *sb, unsigned long ino)
 			else
 				inode->i_mapping->a_ops = &ext2_aops;
 		}
-	} else {
+	} else { //字符设备、块设备、pipefifo文件、sock文件
 		inode->i_op = &ext2_special_inode_operations;
 		if (raw_inode->i_block[0])
 			init_special_inode(inode, inode->i_mode,
@@ -1517,6 +1623,7 @@ struct inode *ext2_iget (struct super_block *sb, unsigned long ino)
 			init_special_inode(inode, inode->i_mode,
 			   new_decode_dev(le32_to_cpu(raw_inode->i_block[1])));
 	}
+	
 	brelse (bh);
 	unlock_new_inode(inode);
 	return inode;

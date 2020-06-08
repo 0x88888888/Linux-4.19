@@ -1045,6 +1045,10 @@ struct file *file_open_root(struct dentry *dentry, struct vfsmount *mnt,
 }
 EXPORT_SYMBOL(file_open_root);
 
+/*
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ */
 long do_sys_open(int dfd, const char __user *filename, int flags, umode_t mode)
 {
 	struct open_flags op;
@@ -1061,11 +1065,13 @@ long do_sys_open(int dfd, const char __user *filename, int flags, umode_t mode)
 	fd = get_unused_fd_flags(flags);
 	if (fd >= 0) {
 		struct file *f = do_filp_open(dfd, tmp, &op);
+		
 		if (IS_ERR(f)) {
 			put_unused_fd(fd);
 			fd = PTR_ERR(f);
 		} else {
 			fsnotify_open(f);
+			//设置current->files[fd] == files
 			fd_install(fd, f);
 		}
 	}

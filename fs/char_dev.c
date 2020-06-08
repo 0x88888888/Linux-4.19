@@ -38,7 +38,7 @@ static struct char_device_struct {
 	int minorct;
 	char name[64];
 	struct cdev *cdev;		/* will die */
-} *chrdevs[CHRDEV_MAJOR_HASH_SIZE];
+} *chrdevs[CHRDEV_MAJOR_HASH_SIZE]; //chrdevs[]主要用于管理系统中主设备号和次设备不要重叠
 
 /* index in the above */
 static inline int major_to_index(unsigned major)
@@ -93,6 +93,10 @@ static int find_dynamic_major(void)
  *
  * If major > 0 this function will attempt to reserve the passed range of
  * minors and will return zero on success.
+ *
+ * init_sg()
+ *  register_chrdev_region() 
+ *   __register_chrdev_region()
  *
  * Returns a -ve errno on failure.
  */
@@ -199,6 +203,9 @@ __unregister_chrdev_region(unsigned major, unsigned baseminor, int minorct)
  * @name: the name of the device or driver.
  *
  * Return value is zero on success, a negative error code on failure.
+ *
+ * init_sg()
+ *  register_chrdev_region()
  */
 int register_chrdev_region(dev_t from, unsigned count, const char *name)
 {

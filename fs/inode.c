@@ -1974,6 +1974,16 @@ void __init inode_init(void)
 					0);
 }
 
+/* 
+ * shmem_get_inode()
+ *  init_special_inode()
+ *
+ * ext2_mknod()
+ *  init_special_inode()
+ *
+ * ext2_iget()
+ *  init_special_inode()
+ */
 void init_special_inode(struct inode *inode, umode_t mode, dev_t rdev)
 {
 	inode->i_mode = mode;

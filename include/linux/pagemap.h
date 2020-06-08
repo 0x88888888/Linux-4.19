@@ -395,9 +395,18 @@ extern struct page * read_cache_page_gfp(struct address_space *mapping,
 extern int read_cache_pages(struct address_space *mapping,
 		struct list_head *pages, filler_t *filler, void *data);
 
+/*
+ * ext2_lookup()
+ *	ext2_inode_by_name() 
+ *	 ext2_find_entry()
+ *	  ext2_get_page()
+ */
 static inline struct page *read_mapping_page(struct address_space *mapping,
 				pgoff_t index, void *data)
 {
+    /*
+     * ext2_aops->readpage == ext2_readpage
+     */
 	filler_t *filler = (filler_t *)mapping->a_ops->readpage;
 	return read_cache_page(mapping, index, filler, data);
 }

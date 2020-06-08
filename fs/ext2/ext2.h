@@ -90,6 +90,7 @@ struct ext2_sb_info {
 	unsigned short s_mount_state;
 	unsigned short s_pad;
 	int s_addr_per_block_bits;
+	
 	int s_desc_per_block_bits;
 	int s_inode_size;
 	int s_first_ino;
@@ -298,6 +299,8 @@ static inline __u32 ext2_mask_flags(umode_t mode, __u32 flags)
 
 /*
  * Structure of an inode on the disk
+ *
+ * ext2文件系统在磁盘上的inode数据结构
  */
 struct ext2_inode {
 	__le16	i_mode;		/* File mode */
@@ -309,7 +312,14 @@ struct ext2_inode {
 	__le32	i_dtime;	/* Deletion Time */
 	__le16	i_gid;		/* Low 16 bits of Group Id */
 	__le16	i_links_count;	/* Links count */
+	/* 文件数据区占用的block数量 */
 	__le32	i_blocks;	/* Blocks count */
+	/*
+	 * EXT2_SECRM_FL表示安全删除，在删除改文件时，其数据块会被随机数填充.
+	 * EXT2_UNRM_FL表示可恢复删除，删除该文件后，其数据块,inode等内容会保存一段时间,在这段时间内，可以恢复该文件.
+	 * EXT2_SYNC_FL表示同步写，由于磁盘上的内容通常被缓冲到内存中，修改操作都是堆内存内容进行的。
+	 *             必要时才会被写到磁盘，EXT2_SYNC_FL表示在写入操作过程中，同步更新磁盘块的内容
+	 */	
 	__le32	i_flags;	/* File flags */
 	union {
 		struct {
@@ -322,7 +332,8 @@ struct ext2_inode {
 			__le32  m_i_reserved1;
 		} masix1;
 	} osd1;				/* OS dependent 1 */
-	__le32	i_block[EXT2_N_BLOCKS];/* Pointers to blocks */
+	/* 数据块信息 */
+	__le32	i_block[EXT2_N_BLOCKS /* 15 */];/* Pointers to blocks */
 	__le32	i_generation;	/* File version (for NFS) */
 	__le32	i_file_acl;	/* File ACL */
 	__le32	i_dir_acl;	/* Directory ACL */

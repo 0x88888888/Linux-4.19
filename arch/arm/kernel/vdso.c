@@ -156,6 +156,7 @@ static Elf32_Sym * __init find_symbol(struct elfinfo *lib, const char *symname)
 		c = strchr(name, '@');
 		if (c)
 			*c = 0;
+		
 		if (strcmp(symname, name) == 0)
 			return &lib->dynsym[i];
 	}

@@ -201,7 +201,9 @@ __find_get_block_slow(struct block_device *bdev, sector_t block)
 	struct page *page;
 	int all_mapped = 1;
 
+    //在bd_mapping中的索引
 	index = block >> (PAGE_SHIFT - bd_inode->i_blkbits);
+	
 	page = find_get_page_flags(bd_mapping, index, FGP_ACCESSED);
 	if (!page)
 		goto out;
@@ -209,6 +211,7 @@ __find_get_block_slow(struct block_device *bdev, sector_t block)
 	spin_lock(&bd_mapping->private_lock);
 	if (!page_has_buffers(page))
 		goto out_unlock;
+	
 	head = page_buffers(page);
 	bh = head;
 	do {
@@ -1016,6 +1019,18 @@ grow_buffers(struct block_device *bdev, sector_t block, int size, gfp_t gfp)
 	return grow_dev_page(bdev, block, index, size, sizebits, gfp);
 }
 
+/*
+ * sb_bread()
+ *  __bread_gfp()
+ *   __getblk_gfp()
+ *    __getblk_slow()
+ *
+ * sb_bread_unmovable()
+ *  __bread_gfp()
+ *   __getblk_gfp()
+ *    __getblk_slow()
+ *
+ */
 static struct buffer_head *
 __getblk_slow(struct block_device *bdev, sector_t block,
 	     unsigned size, gfp_t gfp)
@@ -1283,17 +1298,29 @@ lookup_bh_lru(struct block_device *bdev, sector_t block, unsigned size)
  * Perform a pagecache lookup for the matching buffer.  If it's there, refresh
  * it in the LRU and mark it as accessed.  If it is not present then return
  * NULL
+ *
+ * sb_bread()
+ *  __bread_gfp()
+ *   __getblk_gfp()
+ *    __find_get_block()
+ *
+ * sb_bread_unmovable()
+ *  __bread_gfp()
+ *   __getblk_gfp()
+ *    __find_get_block()
  */
 struct buffer_head *
 __find_get_block(struct block_device *bdev, sector_t block, unsigned size)
 {
+    //从per cpu 变量中查找
 	struct buffer_head *bh = lookup_bh_lru(bdev, block, size);
 
 	if (bh == NULL) {
+		//从bdev->bd_inode->i_mmaping中查找
 		/* __find_get_block_slow will mark the page accessed */
 		bh = __find_get_block_slow(bdev, block);
 		if (bh)
-			bh_lru_install(bh);
+			bh_lru_install(bh); //缓存到per cpu变量中
 	} else
 		touch_buffer(bh);
 
@@ -1308,6 +1335,15 @@ EXPORT_SYMBOL(__find_get_block);
  *
  * __getblk_gfp() will lock up the machine if grow_dev_page's
  * try_to_free_buffers() attempt is failing.  FIXME, perhaps?
+ *
+ * sb_bread()
+ *  __bread_gfp()
+ *   __getblk_gfp()
+ *
+ * sb_bread_unmovable()
+ *  __bread_gfp()
+ *   __getblk_gfp()
+ *
  */
 struct buffer_head *
 __getblk_gfp(struct block_device *bdev, sector_t block,
@@ -1346,15 +1382,24 @@ EXPORT_SYMBOL(__breadahead);
  *  The page cache can be allocated from non-movable area
  *  not to prevent page migration if you set gfp to zero.
  *  It returns NULL if the block was unreadable.
+ *
+ * sb_bread()
+ *  __bread_gfp()
+ *
+ * sb_bread_unmovable()
+ *  __bread_gfp()
+ *
+ * 读取一个block，返回对应的buffer_head
  */
 struct buffer_head *
 __bread_gfp(struct block_device *bdev, sector_t block,
 		   unsigned size, gfp_t gfp)
 {
+    //在bdev->bd_inode->i_mapping 缓存中查找block对应的buffer_head
 	struct buffer_head *bh = __getblk_gfp(bdev, block, size, gfp);
 
 	if (likely(bh) && !buffer_uptodate(bh))
-		bh = __bread_slow(bh);
+		bh = __bread_slow(bh); //去磁盘读取buffer_head对应的block
 	return bh;
 }
 EXPORT_SYMBOL(__bread_gfp);

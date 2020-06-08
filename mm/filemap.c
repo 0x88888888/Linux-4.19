@@ -1539,8 +1539,10 @@ struct page *pagecache_get_page(struct address_space *mapping, pgoff_t offset,
 
 repeat:
 	page = find_get_entry(mapping, offset);
+	
 	if (radix_tree_exceptional_entry(page))
 		page = NULL;
+	
 	if (!page)
 		goto no_page;
 
@@ -2778,6 +2780,14 @@ static struct page *wait_on_page_read(struct page *page)
 	return page;
 }
 
+/*
+ * ext2_lookup()
+ *	ext2_inode_by_name() 
+ *	 ext2_find_entry()
+ *	  ext2_get_page()
+ *     read_cache_page(filler==ext2_readpage)
+ *      do_read_cache_page(filler==ext2_readpage)
+ */
 static struct page *do_read_cache_page(struct address_space *mapping,
 				pgoff_t index,
 				int (*filler)(void *, struct page *),
@@ -2787,8 +2797,9 @@ static struct page *do_read_cache_page(struct address_space *mapping,
 	struct page *page;
 	int err;
 repeat:
+	//先从address_space中查找
 	page = find_get_page(mapping, index);
-	if (!page) {
+	if (!page) { //查找失败，就要分配一个page，然后去磁盘读取数据，填充这个page了
 		page = __page_cache_alloc(gfp);
 		if (!page)
 			return ERR_PTR(-ENOMEM);
@@ -2884,6 +2895,12 @@ out:
  * not set, try to fill the page and wait for it to become unlocked.
  *
  * If the page does not get brought uptodate, return -EIO.
+ *
+ * ext2_lookup()
+ *	ext2_inode_by_name() 
+ *	 ext2_find_entry()
+ *	  ext2_get_page()
+ *     read_cache_page(filler==ext2_readpage)
  */
 struct page *read_cache_page(struct address_space *mapping,
 				pgoff_t index,

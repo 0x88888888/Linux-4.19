@@ -51,8 +51,30 @@ static inline int ext2_add_nondir(struct dentry *dentry, struct inode *inode)
 
 /*
  * Methods themselves.
+ *
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ *    path_openat()
+ *     link_path_walk()
+ *      walk_component()
+ *       lookup_slow()
+ *        __lookup_slow()
+ *         ext2_lookup()
+ *
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ *    path_openat()
+ *     do_o_path()
+ *      path_lookupat()
+ *       link_path_walk()
+ *        walk_component()
+ *         lookup_slow()
+ *          __lookup_slow()
+ *           ext2_lookup()
+ *
  */
-
 static struct dentry *ext2_lookup(struct inode * dir, struct dentry *dentry, unsigned int flags)
 {
 	struct inode * inode;
@@ -61,9 +83,11 @@ static struct dentry *ext2_lookup(struct inode * dir, struct dentry *dentry, uns
 	if (dentry->d_name.len > EXT2_NAME_LEN)
 		return ERR_PTR(-ENAMETOOLONG);
 
+    //从磁盘或者address_space读取dentry->d_name所在的page，然后返回ino
 	ino = ext2_inode_by_name(dir, &dentry->d_name);
 	inode = NULL;
 	if (ino) {
+		//分配ext2文件系统的inode
 		inode = ext2_iget(dir->i_sb, ino);
 		if (inode == ERR_PTR(-ESTALE)) {
 			ext2_error(dir->i_sb, __func__,
@@ -135,6 +159,7 @@ static int ext2_mknod (struct inode * dir, struct dentry *dentry, umode_t mode, 
 	inode = ext2_new_inode (dir, mode, &dentry->d_name);
 	err = PTR_ERR(inode);
 	if (!IS_ERR(inode)) {
+		
 		init_special_inode(inode, inode->i_mode, rdev);
 #ifdef CONFIG_EXT2_FS_XATTR
 		inode->i_op = &ext2_special_inode_operations;

@@ -401,6 +401,15 @@ extern const s32 __start___kcrctab_unused_gpl[];
 #define symversion(base, idx) ((base != NULL) ? ((base) + (idx)) : NULL)
 #endif
 
+/*
+ * SYSCALL_DEFINE3(init_module)
+ *  load_module()
+ *   complete_formation()
+ *    verify_export_symbols()
+ *     find_symbol()
+ *      each_symbol_section(fn == find_symbol_in_section)
+ *       each_symbol_in_section(fn == find_symbol_in_section)
+ */
 static bool each_symbol_in_section(const struct symsearch *arr,
 				   unsigned int arrsize,
 				   struct module *owner,
@@ -419,7 +428,23 @@ static bool each_symbol_in_section(const struct symsearch *arr,
 	return false;
 }
 
-/* Returns true as soon as fn returns true, otherwise false. */
+/* Returns true as soon as fn returns true, otherwise false. 
+ *
+ * SYSCALL_DEFINE3(init_module)
+ *  load_module()
+ *   complete_formation()
+ *    verify_export_symbols()
+ *     find_symbol()
+ *      each_symbol_section(fn == find_symbol_in_section)
+ *
+ * SYSCALL_DEFINE3(init_module)
+ *  load_module()
+ *   simplify_symbols()
+ *    resolve_symbol_wait()
+ *     resolve_symbol()
+ *      find_symbol()
+ *       each_symbol_section(fn == find_symbol_in_section)
+ */
 bool each_symbol_section(bool (*fn)(const struct symsearch *arr,
 				    struct module *owner,
 				    void *data),
@@ -429,12 +454,13 @@ bool each_symbol_section(bool (*fn)(const struct symsearch *arr,
 	static const struct symsearch arr[] = {
 		{ __start___ksymtab, __stop___ksymtab, __start___kcrctab,
 		  NOT_GPL_ONLY, false },
+		  
 		{ __start___ksymtab_gpl, __stop___ksymtab_gpl,
-		  __start___kcrctab_gpl,
-		  GPL_ONLY, false },
+		  __start___kcrctab_gpl,  GPL_ONLY, false },
+		  
 		{ __start___ksymtab_gpl_future, __stop___ksymtab_gpl_future,
-		  __start___kcrctab_gpl_future,
-		  WILL_BE_GPL_ONLY, false },
+		  __start___kcrctab_gpl_future, WILL_BE_GPL_ONLY, false },
+		  
 #ifdef CONFIG_UNUSED_SYMBOLS
 		{ __start___ksymtab_unused, __stop___ksymtab_unused,
 		  __start___kcrctab_unused,
@@ -447,9 +473,11 @@ bool each_symbol_section(bool (*fn)(const struct symsearch *arr,
 
 	module_assert_mutex_or_preempt();
 
+    //首先在内核模块中查找
 	if (each_symbol_in_section(arr, ARRAY_SIZE(arr), NULL, fn, data))
 		return true;
 
+    //然后在各个module中查找
 	list_for_each_entry_rcu(mod, &modules, list) {
 		struct symsearch arr[] = {
 			{ mod->syms, mod->syms + mod->num_syms, mod->crcs,
@@ -529,6 +557,12 @@ static bool check_symbol(const struct symsearch *syms,
 	return true;
 }
 
+/*
+ * SYSCALL_DEFINE3(init_module)
+ *  load_module()
+ *   simplify_symbols()
+ *    kernel_symbol_value()
+ */
 static unsigned long kernel_symbol_value(const struct kernel_symbol *sym)
 {
 #ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
@@ -555,6 +589,16 @@ static int cmp_name(const void *va, const void *vb)
 	return strcmp(a, kernel_symbol_name(b));
 }
 
+/*
+ * SYSCALL_DEFINE3(init_module)
+ *  load_module()
+ *   complete_formation()
+ *    verify_export_symbols()
+ *     find_symbol()
+ *      each_symbol_section(fn == find_symbol_in_section)
+ *       each_symbol_in_section(fn == find_symbol_in_section)
+ *        find_symbol_in_section()
+ */
 static bool find_symbol_in_section(const struct symsearch *syms,
 				   struct module *owner,
 				   void *data)
@@ -562,6 +606,7 @@ static bool find_symbol_in_section(const struct symsearch *syms,
 	struct find_symbol_arg *fsa = data;
 	struct kernel_symbol *sym;
 
+    //折半查找
 	sym = bsearch(fsa->name, syms->start, syms->stop - syms->start,
 			sizeof(struct kernel_symbol), cmp_name);
 
@@ -572,7 +617,22 @@ static bool find_symbol_in_section(const struct symsearch *syms,
 }
 
 /* Find a symbol and return it, along with, (optional) crc and
- * (optional) module which owns it.  Needs preempt disabled or module_mutex. */
+ * (optional) module which owns it.  Needs preempt disabled or module_mutex. 
+ *
+ *
+ * SYSCALL_DEFINE3(init_module)
+ *  load_module()
+ *   complete_formation()
+ *    verify_export_symbols()
+ *     find_symbol()
+ *
+ * SYSCALL_DEFINE3(init_module)
+ *  load_module()
+ *   simplify_symbols()
+ *    resolve_symbol_wait()
+ *     resolve_symbol()
+ *      find_symbol()
+ */
 const struct kernel_symbol *find_symbol(const char *name,
 					struct module **owner,
 					const s32 **crc,
@@ -1379,7 +1439,15 @@ static inline int same_magic(const char *amagic, const char *bmagic,
 }
 #endif /* CONFIG_MODVERSIONS */
 
-/* Resolve a symbol for this module.  I.e. if we find one, record usage. */
+/*
+ * Resolve a symbol for this module.  I.e. if we find one, record usage. 
+ *
+ * SYSCALL_DEFINE3(init_module)
+ *  load_module()
+ *   simplify_symbols()
+ *    resolve_symbol_wait()
+ *     resolve_symbol()
+ */
 static const struct kernel_symbol *resolve_symbol(struct module *mod,
 						  const struct load_info *info,
 						  const char *name,
@@ -1397,6 +1465,7 @@ static const struct kernel_symbol *resolve_symbol(struct module *mod,
 	 */
 	sched_annotate_sleep();
 	mutex_lock(&module_mutex);
+	
 	sym = find_symbol(name, &owner, &crc,
 			  !(mod->taints & (1 << TAINT_PROPRIETARY_MODULE)), true);
 	if (!sym)
@@ -1421,6 +1490,12 @@ unlock:
 	return sym;
 }
 
+/*
+ * SYSCALL_DEFINE3(init_module)
+ *  load_module()
+ *   simplify_symbols()
+ *    resolve_symbol_wait()
+ */
 static const struct kernel_symbol *
 resolve_symbol_wait(struct module *mod,
 		    const struct load_info *info,
@@ -2197,6 +2272,11 @@ EXPORT_SYMBOL_GPL(__symbol_get);
  * in the kernel or in some other module's exported symbol table.
  *
  * You must hold the module_mutex.
+ *
+ * SYSCALL_DEFINE3(init_module)
+ *  load_module()
+ *   complete_formation()
+ *    verify_export_symbols()
  */
 static int verify_export_symbols(struct module *mod)
 {
@@ -2231,10 +2311,18 @@ static int verify_export_symbols(struct module *mod)
 	return 0;
 }
 
-/* Change all symbols so that st_value encodes the pointer directly. */
+/* Change all symbols so that st_value encodes the pointer directly. 
+ *
+ * SYSCALL_DEFINE3(init_module)
+ *  load_module()
+ *   simplify_symbols()
+ *
+ */
 static int simplify_symbols(struct module *mod, const struct load_info *info)
 {
+    //找到symbol table section header
 	Elf_Shdr *symsec = &info->sechdrs[info->index.sym];
+    //找到symbol table section
 	Elf_Sym *sym = (void *)symsec->sh_addr;
 	unsigned long secbase;
 	unsigned int i;
@@ -2299,6 +2387,14 @@ static int simplify_symbols(struct module *mod, const struct load_info *info)
 	return ret;
 }
 
+/*
+ * SYSCALL_DEFINE3(init_module)
+ *  load_module()
+ *   apply_relocations()
+ *
+ *
+ * 对导出符号进行relocation
+ */
 static int apply_relocations(struct module *mod, const struct load_info *info)
 {
 	unsigned int i;
@@ -2320,12 +2416,15 @@ static int apply_relocations(struct module *mod, const struct load_info *info)
 		if (info->sechdrs[i].sh_flags & SHF_RELA_LIVEPATCH)
 			continue;
 
+        //下面两类是需要relocate的
 		if (info->sechdrs[i].sh_type == SHT_REL)
 			err = apply_relocate(info->sechdrs, info->strtab,
 					     info->index.sym, i, mod);
+		
 		else if (info->sechdrs[i].sh_type == SHT_RELA)
 			err = apply_relocate_add(info->sechdrs, info->strtab,
 						 info->index.sym, i, mod);
+		
 		if (err < 0)
 			break;
 	}
@@ -3576,6 +3675,11 @@ out_unlocked:
 	return err;
 }
 
+/*
+ * SYSCALL_DEFINE3(init_module)
+ *  load_module()
+ *   complete_formation()
+ */
 static int complete_formation(struct module *mod, struct load_info *info)
 {
 	int err;
@@ -3638,7 +3742,11 @@ static int unknown_module_param_cb(char *param, char *val, const char *modname,
 }
 
 /* Allocate and load the module: note that size of section 0 is always
-   zero, and we rely on this for optional sections. */
+ * zero, and we rely on this for optional sections. 
+ *
+ * SYSCALL_DEFINE3(init_module)
+ *  load_module()
+ */
 static int load_module(struct load_info *info, const char __user *uargs,
 		       int flags)
 {
@@ -3722,11 +3830,15 @@ static int load_module(struct load_info *info, const char __user *uargs,
 	/* Set up MODINFO_ATTR fields */
 	setup_modinfo(mod, info);
 
-	/* Fix up syms, so that st_value is a pointer to location. */
+	/* Fix up syms, so that st_value is a pointer to location. 
+	 *
+	 * 确定使用的导入符号的位置
+	 */
 	err = simplify_symbols(mod, info);
 	if (err < 0)
 		goto free_modinfo;
 
+    // 导出符号重定位
 	err = apply_relocations(mod, info);
 	if (err < 0)
 		goto free_modinfo;
