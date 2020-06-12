@@ -148,9 +148,20 @@ static inline void *irq_desc_get_handler_data(struct irq_desc *desc)
 /*
  * Architectures call this to let the generic IRQ layer
  * handle an interrupt.
+ *
+ * do_IRQ()
+ *  handle_irq() [irq_32.c]
+ *   generic_handle_irq_desc()
+ *
+ * do_IRQ()
+ *  handle_irq() [irq_64.c]
+ *   generic_handle_irq_desc()
  */
 static inline void generic_handle_irq_desc(struct irq_desc *desc)
 {
+    /*
+     * handle_level_irq()或者 handle_edge_irq()
+     */
 	desc->handle_irq(desc);
 }
 

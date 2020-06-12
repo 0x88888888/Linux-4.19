@@ -394,6 +394,10 @@ static inline void set_store_user_dirty(struct kmem_cache *cachep) {}
 static int slab_max_order = SLAB_MAX_ORDER_LO;
 static bool slab_max_order_set __initdata;
 
+/*
+ * kfree()
+ *  virt_to_cache()
+ */
 static inline struct kmem_cache *virt_to_cache(const void *obj)
 {
 	struct page *page = virt_to_head_page(obj);
@@ -3806,10 +3810,13 @@ void kfree(const void *objp)
 		return;
 	local_irq_save(flags);
 	kfree_debugcheck(objp);
+	//本兑现所属的page所在的kmem_cache对象
 	c = virt_to_cache(objp);
 	debug_check_no_locks_freed(objp, c->object_size);
 
 	debug_check_no_obj_freed(objp, c->object_size);
+
+	//归还objp到所属的kmem_cache对象中的slab上去
 	__cache_free(c, (void *)objp, _RET_IP_);
 	local_irq_restore(flags);
 }

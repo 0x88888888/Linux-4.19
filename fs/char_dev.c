@@ -379,8 +379,17 @@ void cdev_put(struct cdev *p)
 
 /*
  * Called every time a character special file is opened
+ *
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ *    path_openat()
+ *     do_o_path()
+ *      vfs_open()
+ *       do_dentry_open()
+ *        chrdev_open()
  */
-static int chrdev_open(struct inode *inode, struct file *filp)
+static int chrdev_open(struct inode  *inode, struct file *filp)
 {
 	const struct file_operations *fops;
 	struct cdev *p;
@@ -393,9 +402,11 @@ static int chrdev_open(struct inode *inode, struct file *filp)
 		struct kobject *kobj;
 		int idx;
 		spin_unlock(&cdev_lock);
+		//在cdev_map中查找cdev对象
 		kobj = kobj_lookup(cdev_map, inode->i_rdev, &idx);
 		if (!kobj)
 			return -ENXIO;
+		//类型转换
 		new = container_of(kobj, struct cdev, kobj);
 		spin_lock(&cdev_lock);
 		/* Check i_cdev again in case somebody beat us to it while
@@ -415,11 +426,16 @@ static int chrdev_open(struct inode *inode, struct file *filp)
 		return ret;
 
 	ret = -ENXIO;
+	//得到cdev->ops,这些函数对象就一定是在驱动程序中定义的
 	fops = fops_get(p->ops);
 	if (!fops)
 		goto out_cdev_put;
 
 	replace_fops(filp, fops);
+	/*
+	 * 字符设备 hpet_fops->open == hpet_open
+	 *          memory_fops->open == memory_open
+	 */
 	if (filp->f_op->open) {
 		ret = filp->f_op->open(inode, filp);
 		if (ret)

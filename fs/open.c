@@ -713,6 +713,15 @@ SYSCALL_DEFINE3(fchown, unsigned int, fd, uid_t, user, gid_t, group)
 	return ksys_fchown(fd, user, group);
 }
 
+/*
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ *    path_openat()
+ *     do_o_path()
+ *      vfs_open()
+ *       do_dentry_open()
+ */
 static int do_dentry_open(struct file *f,
 			  struct inode *inode,
 			  int (*open)(struct inode *, struct file *))
@@ -749,6 +758,9 @@ static int do_dentry_open(struct file *f,
 	if (S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode))
 		f->f_mode |= FMODE_ATOMIC_POS;
 
+    /*
+     * 从inode的file_operations设置file的file_operations
+     */
 	f->f_op = fops_get(inode->i_fop);
 	if (unlikely(WARN_ON(!f->f_op))) {
 		error = -ENODEV;
@@ -765,13 +777,23 @@ static int do_dentry_open(struct file *f,
 
 	/* normally all 3 are set; ->open() can clear them if needed */
 	f->f_mode |= FMODE_LSEEK | FMODE_PREAD | FMODE_PWRITE;
+	/*
+	 * 确定open函数，然后call it
+	 * ext2_file_operations->open == dquot_file_open
+	 * shmem_file_operations->open == NULL
+	 * def_chr_fops->open == chrdev_open
+	 * def_blk_fops->open == blkdev_open
+	 *
+	 */
 	if (!open)
 		open = f->f_op->open;
+	
 	if (open) {
 		error = open(inode, f);
 		if (error)
 			goto cleanup_all;
 	}
+	
 	f->f_mode |= FMODE_OPENED;
 	if ((f->f_mode & (FMODE_READ | FMODE_WRITE)) == FMODE_READ)
 		i_readcount_inc(inode);
@@ -873,6 +895,13 @@ EXPORT_SYMBOL(file_path);
  * @path: path to open
  * @file: newly allocated file with f_flag initialized
  * @cred: credentials to use
+ *
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ *    path_openat()
+ *     do_o_path()
+ *      vfs_open()
  */
 int vfs_open(const struct path *path, struct file *file)
 {

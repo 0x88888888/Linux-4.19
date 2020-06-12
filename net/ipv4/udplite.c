@@ -108,6 +108,10 @@ static inline int udplite4_proc_init(void)
 }
 #endif
 
+/*
+ * inet_init()
+ *  udplite4_register()
+ */
 void __init udplite4_register(void)
 {
 	udp_table_init(&udplite_table, "UDP-Lite");

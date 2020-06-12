@@ -87,6 +87,9 @@ static int rcu_qsctr_help(struct rcu_ctrlblk *rcp)
  * Record an rcu quiescent state.  And an rcu_bh quiescent state while we
  * are at it, given that any rcu quiescent state is also an rcu_bh
  * quiescent state.  Use "+" instead of "||" to defeat short circuiting.
+ *
+ * rcu_check_callbacks()
+ *  rcu_sched_qs()
  */
 void rcu_sched_qs(void)
 {
@@ -96,11 +99,19 @@ void rcu_sched_qs(void)
 	if (rcu_qsctr_help(&rcu_sched_ctrlblk) +
 	    rcu_qsctr_help(&rcu_bh_ctrlblk))
 		raise_softirq(RCU_SOFTIRQ);
+	
 	local_irq_restore(flags);
 }
 
 /*
  * Record an rcu_bh quiescent state.
+ *
+ * do_IRQ()
+ *  exiting_irq()
+ *   irq_exit()
+ *    invoke_softirq()
+ *     __do_softirq()
+ *      rcu_bh_qs()  [tiny.c]
  */
 void rcu_bh_qs(void)
 {
@@ -109,6 +120,7 @@ void rcu_bh_qs(void)
 	local_irq_save(flags);
 	if (rcu_qsctr_help(&rcu_bh_ctrlblk))
 		raise_softirq(RCU_SOFTIRQ);
+	
 	local_irq_restore(flags);
 }
 
@@ -117,11 +129,31 @@ void rcu_bh_qs(void)
  * quiescent state, and, if so, tell RCU about it.  This function must
  * be called from hardirq context.  It is normally called from the
  * scheduling-clock interrupt.
+ *
+ * tick_handle_periodic()
+ *  tick_periodic() [tick-common.c]
+ *   update_process_times()
+ *    rcu_check_callbacks()
+ *
+ * tick_sched_handle() [tick-sched.c]
+ *  update_process_times()
+ *   rcu_check_callbacks()
+ *
+ * timer_tick()    [arch\arm\kernel\time.c]
+ *  update_process_times()
+ *   rcu_check_callbacks()
+ *
+ * 设置RCU_SOFTIRQ软中断
  */
 void rcu_check_callbacks(int user)
 {
-	if (user)
+	if (user) /*在用户态上下文，说明已经发生过抢占*/
 		rcu_sched_qs();
+
+	/*
+	 * 仅仅针对使用rcu_read_lock_bh类型的rcu，不在softirq，
+     * 说明已经不在read_lock关键区域
+     */
 	if (user || !in_softirq())
 		rcu_bh_qs();
 }
@@ -129,6 +161,10 @@ void rcu_check_callbacks(int user)
 /*
  * Invoke the RCU callbacks on the specified rcu_ctrlkblk structure
  * whose grace period has elapsed.
+ *
+ * rcu_process_callbacks() [RCU_SOFTIRQ软中断处理函数]
+ *  __rcu_process_callbacks()
+ *
  */
 static void __rcu_process_callbacks(struct rcu_ctrlblk *rcp)
 {
@@ -142,11 +178,13 @@ static void __rcu_process_callbacks(struct rcu_ctrlblk *rcp)
 		local_irq_restore(flags);
 		return;
 	}
+	
 	list = rcp->rcucblist;
 	rcp->rcucblist = *rcp->donetail;
 	*rcp->donetail = NULL;
 	if (rcp->curtail == rcp->donetail)
 		rcp->curtail = &rcp->rcucblist;
+	
 	rcp->donetail = &rcp->rcucblist;
 	local_irq_restore(flags);
 
@@ -162,6 +200,10 @@ static void __rcu_process_callbacks(struct rcu_ctrlblk *rcp)
 	}
 }
 
+/*
+ * rcu_process_callbacks() [RCU_SOFTIRQ软中断处理函数]
+ *
+ */
 static __latent_entropy void rcu_process_callbacks(struct softirq_action *unused)
 {
 	__rcu_process_callbacks(&rcu_sched_ctrlblk);
@@ -177,6 +219,9 @@ static __latent_entropy void rcu_process_callbacks(struct softirq_action *unused
  * benefits of doing might_sleep() to reduce latency.)
  *
  * Cool, huh?  (Due to Josh Triplett.)
+ *
+ * synchronize_rcu()
+ *  synchronize_sched()
  */
 void synchronize_sched(void)
 {
@@ -189,6 +234,9 @@ EXPORT_SYMBOL_GPL(synchronize_sched);
 
 /*
  * Helper function for call_rcu() and call_rcu_bh().
+ *
+ * call_rcu_sched()
+ *  __call_rcu()
  */
 static void __call_rcu(struct rcu_head *head,
 		       rcu_callback_t func,

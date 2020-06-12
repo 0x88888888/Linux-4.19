@@ -149,6 +149,8 @@ void clear_lock_stats(struct lock_class *class);
 /*
  * Map the lock object (the lock instance) to the lock-class object.
  * This is embedded into specific lock instances:
+ *
+ * 用于死锁检测 
  */
 struct lockdep_map {
 	struct lock_class_key		*key;

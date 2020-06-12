@@ -41,7 +41,11 @@ struct srcu_data {
 
 	/* Update-side state. */
 	spinlock_t __private lock ____cacheline_internodealigned_in_smp;
+	/*
+	 * 回收对象的时候调用srcu_cblist中的函数
+	 */
 	struct rcu_segcblist srcu_cblist;	/* List of callbacks.*/
+	
 	unsigned long srcu_gp_seq_needed;	/* Furthest future GP needed. */
 	unsigned long srcu_gp_seq_needed_exp;	/* Furthest future exp GP. */
 	bool srcu_cblist_invoking;		/* Invoking these CBs? */

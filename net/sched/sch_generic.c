@@ -134,7 +134,20 @@ static inline int __dev_requeue_skb(struct sk_buff *skb, struct Qdisc *q)
 
 	return 0;
 }
-
+/*
+ * do_IRQ()
+ *  exiting_irq()
+ *   irq_exit()
+ *    invoke_softirq()
+ *     __do_softirq()
+ *      net_tx_action()
+ *       qdisc_run()
+ *        __qdisc_run()
+ *         qdisc_restart()
+ *          sch_direct_xmit()
+ *           dev_requeue_skb()
+ *            dev_requeue_skb_locked()
+ */
 static inline int dev_requeue_skb_locked(struct sk_buff *skb, struct Qdisc *q)
 {
 	spinlock_t *lock = qdisc_lock(q);
@@ -153,11 +166,25 @@ static inline int dev_requeue_skb_locked(struct sk_buff *skb, struct Qdisc *q)
 	}
 	spin_unlock(lock);
 
+    //重新启动 NET_TX_SOFTIRQ
 	__netif_schedule(q);
 
 	return 0;
 }
 
+/*
+ * do_IRQ()
+ *  exiting_irq()
+ *   irq_exit()
+ *    invoke_softirq()
+ *     __do_softirq()
+ *      net_tx_action()
+ *       qdisc_run()
+ *        __qdisc_run()
+ *         qdisc_restart()
+ *          sch_direct_xmit()
+ *           dev_requeue_skb()
+ */
 static inline int dev_requeue_skb(struct sk_buff *skb, struct Qdisc *q)
 {
 	if (q->flags & TCQ_F_NOLOCK)
@@ -295,6 +322,17 @@ trace:
  * Returns to the caller:
  *				false  - hardware queue frozen backoff
  *				true   - feel free to send more pkts
+ *
+ * do_IRQ()
+ *  exiting_irq()
+ *   irq_exit()
+ *    invoke_softirq()
+ *     __do_softirq()
+ *      net_tx_action()
+ *       qdisc_run()
+ *        __qdisc_run()
+ *         qdisc_restart()
+ *          sch_direct_xmit()
  */
 bool sch_direct_xmit(struct sk_buff *skb, struct Qdisc *q,
 		     struct net_device *dev, struct netdev_queue *txq,
@@ -367,6 +405,15 @@ bool sch_direct_xmit(struct sk_buff *skb, struct Qdisc *q,
  *				0  - queue is empty or throttled.
  *				>0 - queue is not empty.
  *
+ * do_IRQ()
+ *  exiting_irq()
+ *   irq_exit()
+ *    invoke_softirq()
+ *     __do_softirq()
+ *      net_tx_action()
+ *       qdisc_run()
+ *        __qdisc_run()
+ *         qdisc_restart()
  */
 static inline bool qdisc_restart(struct Qdisc *q, int *packets)
 {
@@ -390,6 +437,16 @@ static inline bool qdisc_restart(struct Qdisc *q, int *packets)
 	return sch_direct_xmit(skb, q, dev, txq, root_lock, validate);
 }
 
+/*
+ * do_IRQ()
+ *  exiting_irq()
+ *   irq_exit()
+ *    invoke_softirq()
+ *     __do_softirq()
+ *      net_tx_action()
+ *       qdisc_run()
+ *        __qdisc_run()
+ */
 void __qdisc_run(struct Qdisc *q)
 {
 	int quota = dev_tx_weight;

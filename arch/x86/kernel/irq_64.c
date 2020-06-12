@@ -68,6 +68,10 @@ static inline void stack_overflow_check(struct pt_regs *regs)
 #endif
 }
 
+/*
+ * do_IRQ()
+ *  handle_irq() [irq_64.c]
+ */
 bool handle_irq(struct irq_desc *desc, struct pt_regs *regs)
 {
 	stack_overflow_check(regs);

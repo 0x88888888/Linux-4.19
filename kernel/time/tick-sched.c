@@ -1000,6 +1000,12 @@ void tick_nohz_idle_enter(void)
  * a reschedule, it may still add, modify or delete a timer, enqueue
  * an RCU callback, etc...
  * So we need to re-calculate and reprogram the next tick event.
+ *
+ * do_IRQ()
+ *  exiting_irq()
+ *   irq_exit()
+ *    tick_irq_exit()
+ *     tick_nohz_irq_exit()
  */
 void tick_nohz_irq_exit(void)
 {
@@ -1242,6 +1248,11 @@ static inline void tick_nohz_activate(struct tick_sched *ts, int mode) { }
 
 /*
  * Called from irq_enter to notify about the possible interruption of idle()
+ *
+ * do_IRQ()
+ *  entering_irq()
+ *   irq_enter()
+ *    tick_irq_enter()
  */
 void tick_irq_enter(void)
 {

@@ -233,9 +233,12 @@ __visible unsigned int __irq_entry do_IRQ(struct pt_regs *regs)
 {
 	struct pt_regs *old_regs = set_irq_regs(regs);
 	struct irq_desc * desc;
-	/* high bit used in ret_from_ code  */
+	/* high bit used in ret_from_ code  
+	 * 中断号
+	 */
 	unsigned vector = ~regs->orig_ax;
 
+    // 中断的上半部，在关中断的情况下处理
 	entering_irq();
 
 	/* entering_irq() tells RCU that we're not quiescent.  Check it. */
@@ -255,6 +258,7 @@ __visible unsigned int __irq_entry do_IRQ(struct pt_regs *regs)
 		}
 	}
 
+    //中断的下半部，在开中断的情况下处理
 	exiting_irq();
 
 	set_irq_regs(old_regs);

@@ -624,9 +624,14 @@ static inline void rcu_preempt_sleep_check(void) { }
  */
 static inline void rcu_read_lock(void)
 {
+    //关闭内核抢占
 	__rcu_read_lock();
+	//空
 	__acquire(RCU);
+	//空
 	rcu_lock_acquire(&rcu_lock_map);
+
+	//空
 	RCU_LOCKDEP_WARN(!rcu_is_watching(),
 			 "rcu_read_lock() used illegally while idle");
 }
@@ -679,6 +684,7 @@ static inline void rcu_read_unlock(void)
 	RCU_LOCKDEP_WARN(!rcu_is_watching(),
 			 "rcu_read_unlock() used illegally while idle");
 	__release(RCU);
+	//打开内核抢占
 	__rcu_read_unlock();
 	rcu_lock_release(&rcu_lock_map); /* Keep acq info for rls diags. */
 }

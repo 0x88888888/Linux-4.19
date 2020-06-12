@@ -246,6 +246,13 @@ static inline bool lockdep_softirq_start(void) { return false; }
 static inline void lockdep_softirq_end(bool in_hardirq) { }
 #endif
 
+/*
+ * do_IRQ()
+ *  exiting_irq()
+ *   irq_exit()
+ *    invoke_softirq()
+ *     __do_softirq()
+ */
 asmlinkage __visible void __softirq_entry __do_softirq(void)
 {
 	unsigned long end = jiffies + MAX_SOFTIRQ_TIME;
@@ -263,6 +270,7 @@ asmlinkage __visible void __softirq_entry __do_softirq(void)
 	 */
 	current->flags &= ~PF_MEMALLOC;
 
+    //取出当前需要处理的软中断
 	pending = local_softirq_pending();
 	account_irq_enter_time(current);
 
@@ -277,6 +285,7 @@ restart:
 
 	h = softirq_vec;
 
+    //处理软中断
 	while ((softirq_bit = ffs(pending))) {
 		unsigned int vec_nr;
 		int prev_count;
@@ -289,6 +298,17 @@ restart:
 		kstat_incr_softirqs_this_cpu(vec_nr);
 
 		trace_softirq_entry(vec_nr);
+
+		/*
+		 * tasklet_hi_action
+         * run_timer_softirq
+         * net_tx_action
+         * net_rx_action
+         * blk_done_softirq
+         * irq_poll_softirq
+         * run_rebalance_domains
+         * rcu_process_callbacks
+         */
 		h->action(h);
 		trace_softirq_exit(vec_nr);
 		if (unlikely(prev_count != preempt_count())) {
@@ -301,15 +321,19 @@ restart:
 		pending >>= softirq_bit;
 	}
 
+    /*
+     * 如果是tiny rcu，可能会启动 RCU_SOFTIRQ
+     */
 	rcu_bh_qs();
 	local_irq_disable();
 
+    //在上面处理软中断的时候，因为硬件中断，又添加进来软中断需要处理了
 	pending = local_softirq_pending();
 	if (pending) {
 		if (time_before(jiffies, end) && !need_resched() &&
 		    --max_restart)
 			goto restart;
-
+        // 唤醒ksoftirqd进程
 		wakeup_softirqd();
 	}
 
@@ -340,6 +364,10 @@ asmlinkage __visible void do_softirq(void)
 
 /*
  * Enter an interrupt context.
+ *
+ * do_IRQ()
+ *  entering_irq()
+ *   irq_enter()
  */
 void irq_enter(void)
 {
@@ -350,6 +378,10 @@ void irq_enter(void)
 		 * here, as softirq will be serviced on return from interrupt.
 		 */
 		local_bh_disable();
+		/*
+		 * 如果配置了CONFIG_TICK_ONESHOT,则为空函数
+         * 否则有实现
+		 */
 		tick_irq_enter();
 		_local_bh_enable();
 	}
@@ -357,6 +389,12 @@ void irq_enter(void)
 	__irq_enter();
 }
 
+/*
+ * do_IRQ()
+ *  exiting_irq()
+ *   irq_exit()
+ *    invoke_softirq()
+ */
 static inline void invoke_softirq(void)
 {
 	if (ksoftirqd_running(local_softirq_pending()))
@@ -383,6 +421,12 @@ static inline void invoke_softirq(void)
 	}
 }
 
+/*
+ * do_IRQ()
+ *  exiting_irq()
+ *   irq_exit()
+ *    tick_irq_exit()
+ */
 static inline void tick_irq_exit(void)
 {
 #ifdef CONFIG_NO_HZ_COMMON
@@ -398,6 +442,10 @@ static inline void tick_irq_exit(void)
 
 /*
  * Exit an interrupt context. Process softirqs if needed and possible:
+ *
+ * do_IRQ()
+ *  exiting_irq()
+ *   irq_exit()
  */
 void irq_exit(void)
 {
@@ -406,13 +454,20 @@ void irq_exit(void)
 #else
 	lockdep_assert_irqs_disabled();
 #endif
+
 	account_irq_exit_time(current);
+    //结束中断处理上半部分
 	preempt_count_sub(HARDIRQ_OFFSET);
+	/*
+	 * 不在中断处理上半部分和下半部分，也是要在不可抢占内核的状态
+	 * 并且要有软中断等待处理
+	 */
 	if (!in_interrupt() && local_softirq_pending())
-		invoke_softirq();
+		invoke_softirq(); //调用软中断
 
 	tick_irq_exit();
 	rcu_irq_exit();
+	
 	trace_hardirq_exit(); /* must be last! */
 }
 
@@ -497,6 +552,15 @@ void __tasklet_hi_schedule(struct tasklet_struct *t)
 }
 EXPORT_SYMBOL(__tasklet_hi_schedule);
 
+/*
+ * do_IRQ()
+ *  exiting_irq()
+ *   irq_exit()
+ *    invoke_softirq()
+ *     __do_softirq()
+ *      tasklet_hi_action()
+ *       tasklet_action_common()
+ */
 static void tasklet_action_common(struct softirq_action *a,
 				  struct tasklet_head *tl_head,
 				  unsigned int softirq_nr)
@@ -540,6 +604,14 @@ static __latent_entropy void tasklet_action(struct softirq_action *a)
 	tasklet_action_common(a, this_cpu_ptr(&tasklet_vec), TASKLET_SOFTIRQ);
 }
 
+/*
+ * do_IRQ()
+ *  exiting_irq()
+ *   irq_exit()
+ *    invoke_softirq()
+ *     __do_softirq()
+ *      tasklet_hi_action()
+ */
 static __latent_entropy void tasklet_hi_action(struct softirq_action *a)
 {
 	tasklet_action_common(a, this_cpu_ptr(&tasklet_hi_vec), HI_SOFTIRQ);

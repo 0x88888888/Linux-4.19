@@ -653,6 +653,11 @@ static inline int page_trans_huge_mapcount(struct page *page,
 }
 #endif
 
+/*
+ * kfree()
+ *  virt_to_cache()
+ *   virt_to_head_page()
+ */
 static inline struct page *virt_to_head_page(const void *x)
 {
 	struct page *page = virt_to_page(x);

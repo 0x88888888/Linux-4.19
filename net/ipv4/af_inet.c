@@ -125,6 +125,9 @@
 
 /* The inetsw table contains everything that inet_create needs to
  * build a new socket.
+ *
+ * inet_init() 通过循环调用inet_register_protosw()
+ * 将inetsw_array[]中注册到inetsw
  */
 static struct list_head inetsw[SOCK_MAX];
 static DEFINE_SPINLOCK(inetsw_lock);
@@ -242,8 +245,13 @@ EXPORT_SYMBOL(inet_listen);
 
 /*
  *	Create an inet socket.
+ *
+ * SYSCALL_DEFINE3(socket)
+ *  __sys_socket()
+ *   sock_create()
+ *    __sock_create()
+ *     inet_create()
  */
-
 static int inet_create(struct net *net, struct socket *sock, int protocol,
 		       int kern)
 {
@@ -1117,6 +1125,12 @@ static struct inet_protosw inetsw_array[] =
 
 #define INETSW_ARRAY_LEN ARRAY_SIZE(inetsw_array)
 
+/*
+ * inet_init() 通过循环将inetsw_array[]中注册到inetsw
+ *  inet_register_protosw()
+ *
+ * 将p注册到inetsw[]
+ */
 void inet_register_protosw(struct inet_protosw *p)
 {
 	struct list_head *lh;
@@ -1131,11 +1145,13 @@ void inet_register_protosw(struct inet_protosw *p)
 
 	/* If we are trying to override a permanent protocol, bail. */
 	last_perm = &inetsw[p->type];
+	
 	list_for_each(lh, &inetsw[p->type]) {
 		answer = list_entry(lh, struct inet_protosw, list);
 		/* Check only the non-wild match. */
 		if ((INET_PROTOSW_PERMANENT & answer->flags) == 0)
 			break;
+		
 		if (protocol == answer->protocol)
 			goto out_permanent;
 		last_perm = lh;
@@ -1146,6 +1162,8 @@ void inet_register_protosw(struct inet_protosw *p)
 	 * a wild-card protocol. But it is allowed to override any existing
 	 * non-permanent entry.  This means that when we remove this entry, the
 	 * system automatically returns to the old behavior.
+	 *
+	 * 挂载到inetsw[p->type] 链表上去
 	 */
 	list_add_rcu(&p->list, last_perm);
 out:

@@ -2695,6 +2695,24 @@ int netif_get_num_default_rss_queues(void)
 }
 EXPORT_SYMBOL(netif_get_num_default_rss_queues);
 
+/*
+ * do_IRQ()
+ *  exiting_irq()
+ *   irq_exit()
+ *    invoke_softirq()
+ *     __do_softirq()
+ *      net_tx_action()
+ *       qdisc_run()
+ *        __qdisc_run()
+ *         qdisc_restart()
+ *          sch_direct_xmit()
+ *           dev_requeue_skb()
+ *            dev_requeue_skb_locked()
+ *             __netif_schedule()
+ *              __netif_reschedule()
+ *
+ * 重新启动 NET_TX_SOFTIRQ 软中断
+ */
 static void __netif_reschedule(struct Qdisc *q)
 {
 	struct softnet_data *sd;
@@ -2709,6 +2727,21 @@ static void __netif_reschedule(struct Qdisc *q)
 	local_irq_restore(flags);
 }
 
+/*
+ * do_IRQ()
+ *  exiting_irq()
+ *   irq_exit()
+ *    invoke_softirq()
+ *     __do_softirq()
+ *      net_tx_action()
+ *       qdisc_run()
+ *        __qdisc_run()
+ *         qdisc_restart()
+ *          sch_direct_xmit()
+ *           dev_requeue_skb()
+ *            dev_requeue_skb_locked()
+ *             __netif_schedule()
+ */
 void __netif_schedule(struct Qdisc *q)
 {
 	if (!test_and_set_bit(__QDISC_STATE_SCHED, &q->state))
@@ -4514,6 +4547,14 @@ int netif_rx_ni(struct sk_buff *skb)
 }
 EXPORT_SYMBOL(netif_rx_ni);
 
+/*
+ * do_IRQ()
+ *  exiting_irq()
+ *   irq_exit()
+ *    invoke_softirq()
+ *     __do_softirq()
+ *      net_tx_action()
+ */
 static __latent_entropy void net_tx_action(struct softirq_action *h)
 {
 	struct softnet_data *sd = this_cpu_ptr(&softnet_data);

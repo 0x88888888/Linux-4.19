@@ -1044,6 +1044,12 @@ static inline void sk_prot_clear_nulls(struct sock *sk, int size)
 
 /* Networking protocol blocks we attach to sockets.
  * socket layer -> transport layer interface
+ *
+ * tcp_prot, udp_prot,
+ * raw_prot, ping_prot
+ *
+ * 通过proto_register()注册到proto_list
+ * 
  */
 struct proto {
 	void			(*close)(struct sock *sk,

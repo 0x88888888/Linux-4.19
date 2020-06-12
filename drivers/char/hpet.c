@@ -257,6 +257,17 @@ static void hpet_timer_set_irq(struct hpet_dev *devp)
 	return;
 }
 
+/*
+ * SYSCALL_DEFINE3(open)
+ *  do_sys_open()
+ *   do_filp_open()
+ *    path_openat()
+ *     do_o_path()
+ *      vfs_open()
+ *       do_dentry_open()
+ *        chrdev_open()
+ *         hpet_open()
+ */
 static int hpet_open(struct inode *inode, struct file *file)
 {
 	struct hpet_dev *devp;

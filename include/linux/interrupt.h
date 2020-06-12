@@ -462,17 +462,17 @@ extern bool force_irqthreads;
 
 enum
 {
-	HI_SOFTIRQ=0,
-	TIMER_SOFTIRQ,
-	NET_TX_SOFTIRQ,
-	NET_RX_SOFTIRQ,
-	BLOCK_SOFTIRQ,
-	IRQ_POLL_SOFTIRQ,
-	TASKLET_SOFTIRQ,
-	SCHED_SOFTIRQ,
+	HI_SOFTIRQ=0,     /* tasklet_hi_action */
+	TIMER_SOFTIRQ,    /* run_timer_softirq */
+	NET_TX_SOFTIRQ,   /* net_tx_action */
+	NET_RX_SOFTIRQ,   /* net_rx_action */
+	BLOCK_SOFTIRQ,    /* blk_done_softirq */
+	IRQ_POLL_SOFTIRQ, /* irq_poll_softirq */
+	TASKLET_SOFTIRQ,  /* tasklet_action */
+	SCHED_SOFTIRQ,    /* run_rebalance_domains */
 	HRTIMER_SOFTIRQ, /* Unused, but kept as tools rely on the
 			    numbering. Sigh! */
-	RCU_SOFTIRQ,    /* Preferable RCU should always be the last softirq */
+	RCU_SOFTIRQ,     /* rcu_process_callbacks ,  Preferable RCU should always be the last softirq */
 
 	NR_SOFTIRQS
 };

@@ -512,6 +512,10 @@ static inline bool apic_id_is_primary_thread(unsigned int id) { return false; }
 extern void irq_enter(void);
 extern void irq_exit(void);
 
+/*
+ * do_IRQ()
+ *  entering_irq()
+ */
 static inline void entering_irq(void)
 {
 	irq_enter();
@@ -531,6 +535,10 @@ static inline void ipi_entering_ack_irq(void)
 	kvm_set_cpu_l1tf_flush_l1d();
 }
 
+/*
+ * do_IRQ()
+ *  exiting_irq()
+ */
 static inline void exiting_irq(void)
 {
 	irq_exit();

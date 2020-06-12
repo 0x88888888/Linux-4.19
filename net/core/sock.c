@@ -3252,6 +3252,18 @@ static int req_prot_init(const struct proto *prot)
 	return 0;
 }
 
+/*
+ * inet_init()
+ *  proto_register(prot== tcp_prot)
+ *  proto_register(prot== udp_prot)
+ *  proto_register(prot== raw_prot)
+ *  proto_register(prot== ping_prot)
+ *
+ * rawsock_init()
+ *  nfc_proto_register(nfc_protocol == rawsock_nfc_proto)
+ *   proto_register(prot== rawsock_proto)
+ *  
+ */
 int proto_register(struct proto *prot, int alloc_slab)
 {
 	if (alloc_slab) {

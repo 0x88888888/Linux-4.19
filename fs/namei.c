@@ -3634,6 +3634,7 @@ out:
 static int do_o_path(struct nameidata *nd, unsigned flags, struct file *file)
 {
 	struct path path;
+	//路径查找
 	int error = path_lookupat(nd, flags, &path);
 	if (!error) {
 		audit_inode(nd->name, path.dentry, 0);
@@ -3655,14 +3656,17 @@ static struct file *path_openat(struct nameidata *nd,
 	struct file *file;
 	int error;
 
+    //分配一个file对象
 	file = alloc_empty_file(op->open_flag, current_cred());
 	if (IS_ERR(file))
 		return file;
 
-	if (unlikely(file->f_flags & __O_TMPFILE)) {
+	if (unlikely(file->f_flags & __O_TMPFILE)) { //打开临时文件
 		error = do_tmpfile(nd, flags, op, file);
+		
 	} else if (unlikely(file->f_flags & O_PATH)) {
 		error = do_o_path(nd, flags, file);
+		
 	} else {
 		const char *s = path_init(nd, flags);
 		while (!(error = link_path_walk(s, nd)) &&
@@ -3673,12 +3677,14 @@ static struct file *path_openat(struct nameidata *nd,
 		}
 		terminate_walk(nd);
 	}
+	
 	if (likely(!error)) {
 		if (likely(file->f_mode & FMODE_OPENED))
 			return file;
 		WARN_ON(1);
 		error = -EINVAL;
 	}
+	
 	fput(file);
 	if (error == -EOPENSTALE) {
 		if (flags & LOOKUP_RCU)
@@ -3701,7 +3707,9 @@ struct file *do_filp_open(int dfd, struct filename *pathname,
 	int flags = op->lookup_flags;
 	struct file *filp;
 
+    //设置nd的一些值
 	set_nameidata(&nd, dfd, pathname);
+	
 	filp = path_openat(&nd, op, flags | LOOKUP_RCU);
 	
 	if (unlikely(filp == ERR_PTR(-ECHILD)))

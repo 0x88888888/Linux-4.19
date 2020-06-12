@@ -134,6 +134,15 @@ void __irq_wake_thread(struct irq_desc *desc, struct irqaction *action)
 	wake_up_process(action->thread);
 }
 
+/*
+ * do_IRQ()
+ *  handle_irq() [irq_64.c]
+ *   generic_handle_irq_desc()
+ *    handle_edge_irq()
+ *     handle_irq_event()
+ *      handle_irq_event_percpu()
+ *       __handle_irq_event_percpu()
+ */
 irqreturn_t __handle_irq_event_percpu(struct irq_desc *desc, unsigned int *flags)
 {
 	irqreturn_t retval = IRQ_NONE;
@@ -181,6 +190,14 @@ irqreturn_t __handle_irq_event_percpu(struct irq_desc *desc, unsigned int *flags
 	return retval;
 }
 
+/*
+ * do_IRQ()
+ *  handle_irq() [irq_64.c]
+ *   generic_handle_irq_desc()
+ *    handle_edge_irq()
+ *     handle_irq_event()
+ *      handle_irq_event_percpu()
+ */
 irqreturn_t handle_irq_event_percpu(struct irq_desc *desc)
 {
 	irqreturn_t retval;
@@ -195,6 +212,13 @@ irqreturn_t handle_irq_event_percpu(struct irq_desc *desc)
 	return retval;
 }
 
+/*
+ * do_IRQ()
+ *  handle_irq() [irq_64.c]
+ *   generic_handle_irq_desc()
+ *    handle_edge_irq()
+ *     handle_irq_event()
+ */
 irqreturn_t handle_irq_event(struct irq_desc *desc)
 {
 	irqreturn_t ret;

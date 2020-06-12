@@ -203,6 +203,22 @@ struct proto_ops {
 #define DECLARE_SOCKADDR(type, dst, src)	\
 	type dst = ({ __sockaddr_check_size(sizeof(*dst)); (type) src; })
 
+
+/*
+ * 所有的net_proto_family对象都在net_families[NPROTO]中
+ * 用sock_register将net_proto_family对象放到net_families中
+ *
+ * 对于不同的协议族，传输层的结构和实现有巨大的差异，因此其各自的套接口创建函数也有很大的差别。
+ * net_proto_family->create函数指针成员是用来屏蔽这些差别的。 
+ *
+ * PF_INET协议族对应的对象为 inet_family_ops
+ * PF_INET6协议族对应的对象为 inet6_family_ops
+ * PF_PACKET协议族对应的对象为 packet_family_ops
+ * PF_NETLINK协议族对应的对象为 netlink_family_ops
+ * PF_UNIX协议族对应的对象为 unix_family_ops
+ * 
+ * 在__sock_create()中会调用net_proto_family->create函数
+ */
 struct net_proto_family {
 	int		family;
 	int		(*create)(struct net *net, struct socket *sock,

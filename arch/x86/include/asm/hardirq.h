@@ -62,6 +62,11 @@ extern u64 arch_irq_stat(void);
 
 
 #if IS_ENABLED(CONFIG_KVM_INTEL)
+/*
+ * do_IRQ()
+ *  entering_irq()
+ *   kvm_set_cpu_l1tf_flush_l1d()
+ */
 static inline void kvm_set_cpu_l1tf_flush_l1d(void)
 {
 	__this_cpu_write(irq_stat.kvm_cpu_l1tf_flush_l1d, 1);

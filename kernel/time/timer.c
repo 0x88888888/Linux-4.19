@@ -1625,6 +1625,16 @@ static inline int collect_expired_timers(struct timer_base *base,
 /*
  * Called from the timer interrupt handler to charge one tick to the current
  * process.  user_tick is 1 if the tick is user time, 0 for system.
+ *
+ * tick_handle_periodic()()
+ *  tick_periodic() [tick-common.c]
+ *   update_process_times()
+ *
+ * tick_sched_handle() [tick-sched.c]
+ *  update_process_times()
+ *
+ * timer_tick()    [arch\arm\kernel\time.c]
+ *  update_process_times()
  */
 void update_process_times(int user_tick)
 {
@@ -1632,12 +1642,16 @@ void update_process_times(int user_tick)
 
 	/* Note: this timer irq context must be accounted for as well. */
 	account_process_tick(p, user_tick);
-	run_local_timers();
+	run_local_timers(); //运行本cpu上的hrtimer和启动TIMER_SOFTIRQ
+
+	//运行rcu callback
 	rcu_check_callbacks(user_tick);
 #ifdef CONFIG_IRQ_WORK
 	if (in_irq())
 		irq_work_tick();
 #endif
+
+    //尝试进程调度了
 	scheduler_tick();
 	if (IS_ENABLED(CONFIG_POSIX_TIMERS))
 		run_posix_cpu_timers(p);
@@ -1646,6 +1660,14 @@ void update_process_times(int user_tick)
 /**
  * __run_timers - run all expired timers (if any) on this CPU.
  * @base: the timer vector to be processed.
+ *
+ * do_IRQ()
+ *  exiting_irq()
+ *   irq_exit()
+ *    invoke_softirq()
+ *     __do_softirq()
+ *      run_timer_softirq()
+ *       __run_timers()
  */
 static inline void __run_timers(struct timer_base *base)
 {
@@ -1687,6 +1709,13 @@ static inline void __run_timers(struct timer_base *base)
 
 /*
  * This function runs timers and the timer-tq in bottom half context.
+ *
+ * do_IRQ()
+ *  exiting_irq()
+ *   irq_exit()
+ *    invoke_softirq()
+ *     __do_softirq()
+ *      run_timer_softirq()
  */
 static __latent_entropy void run_timer_softirq(struct softirq_action *h)
 {

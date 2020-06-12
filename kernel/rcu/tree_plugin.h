@@ -780,6 +780,10 @@ static void rcu_preempt_check_callbacks(void)
  * between the call to call_rcu() and the invocation of "func()" -- even
  * if CPU A and CPU B are the same CPU (but again only if the system has
  * more than one CPU).
+ *
+ * 将要删除的对象保存起来。并标记或者开始一个宽限期
+ *（同一时间只能运行一个宽限期，所以当已经有宽限期在运行的时候，
+ * 其它的宽限期必须等待）
  */
 void call_rcu(struct rcu_head *head, rcu_callback_t func)
 {
@@ -1242,6 +1246,10 @@ static int rcu_spawn_one_boost_kthread(struct rcu_state *rsp,
 	return 0;
 }
 
+/*
+ * rcu_cpu_kthread()
+ *  rcu_kthread_do_work()
+ */
 static void rcu_kthread_do_work(void)
 {
 	rcu_do_batch(&rcu_sched_state, this_cpu_ptr(&rcu_sched_data));
@@ -1286,9 +1294,11 @@ static void rcu_cpu_kthread(unsigned int cpu)
 		local_irq_disable();
 		work = *workp;
 		*workp = 0;
+		
 		local_irq_enable();
 		if (work)
 			rcu_kthread_do_work();
+		
 		local_bh_enable();
 		if (*workp == 0) {
 			trace_rcu_utilization(TPS("End CPU kthread@rcu_wait"));
@@ -2078,6 +2088,10 @@ static void __call_rcu_nocb_enqueue(struct rcu_data *rdp,
  *
  * Otherwise, this function queues the callback where the corresponding
  * "rcuo" kthread can find it.
+ *
+ * call_rcu()
+ *  __call_rcu()
+ *   __call_rcu_nocb()
  */
 static bool __call_rcu_nocb(struct rcu_data *rdp, struct rcu_head *rhp,
 			    bool lazy, unsigned long flags)
@@ -2085,7 +2099,9 @@ static bool __call_rcu_nocb(struct rcu_data *rdp, struct rcu_head *rhp,
 
 	if (!rcu_is_nocb_cpu(rdp->cpu))
 		return false;
+	
 	__call_rcu_nocb_enqueue(rdp, rhp, &rhp->next, 1, lazy, flags);
+	
 	if (__is_kfree_rcu_offset((unsigned long)rhp->func))
 		trace_rcu_kfree_callback(rdp->rsp->name, rhp,
 					 (unsigned long)rhp->func,
@@ -2132,6 +2148,12 @@ static bool __maybe_unused rcu_nocb_adopt_orphan_cbs(struct rcu_data *my_rdp,
 /*
  * If necessary, kick off a new grace period, and either way wait
  * for a subsequent grace period to complete.
+ *
+ * rcu_spawn_one_nocb_kthread()
+ *  ......
+ *    rcu_nocb_kthread()
+ *     nocb_leader_wait()
+ *      rcu_nocb_wait_gp()
  */
 static void rcu_nocb_wait_gp(struct rcu_data *rdp)
 {
@@ -2147,6 +2169,7 @@ static void rcu_nocb_wait_gp(struct rcu_data *rdp)
 		local_irq_restore(flags);
 	} else {
 		raw_spin_lock_rcu_node(rnp); /* irqs already disabled. */
+		
 		needwake = rcu_start_this_gp(rnp, rdp, c);
 		raw_spin_unlock_irqrestore_rcu_node(rnp, flags);
 		if (needwake)
@@ -2174,6 +2197,11 @@ static void rcu_nocb_wait_gp(struct rcu_data *rdp)
 /*
  * Leaders come here to wait for additional callbacks to show up.
  * This function does not return until callbacks appear.
+ *
+ * rcu_spawn_one_nocb_kthread()
+ *  ......
+ *    rcu_nocb_kthread()
+ *     nocb_leader_wait()
  */
 static void nocb_leader_wait(struct rcu_data *my_rdp)
 {
@@ -2286,6 +2314,11 @@ static void nocb_follower_wait(struct rcu_data *rdp)
  * callbacks queued by the corresponding no-CBs CPU, however, there is
  * an optional leader-follower relationship so that the grace-period
  * kthreads don't have to do quite so many wakeups.
+ *
+ * rcu_spawn_one_nocb_kthread()
+ *  ......
+ *    rcu_nocb_kthread()
+ *
  */
 static int rcu_nocb_kthread(void *arg)
 {
@@ -2488,6 +2521,7 @@ static void rcu_spawn_one_nocb_kthread(struct rcu_state *rsp, int cpu)
 	/* Spawn the kthread for this CPU and RCU flavor. */
 	t = kthread_run(rcu_nocb_kthread, rdp_spawn,
 			"rcuo%c/%d", rsp->abbr, cpu);
+	
 	BUG_ON(IS_ERR(t));
 	WRITE_ONCE(rdp_spawn->nocb_kthread, t);
 }
@@ -2683,7 +2717,14 @@ static void rcu_dynticks_task_enter(void)
 #endif /* #if defined(CONFIG_TASKS_RCU) && defined(CONFIG_NO_HZ_FULL) */
 }
 
-/* Record no current task on dyntick-idle exit. */
+/* Record no current task on dyntick-idle exit. 
+ *
+ * do_IRQ()
+ *  entering_irq()
+ *   irq_enter()
+ *    rcu_irq_enter()
+ *     rcu_dynticks_task_exit()
+ */
 static void rcu_dynticks_task_exit(void)
 {
 #if defined(CONFIG_TASKS_RCU) && defined(CONFIG_NO_HZ_FULL)

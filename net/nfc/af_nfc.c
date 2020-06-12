@@ -54,6 +54,10 @@ static const struct net_proto_family nfc_sock_family_ops = {
 	.create = nfc_sock_create,
 };
 
+/*
+ * rawsock_init()
+ *  nfc_proto_register((nfc_protocol == rawsock_nfc_proto)
+ */
 int nfc_proto_register(const struct nfc_protocol *nfc_proto)
 {
 	int rc;

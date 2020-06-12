@@ -647,6 +647,11 @@ static void wait_rcu_exp_gp(struct work_struct *wp)
 /*
  * Given an rcu_state pointer and a smp_call_function() handler, kick
  * off the specified flavor of expedited grace period.
+ *
+ * synchronize_rcu()
+ *  synchronize_rcu_expedited()
+ *   _synchronize_rcu_expedited(func == sync_rcu_exp_handler)
+ * 
  */
 static void _synchronize_rcu_expedited(struct rcu_state *rsp,
 				       smp_call_func_t func)
@@ -677,12 +682,17 @@ static void _synchronize_rcu_expedited(struct rcu_state *rsp,
 		rew.rew_rsp = rsp;
 		rew.rew_s = s;
 		INIT_WORK_ONSTACK(&rew.rew_work, wait_rcu_exp_gp);
+
+		//进入队列
 		queue_work(rcu_gp_wq, &rew.rew_work);
 	}
 
 	/* Wait for expedited grace period to complete. */
 	rdp = per_cpu_ptr(rsp->rda, raw_smp_processor_id());
+
+	//根节点
 	rnp = rcu_get_root(rsp);
+	//等待rcu_node 上的回收函数结束
 	wait_event(rnp->exp_wq[rcu_seq_ctr(s) & 0x3],
 		   sync_exp_work_done(rsp, s));
 	smp_mb(); /* Workqueue actions happen before return. */
@@ -780,6 +790,9 @@ static void sync_rcu_exp_handler(void *info)
  * you are using synchronize_rcu_expedited() in a loop, please restructure
  * your code to batch your updates, and then Use a single synchronize_rcu()
  * instead.
+ *
+ * synchronize_rcu()
+ *  synchronize_rcu_expedited()
  */
 void synchronize_rcu_expedited(void)
 {

@@ -88,6 +88,7 @@ struct vm_area_struct;
  */
 #define __GFP_RECLAIMABLE ((__force gfp_t)___GFP_RECLAIMABLE)
 #define __GFP_WRITE	((__force gfp_t)___GFP_WRITE)
+//只能在当前进程允许运行的cpu所关联的node上分配内存
 #define __GFP_HARDWALL   ((__force gfp_t)___GFP_HARDWALL)
 #define __GFP_THISNODE	((__force gfp_t)___GFP_THISNODE)
 #define __GFP_ACCOUNT	((__force gfp_t)___GFP_ACCOUNT)
@@ -476,6 +477,9 @@ __alloc_pages(gfp_t gfp_mask, unsigned int order, int preferred_nid)
 /*
  * Allocate pages, preferring the node given as nid. The node must be valid and
  * online. For more general interface, see alloc_pages_node().
+ *
+ * alloc_pages_node()
+ *  __alloc_pages_node()
  */
 static inline struct page *
 __alloc_pages_node(int nid, gfp_t gfp_mask, unsigned int order)

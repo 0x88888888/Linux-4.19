@@ -75,6 +75,9 @@ int tick_is_oneshot_available(void)
 
 /*
  * Periodic tick
+ *
+ * tick_handle_periodic()
+ *  tick_periodic()
  */
 static void tick_periodic(int cpu)
 {

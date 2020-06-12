@@ -253,7 +253,7 @@ void __sched mutex_lock(struct mutex *lock)
 {
 	might_sleep();
 
-	if (!__mutex_trylock_fast(lock))
+	if (!__mutex_trylock_fast(lock)) //先直接获取一次
 		__mutex_lock_slowpath(lock);
 }
 EXPORT_SYMBOL(mutex_lock);

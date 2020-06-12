@@ -645,6 +645,7 @@ void exit_swap_address_space(unsigned int type)
 	nr_swapper_spaces[type] = 0;
 	rcu_assign_pointer(swapper_spaces[type], NULL);
 	synchronize_rcu();
+	
 	kvfree(spaces);
 }
 

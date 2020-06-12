@@ -31,13 +31,27 @@ struct notifier_block;		/* in notifier.h */
 #define IOREMAP_MAX_ORDER	(7 + PAGE_SHIFT)	/* 128 pages */
 #endif
 
+/*
+ * vmalloc区域中的子内存区，ioremap也使用了该区域
+ * 所有的vm_struct组成一个链表，管理着vmalloc区域
+ * 中已经建立的各个子区域，该链表头保存于
+ * 全局变量vmlist中。
+ */
 struct vm_struct {
 	struct vm_struct	*next;
+	// 对应的虚拟内存地址
 	void			*addr;
+	// 对应的虚拟内存的大小，总是4096的整数倍
 	unsigned long		size;
+	/*
+	 * VM_ALLOC指定由vmalloc产生的子区域,映射的是实际的物理内存
+     * VM_MAP表示将现存pages集合映射到连续的虚拟地址空间中。
+     * VM_IOREMAP表示将IO内存映射到vmalloc区域中,映射的是IO设备的内存。
+	 */	
 	unsigned long		flags;
 	struct page		**pages;
 	unsigned int		nr_pages;
+	//多在ioremap函数中使用
 	phys_addr_t		phys_addr;
 	const void		*caller;
 };

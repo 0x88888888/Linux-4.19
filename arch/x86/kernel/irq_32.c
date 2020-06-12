@@ -70,6 +70,11 @@ static inline void *current_stack(void)
 	return (void *)(current_stack_pointer & ~(THREAD_SIZE - 1));
 }
 
+/*
+ * do_IRQ()
+ *  handle_irq() [irq_32.c]
+ *   execute_on_irq_stack [irq_32.c]
+ */
 static inline int execute_on_irq_stack(int overflow, struct irq_desc *desc)
 {
 	struct irq_stack *curstk, *irqstk;
@@ -83,10 +88,15 @@ static inline int execute_on_irq_stack(int overflow, struct irq_desc *desc)
 	 * already using the IRQ stack (because we interrupted a hardirq
 	 * handler) we can't do that and just have to keep using the
 	 * current stack (which is the irq stack already after all)
+	 *
+	 * 已经在使用中断stack，但是发生中断嵌套的情况,就跳过了
 	 */
 	if (unlikely(curstk == irqstk))
 		return 0;
 
+    /*
+     * 下面开始切换中断stack
+     */
 	isp = (u32 *) ((char *)irqstk + sizeof(*irqstk));
 
 	/* Save the next esp at the bottom of the stack */
@@ -147,6 +157,10 @@ void do_softirq_own_stack(void)
 	call_on_stack(__do_softirq, isp);
 }
 
+/*
+ * do_IRQ()
+ *  handle_irq() [irq_32.c]
+ */
 bool handle_irq(struct irq_desc *desc, struct pt_regs *regs)
 {
 	int overflow = check_stack_overflow();
@@ -154,9 +168,11 @@ bool handle_irq(struct irq_desc *desc, struct pt_regs *regs)
 	if (IS_ERR_OR_NULL(desc))
 		return false;
 
+    //切换到中断专用栈
 	if (user_mode(regs) || !execute_on_irq_stack(overflow, desc)) {
 		if (unlikely(overflow))
 			print_stack_overflow();
+		
 		generic_handle_irq_desc(desc);
 	}
 

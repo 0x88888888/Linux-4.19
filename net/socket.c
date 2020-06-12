@@ -1203,6 +1203,12 @@ call_kill:
 }
 EXPORT_SYMBOL(sock_wake_async);
 
+/*
+ * SYSCALL_DEFINE3(socket)
+ *  __sys_socket()
+ *   sock_create()
+ *    __sock_create()
+ */
 int __sock_create(struct net *net, int family, int type, int protocol,
 			 struct socket **res, int kern)
 {
@@ -1274,6 +1280,9 @@ int __sock_create(struct net *net, int family, int type, int protocol,
 	/* Now protected by module ref count */
 	rcu_read_unlock();
 
+    /*
+     * inet_family_ops->create = inet_create
+     */
 	err = pf->create(net, sock, protocol, kern);
 	if (err < 0)
 		goto out_module_put;
@@ -1312,6 +1321,11 @@ out_release:
 }
 EXPORT_SYMBOL(__sock_create);
 
+/*
+ * SYSCALL_DEFINE3(socket)
+ *  __sys_socket()
+ *   sock_create()
+ */
 int sock_create(int family, int type, int protocol, struct socket **res)
 {
 	return __sock_create(current->nsproxy->net_ns, family, type, protocol, res, 0);
@@ -1324,6 +1338,10 @@ int sock_create_kern(struct net *net, int family, int type, int protocol, struct
 }
 EXPORT_SYMBOL(sock_create_kern);
 
+/*
+ * SYSCALL_DEFINE3(socket)
+ *  __sys_socket()
+ */
 int __sys_socket(int family, int type, int protocol)
 {
 	int retval;
@@ -2626,6 +2644,19 @@ SYSCALL_DEFINE2(socketcall, int, call, unsigned long __user *, args)
  *	advertise its address family, and have it linked into the
  *	socket interface. The value ops->family corresponds to the
  *	socket system call protocol family.
+ *
+ * inet_init()
+ *  sock_register(ops== inet_family_ops)
+ *
+ * inet6_init()
+ *  sock_register(ops== inet6_family_ops)
+ *
+ * sock_register()
+ *  sock_register(ops== netlink_family_ops)
+ *
+ * packet_init()
+ *  sock_register(ops== packet_family_ops)
+ *
  */
 int sock_register(const struct net_proto_family *ops)
 {

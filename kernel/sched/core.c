@@ -449,6 +449,11 @@ void wake_up_q(struct wake_q_head *head)
  * On UP this means the setting of the need_resched flag, on SMP it
  * might also involve a cross-CPU call to trigger the scheduler on
  * the target CPU.
+ *
+ * call_rcu_sched()
+ *  __call_rcu()
+ *   resched_cpu()
+ *    resched_curr()
  */
 void resched_curr(struct rq *rq)
 {
@@ -474,6 +479,11 @@ void resched_curr(struct rq *rq)
 		trace_sched_wake_idle_without_ipi(cpu);
 }
 
+/*
+ * call_rcu_sched()
+ *  __call_rcu()
+ *   resched_cpu()
+ */
 void resched_cpu(int cpu)
 {
 	struct rq *rq = cpu_rq(cpu);
@@ -482,6 +492,7 @@ void resched_cpu(int cpu)
 	raw_spin_lock_irqsave(&rq->lock, flags);
 	if (cpu_online(cpu) || cpu == smp_processor_id())
 		resched_curr(rq);
+	
 	raw_spin_unlock_irqrestore(&rq->lock, flags);
 }
 
@@ -3379,6 +3390,9 @@ again:
  *          - return from interrupt-handler to user-space
  *
  * WARNING: must be called with preemption disabled!
+ *
+ * schedule()
+ *  __schedule()
  */
 static void __sched notrace __schedule(bool preempt)
 {
@@ -3398,6 +3412,7 @@ static void __sched notrace __schedule(bool preempt)
 		hrtick_clear(rq);
 
 	local_irq_disable();
+	
 	rcu_note_context_switch(preempt);
 
 	/*
@@ -3495,6 +3510,10 @@ void __noreturn do_task_dead(void)
 		cpu_relax();
 }
 
+/*
+ * schedule()
+ *  sched_submit_work()
+ */
 static inline void sched_submit_work(struct task_struct *tsk)
 {
 	if (!tsk->state || tsk_is_pi_blocked(tsk))
@@ -3513,6 +3532,7 @@ asmlinkage __visible void __sched schedule(void)
 
 	sched_submit_work(tsk);
 	do {
+		//关闭内核抢占
 		preempt_disable();
 		__schedule(false);
 		sched_preempt_enable_no_resched();

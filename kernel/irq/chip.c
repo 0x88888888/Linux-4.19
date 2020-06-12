@@ -620,6 +620,17 @@ static void cond_unmask_irq(struct irq_desc *desc)
  *	the active level. This may require to mask the interrupt and unmask
  *	it after the associated handler has acknowledged the device, so the
  *	interrupt line is back to inactive.
+ *
+ * do_IRQ()
+ *  handle_irq() [irq_32.c]
+ *   generic_handle_irq_desc()
+ *    handle_level_irq()
+ *
+ * do_IRQ()
+ *  handle_irq() [irq_64.c]
+ *   generic_handle_irq_desc()
+ *    handle_level_irq()
+ *
  */
 void handle_level_irq(struct irq_desc *desc)
 {
@@ -743,6 +754,17 @@ EXPORT_SYMBOL_GPL(handle_fasteoi_irq);
  *	of the loop which handles the interrupts which have arrived while
  *	the handler was running. If all pending interrupts are handled, the
  *	loop is left.
+ *
+ * do_IRQ()
+ *  handle_irq() [irq_32.c]
+ *   generic_handle_irq_desc()
+ *    handle_edge_irq()
+ *
+ * do_IRQ()
+ *  handle_irq() [irq_64.c]
+ *   generic_handle_irq_desc()
+ *    handle_edge_irq()
+ *
  */
 void handle_edge_irq(struct irq_desc *desc)
 {
@@ -750,6 +772,7 @@ void handle_edge_irq(struct irq_desc *desc)
 
 	desc->istate &= ~(IRQS_REPLAY | IRQS_WAITING);
 
+    //这个irq对应的中断已经在跑了，跳过
 	if (!irq_may_run(desc)) {
 		desc->istate |= IRQS_PENDING;
 		mask_ack_irq(desc);
@@ -768,11 +791,15 @@ void handle_edge_irq(struct irq_desc *desc)
 
 	kstat_incr_irqs_this_cpu(desc);
 
-	/* Start handling the irq */
+	/*
+	 * Start handling the irq 
+	 * 给中断控制器发送一个ack，设备不会在发送中断了
+	 */
 	desc->irq_data.chip->irq_ack(&desc->irq_data);
 
 	do {
 		if (unlikely(!desc->action)) {
+			//中断控制器屏蔽中断
 			mask_irq(desc);
 			goto out_unlock;
 		}

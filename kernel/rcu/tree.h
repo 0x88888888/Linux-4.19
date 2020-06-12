@@ -193,16 +193,24 @@ struct rcu_data {
 					/*  for rcu_all_qs() invocations. */
 	union rcu_noqs	cpu_no_qs;	/* No QSes yet for this CPU. */
 	bool		core_needs_qs;	/* Core waits for quiesc state. */
+	/* CPU是否在线，不在线的CPU需要特殊处理，以提高性能*/
 	bool		beenonline;	/* CPU online at least once. */
 	bool		gpwrap;		/* Possible ->gp_seq wrap. */
+	/* 这个CPU对应的 rcu_node */  
 	struct rcu_node *mynode;	/* This CPU's leaf of hierarchy */
+	/* 占用1bit，对应与所属的rcu_node. */
 	unsigned long grpmask;		/* Mask to apply to leaf qsmask. */
+	
 	unsigned long	ticks_this_gp;	/* The number of scheduling-clock */
 					/*  ticks this CPU has handled */
 					/*  during and after the last grace */
 					/* period it is aware of. */
 
-	/* 2) batch handling */
+	/* 2) batch handling  
+	 *
+	 * 这个数据结构很重要
+	 * 当中的 *head,**tails[]很重要
+	 */
 	struct rcu_segcblist cblist;	/* Segmented callback list, with */
 					/* different callbacks waiting for */
 					/* different grace periods. */
@@ -212,11 +220,22 @@ struct rcu_data {
 					/* did other CPU force QS recently? */
 	long		blimit;		/* Upper limit on a processed batch */
 
-	/* 3) dynticks interface. */
+	/* 3) dynticks interface. 
+	 * 
+	 * 3) 动态时钟
+	 */
+
+	/* 每个CPU都包含一个动态时钟. */
 	struct rcu_dynticks *dynticks;	/* Shared per-CPU dynticks state. */
+	/* 用于检测CPU是否在线. */
 	int dynticks_snap;		/* Per-GP tracking for dynticks. */
 
-	/* 4) reasons this CPU needed to be kicked by force_quiescent_state */
+	/* 4) reasons this CPU needed to be kicked by force_quiescent_state 
+	 *
+	 * 4) 强制执行时候处理的CPU 
+	 */
+
+	/* 由于进入dynticks idle而被处理的CPU. */ 
 	unsigned long dynticks_fqs;	/* Kicked due to dynticks idle. */
 	unsigned long cond_resched_completed;
 					/* Grace period that needs help */
@@ -227,12 +246,15 @@ struct rcu_data {
 #ifdef CONFIG_RCU_FAST_NO_HZ
 	struct rcu_head oom_head;
 #endif /* #ifdef CONFIG_RCU_FAST_NO_HZ */
+
 	int exp_dynticks_snap;		/* Double-check need for IPI. */
 
 	/* 6) Callback offloading. */
 #ifdef CONFIG_RCU_NOCB_CPU
+
 	struct rcu_head *nocb_head;	/* CBs waiting for kthread. */
 	struct rcu_head **nocb_tail;
+	
 	atomic_long_t nocb_q_count;	/* # CBs waiting for nocb */
 	atomic_long_t nocb_q_count_lazy; /*  invocation (all stages). */
 	struct rcu_head *nocb_follower_head; /* CBs ready to invoke. */
@@ -310,18 +332,24 @@ do {									\
  * consisting of a single rcu_node.
  */
 struct rcu_state {
+    /* 保存了所有的节点. */ 
 	struct rcu_node node[NUM_RCU_NODES];	/* Hierarchy. */
+	/* 每个层级所指向的节点. */
 	struct rcu_node *level[RCU_NUM_LVLS + 1];
 						/* Hierarchy levels (+1 to */
 						/*  shut bogus gcc warning) */
+	/* 指向rcu_data. */					
 	struct rcu_data __percpu *rda;		/* pointer of percu rcu_data. */
+					
 	call_rcu_func_t call;			/* call_rcu() flavor. */
 	int ncpus;				/* # CPUs seen so far. */
 
 	/* The following fields are guarded by the root rcu_node's lock. */
 
+    /* 加速. */
 	u8	boost ____cacheline_internodealigned_in_smp;
 						/* Subject to priority boost. */
+	
 	unsigned long gp_seq;			/* Grace-period sequence #. */
 	struct task_struct *gp_kthread;		/* Task for grace periods. */
 	struct swait_queue_head gp_wq;		/* Where GP task waits. */
