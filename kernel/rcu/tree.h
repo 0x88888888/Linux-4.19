@@ -36,6 +36,17 @@
 
 /*
  * Dynticks per-CPU state.
+ *   classic RCU至少会在一个gracep period内唤醒每一个处于睡眠状态的CPU。
+ * 当其他大多数CPU都处于空闲状态时，这些个别的CPU进行rcu写操作，
+ * 会使得这种处理方法不是最优的。这种情形将在周期性的高负载系统中发生，
+ * 我们需要更好的处理这种情况。
+ *  这是通过要求所有CPU操作位于一个每CPU rcu_dynticks 结构中的计数器来实现的。
+ * 不是那么准确的说，当相应的CPU处于dynticks idle模式时，计数器的值为偶数，
+ * 否则是奇数。这样，RCU仅仅需要等待rcu_dynticks 计数值为奇数的CPU经过静止状态，
+ * 而不必唤醒正在睡眠的CPU。如上图，每一个每CPU rcu_dynticks结构被“rcu”和“rcu_bh”实现所共享。
+ *
+ *
+ * rcu_data中的一个成员
  */
 struct rcu_dynticks {
 	long dynticks_nesting;      /* Track process nesting level. */
@@ -84,6 +95,10 @@ struct rcu_node {
 	unsigned long gp_seq;	/* Track rsp->rcu_gp_seq. */
 	unsigned long gp_seq_needed; /* Track rsp->rcu_gp_seq_needed. */
 	unsigned long completedqs; /* All QSes done for this node. */
+	/*
+	 * qsmask中的每个bit都对应着一个cpu是否已经过了 grace period(就是reports QS了)
+	 * 0表示已经通过grace period了，1表示没有通过grace period
+	 */
 	unsigned long qsmask;	/* CPUs or groups that need to switch in */
 				/*  order for current grace period to proceed.*/
 				/*  In leaf rcu_node, each bit corresponds to */
@@ -91,6 +106,9 @@ struct rcu_node {
 				/*  bit corresponds to a child rcu_node */
 				/*  structure. */
 	unsigned long rcu_gp_init_mask;	/* Mask of offline CPUs at GP init. */
+	/*
+	 * 每个GP初始化时,qsmaskinit等于qsmark的初始值。
+	 */
 	unsigned long qsmaskinit;
 				/* Per-GP initial value for qsmask. */
 				/*  Initialized from ->qsmaskinitnext at the */
@@ -109,17 +127,19 @@ struct rcu_node {
 				/*  Any CPU that has ever been online will */
 				/*  have its bit set. */
 	unsigned long ffmask;	/* Fully functional CPUs. */
+	//在父节点中qsmask中的bit的位置
 	unsigned long grpmask;	/* Mask to apply to parent qsmask. */
 				/*  Only one bit will be set in this mask. */
 	int	grplo;		/* lowest-numbered CPU or group here. */
 	int	grphi;		/* highest-numbered CPU or group here. */
+	
 	u8	grpnum;		/* CPU/group number for next level up. */
 	u8	level;		/* root is at level 0. */
 	bool	wait_blkd_tasks;/* Necessary to wait for blocked tasks to */
 				/*  exit RCU read-side critical sections */
 				/*  before propagating offline up the */
 				/*  rcu_node tree? */
-	struct rcu_node *parent;
+	struct rcu_node *parent; // 父节点
 	struct list_head blkd_tasks;
 				/* Tasks blocked in RCU read-side critical */
 				/*  section.  Tasks are placed at the head */
@@ -184,19 +204,28 @@ union rcu_noqs {
 	u16 s; /* Set of bits, aggregate OR here. */
 };
 
-/* Per-CPU data for read-copy update. */
+/* Per-CPU data for read-copy update. 
+ *
+ * 每个cpu一个cur_data对象
+ */
 struct rcu_data {
 	/* 1) quiescent-state and grace-period handling : */
 	unsigned long	gp_seq;		/* Track rsp->rcu_gp_seq counter. */
 	unsigned long	gp_seq_needed;	/* Track rsp->rcu_gp_seq_needed ctr. */
 	unsigned long	rcu_qs_ctr_snap;/* Snapshot of rcu_qs_ctr to check */
 					/*  for rcu_all_qs() invocations. */
+	
 	union rcu_noqs	cpu_no_qs;	/* No QSes yet for this CPU. */
 	bool		core_needs_qs;	/* Core waits for quiesc state. */
 	/* CPU是否在线，不在线的CPU需要特殊处理，以提高性能*/
 	bool		beenonline;	/* CPU online at least once. */
 	bool		gpwrap;		/* Possible ->gp_seq wrap. */
-	/* 这个CPU对应的 rcu_node */  
+	
+	/*
+     * 这个CPU对应的 rcu_node
+     * 每个cpu对应到一个rcu_node上去，
+     * 一个rcu_node对应多个cpu
+     */  
 	struct rcu_node *mynode;	/* This CPU's leaf of hierarchy */
 	/* 占用1bit，对应与所属的rcu_node. */
 	unsigned long grpmask;		/* Mask to apply to leaf qsmask. */
@@ -237,6 +266,7 @@ struct rcu_data {
 
 	/* 由于进入dynticks idle而被处理的CPU. */ 
 	unsigned long dynticks_fqs;	/* Kicked due to dynticks idle. */
+	
 	unsigned long cond_resched_completed;
 					/* Grace period that needs help */
 					/*  from cond_resched(). */
@@ -273,7 +303,10 @@ struct rcu_data {
 	struct rcu_data *nocb_next_follower;
 					/* Next follower in wakeup chain. */
 
-	/* The following fields are used by the follower, hence new cachline. */
+	/* The following fields are used by the follower, hence new cachline.
+	 *
+	 *
+	 */
 	struct rcu_data *nocb_leader ____cacheline_internodealigned_in_smp;
 					/* Leader CPU takes GP-end wakeups. */
 #endif /* #ifdef CONFIG_RCU_NOCB_CPU */
@@ -330,15 +363,26 @@ do {									\
  * by ->level[2]).  The number of levels is determined by the number of
  * CPUs and by CONFIG_RCU_FANOUT.  Small systems will have a "hierarchy"
  * consisting of a single rcu_node.
+ *
+ * 就 rcu_sched_state,rcu_bh_state,rcu_preempt_state 几个对象
+ * 在rcu_kthread_do_work()中发起处理
+ * 
+ * 用RCU_STATE_INITIALIZER()去定义
  */
 struct rcu_state {
-    /* 保存了所有的节点. */ 
+    /* 保存了所有的rcu_node节点. 
+     * node[0] 为root 节点
+     */ 
 	struct rcu_node node[NUM_RCU_NODES];	/* Hierarchy. */
 	/* 每个层级所指向的节点. */
 	struct rcu_node *level[RCU_NUM_LVLS + 1];
 						/* Hierarchy levels (+1 to */
 						/*  shut bogus gcc warning) */
-	/* 指向rcu_data. */					
+	/* 指向rcu_data. 
+	 * 每个cpu一个rcu_data对象
+	 *
+	 * 
+	 */					
 	struct rcu_data __percpu *rda;		/* pointer of percu rcu_data. */
 					
 	call_rcu_func_t call;			/* call_rcu() flavor. */
@@ -349,9 +393,20 @@ struct rcu_state {
     /* 加速. */
 	u8	boost ____cacheline_internodealigned_in_smp;
 						/* Subject to priority boost. */
-	
+
+	/*
+	 * 应该是当前正在进行的grace period
+	 * 初始值为-300
+	*/
 	unsigned long gp_seq;			/* Grace-period sequence #. */
+	/*
+	 * RCU内核线程，处理函数为rcu_gp_kthread
+	 * 在rcu_spawn_gp_kthread中创建这个线程
+	 */					
 	struct task_struct *gp_kthread;		/* Task for grace periods. */
+	/*
+	 * 在rcu_gp_kthread_wake中唤醒
+	 */
 	struct swait_queue_head gp_wq;		/* Where GP task waits. */
 	short gp_flags;				/* Commands for GP task. */
 	short gp_state;				/* GP kthread sleep state. */

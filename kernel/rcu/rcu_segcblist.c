@@ -88,6 +88,14 @@ void rcu_segcblist_disable(struct rcu_segcblist *rsclp)
 /*
  * Does the specified rcu_segcblist structure contain callbacks that
  * are ready to be invoked?
+ *
+ * tick_handle_periodic()
+ *  tick_periodic() [tick-common.c]
+ *   update_process_times()
+ *    rcu_check_callbacks()
+ *     rcu_pending()
+ *      __rcu_pending()
+ *       rcu_segcblist_ready_cbs()
  */
 bool rcu_segcblist_ready_cbs(struct rcu_segcblist *rsclp)
 {
@@ -98,6 +106,17 @@ bool rcu_segcblist_ready_cbs(struct rcu_segcblist *rsclp)
 /*
  * Does the specified rcu_segcblist structure contain callbacks that
  * are still pending, that is, not yet ready to be invoked?
+ *
+ * do_IRQ()
+ *  exiting_irq()
+ *   irq_exit()
+ *    invoke_softirq()
+ *     __do_softirq()
+ *      rcu_process_callbacks()
+ *       __rcu_process_callbacks()
+ *        rcu_accelerate_cbs_unlocked()
+ *         rcu_accelerate_cbs()
+ *          rcu_segcblist_pend_cbs()
  */
 bool rcu_segcblist_pend_cbs(struct rcu_segcblist *rsclp)
 {
@@ -138,6 +157,12 @@ struct rcu_head *rcu_segcblist_first_pend_cb(struct rcu_segcblist *rsclp)
  * if it must post a callback on this structure, and it is OK
  * for rcu_barrier() to sometimes post callbacks needlessly, but
  * absolutely not OK for it to ever miss posting a callback.
+ *
+ * call_rcu_bh()
+ * call_rcu_sched()
+ * call_rcu()
+ *  __call_rcu()
+ *   rcu_segcblist_enqueue()
  */
 void rcu_segcblist_enqueue(struct rcu_segcblist *rsclp,
 			   struct rcu_head *rhp, bool lazy)
@@ -296,12 +321,20 @@ void rcu_segcblist_insert_pend_cbs(struct rcu_segcblist *rsclp,
 /*
  * Advance the callbacks in the specified rcu_segcblist structure based
  * on the current value passed in for the grace-period counter.
+ *
+ * rcu_check_quiescent_state()
+ *  note_gp_changes()
+ *   __note_gp_changes()
+ *    rcu_advance_cbs()
+ *     rcu_segcblist_advance()
  */
 void rcu_segcblist_advance(struct rcu_segcblist *rsclp, unsigned long seq)
 {
 	int i, j;
 
 	WARN_ON_ONCE(!rcu_segcblist_is_enabled(rsclp));
+
+	//没有需要回调的函数
 	if (rcu_segcblist_restempty(rsclp, RCU_DONE_TAIL))
 		return;
 
@@ -335,6 +368,8 @@ void rcu_segcblist_advance(struct rcu_segcblist *rsclp, unsigned long seq)
 		rsclp->tails[j] = rsclp->tails[i];
 		rsclp->gp_seq[j] = rsclp->gp_seq[i];
 	}
+
+	
 }
 
 /*

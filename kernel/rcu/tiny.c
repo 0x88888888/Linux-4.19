@@ -201,6 +201,13 @@ static void __rcu_process_callbacks(struct rcu_ctrlblk *rcp)
 }
 
 /*
+ * do_IRQ()
+ *  exiting_irq()
+ *   irq_exit()
+ *    invoke_softirq()
+ *     __do_softirq()
+ *      rcu_process_callbacks()
+ *
  * rcu_process_callbacks() [RCU_SOFTIRQ软中断处理函数]
  *
  */

@@ -289,6 +289,11 @@ struct rcu_torture_ops {
 	void (*cond_sync)(unsigned long oldstate);
 	call_rcu_func_t call;
 	void (*cb_barrier)(void);
+	/*
+	 * rcu_force_quiescent_state()
+	 * rcu_bh_force_quiescent_state()
+	 * rcu_sched_force_quiescent_state()
+	 */
 	void (*fqs)(void);
 	void (*stats)(void);
 	int irq_capable;

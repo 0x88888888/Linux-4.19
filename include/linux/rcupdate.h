@@ -400,6 +400,8 @@ static inline void rcu_preempt_sleep_check(void) { }
  * macros, this execute-arguments-only-once property is important, so
  * please be careful when making changes to rcu_assign_pointer() and the
  * other macros that it invokes.
+ *
+ * 主要作用是 write barrier
  */
 #define rcu_assign_pointer(p, v)					      \
 ({									      \
@@ -540,6 +542,8 @@ static inline void rcu_preempt_sleep_check(void) { }
  * @p: The pointer to read, prior to dereferencing
  *
  * This is a simple wrapper around rcu_dereference_check().
+ *
+ * 主要作用是 read barrier
  */
 #define rcu_dereference(p) rcu_dereference_check(p, 0)
 

@@ -1177,6 +1177,16 @@ static void rcu_initiate_boost(struct rcu_node *rnp, unsigned long flags)
 
 /*
  * Wake up the per-CPU kthread to invoke RCU callbacks.
+ *
+ * do_IRQ()
+ *  exiting_irq()
+ *   irq_exit()
+ *    invoke_softirq()
+ *     __do_softirq()
+ *      rcu_process_callbacks()
+ *       __rcu_process_callbacks()
+ *        invoke_rcu_callbacks()
+ *         invoke_rcu_callbacks_kthread()
  */
 static void invoke_rcu_callbacks_kthread(void)
 {
@@ -1186,6 +1196,7 @@ static void invoke_rcu_callbacks_kthread(void)
 	__this_cpu_write(rcu_cpu_has_work, 1);
 	if (__this_cpu_read(rcu_cpu_kthread_task) != NULL &&
 	    current != __this_cpu_read(rcu_cpu_kthread_task)) {
+	    
 		rcu_wake_cond(__this_cpu_read(rcu_cpu_kthread_task),
 			      __this_cpu_read(rcu_cpu_kthread_status));
 	}
@@ -1279,6 +1290,9 @@ static int rcu_cpu_kthread_should_run(unsigned int cpu)
  * Per-CPU kernel thread that invokes RCU callbacks.  This replaces the
  * RCU softirq used in flavors and configurations of RCU that do not
  * support RCU priority boosting.
+ *
+ * rcu_cpu_thread_spec->thread_fn == rcu_cpu_kthread
+ *
  */
 static void rcu_cpu_kthread(unsigned int cpu)
 {
@@ -1362,7 +1376,9 @@ static void __init rcu_spawn_boost_kthreads(void)
 
 	for_each_possible_cpu(cpu)
 		per_cpu(rcu_cpu_has_work, cpu) = 0;
+	
 	BUG_ON(smpboot_register_percpu_thread(&rcu_cpu_thread_spec));
+	
 	rcu_for_each_leaf_node(rcu_state_p, rnp)
 		(void)rcu_spawn_one_boost_kthread(rcu_state_p, rnp);
 }
@@ -2161,10 +2177,15 @@ static void rcu_nocb_wait_gp(struct rcu_data *rdp)
 	bool d;
 	unsigned long flags;
 	bool needwake;
+
+	/*
+	 * rcu_data对应的上级的rcu_node对象
+	 */
 	struct rcu_node *rnp = rdp->mynode;
 
 	local_irq_save(flags);
 	c = rcu_seq_snap(&rdp->rsp->gp_seq);
+	
 	if (!rdp->gpwrap && ULONG_CMP_GE(rdp->gp_seq_needed, c)) {
 		local_irq_restore(flags);
 	} else {
@@ -2172,7 +2193,8 @@ static void rcu_nocb_wait_gp(struct rcu_data *rdp)
 		
 		needwake = rcu_start_this_gp(rnp, rdp, c);
 		raw_spin_unlock_irqrestore_rcu_node(rnp, flags);
-		if (needwake)
+		
+		if (needwake) //唤醒线程
 			rcu_gp_kthread_wake(rdp->rsp);
 	}
 
@@ -2181,12 +2203,18 @@ static void rcu_nocb_wait_gp(struct rcu_data *rdp)
 	 * up the load average.
 	 */
 	trace_rcu_this_gp(rnp, rdp, c, TPS("StartWait"));
+	
 	for (;;) {
+		/*
+		 * 等待
+		 */
 		swait_event_interruptible_exclusive(
 			rnp->nocb_gp_wq[rcu_seq_ctr(c) & 0x1],
 			(d = rcu_seq_done(&rnp->gp_seq, c)));
+		
 		if (likely(d))
 			break;
+		
 		WARN_ON(signal_pending(current));
 		trace_rcu_this_gp(rnp, rdp, c, TPS("ResumeWait"));
 	}
@@ -2216,10 +2244,13 @@ wait_again:
 	/* Wait for callbacks to appear. */
 	if (!rcu_nocb_poll) {
 		trace_rcu_nocb_wake(my_rdp->rsp->name, my_rdp->cpu, TPS("Sleep"));
+		
 		swait_event_interruptible_exclusive(my_rdp->nocb_wq,
 				!READ_ONCE(my_rdp->nocb_leader_sleep));
 		raw_spin_lock_irqsave(&my_rdp->nocb_lock, flags);
+		
 		my_rdp->nocb_leader_sleep = true;
+		
 		WRITE_ONCE(my_rdp->nocb_defer_wakeup, RCU_NOCB_WAKE_NOT);
 		del_timer(&my_rdp->nocb_timer);
 		raw_spin_unlock_irqrestore(&my_rdp->nocb_lock, flags);
@@ -2258,11 +2289,15 @@ wait_again:
 		goto wait_again;
 	}
 
-	/* Wait for one grace period. */
+	/* Wait for one grace period. 
+	 *
+	 * 
+	 */
 	rcu_nocb_wait_gp(my_rdp);
 
 	/* Each pass through the following loop wakes a follower, if needed. */
 	for (rdp = my_rdp; rdp; rdp = rdp->nocb_next_follower) {
+		
 		if (!rcu_nocb_poll &&
 		    READ_ONCE(rdp->nocb_head) &&
 		    READ_ONCE(my_rdp->nocb_leader_sleep)) {
@@ -2270,6 +2305,7 @@ wait_again:
 			my_rdp->nocb_leader_sleep = false;/* No need to sleep.*/
 			raw_spin_unlock_irqrestore(&my_rdp->nocb_lock, flags);
 		}
+			
 		if (!rdp->nocb_gp_head)
 			continue; /* No CBs, so no need to wake follower. */
 
@@ -2507,6 +2543,7 @@ static void rcu_spawn_one_nocb_kthread(struct rcu_state *rsp, int cpu)
 			rdp->nocb_leader = rdp_spawn;
 			if (rdp_last && rdp != rdp_spawn)
 				rdp_last->nocb_next_follower = rdp;
+			
 			if (rdp == rdp_spawn) {
 				rdp = rdp->nocb_next_follower;
 			} else {
@@ -2701,6 +2738,11 @@ static bool rcu_nohz_full_cpu(struct rcu_state *rsp)
 
 /*
  * Bind the RCU grace-period kthreads to the housekeeping CPU.
+ *
+ * rcu_spawn_gp_kthread()
+ *  ......
+ *   rcu_gp_kthread()
+ *    rcu_bind_gp_kthread()
  */
 static void rcu_bind_gp_kthread(void)
 {

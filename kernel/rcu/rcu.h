@@ -220,6 +220,17 @@ void kfree(const void *);
 /*
  * Reclaim the specified callback, either by invoking it (non-lazy case)
  * or freeing it directly (lazy case).  Return true if lazy, false otherwise.
+ *
+ * do_IRQ()
+ *  exiting_irq()
+ *   irq_exit()
+ *    invoke_softirq()
+ *     __do_softirq()
+ *      rcu_process_callbacks()
+ *       __rcu_process_callbacks()
+ *        invoke_rcu_callbacks()
+ *         rcu_do_batch()
+ *          __rcu_reclaim()
  */
 static inline bool __rcu_reclaim(const char *rn, struct rcu_head *head)
 {
@@ -228,11 +239,17 @@ static inline bool __rcu_reclaim(const char *rn, struct rcu_head *head)
 	rcu_lock_acquire(&rcu_callback_map);
 	if (__is_kfree_rcu_offset(offset)) {
 		RCU_TRACE(trace_rcu_invoke_kfree_callback(rn, head, offset);)
+
+		//释放对象
 		kfree((void *)head - offset);
 		rcu_lock_release(&rcu_callback_map);
 		return true;
 	} else {
 		RCU_TRACE(trace_rcu_invoke_callback(rn, head);)
+
+		/*
+		 * 回收对象函数
+		 */
 		head->func(head);
 		rcu_lock_release(&rcu_callback_map);
 		return false;

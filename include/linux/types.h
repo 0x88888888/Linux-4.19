@@ -223,6 +223,16 @@ struct ustat {
  */
 struct callback_head {
 	struct callback_head *next;
+	/*
+	 * func可以是一个函数，也可以是一个对象地址
+	 * 如果是对象地址，就直接kfree()它
+	 *
+	 * 看__rcu_reclaim函数
+	 *
+	 * func == ____fput, __report_access, 
+	 *         __cleanup_mnt, irq_thread_dtor, 
+	 *         dup_xol_work, task_numa_work
+	 */	
 	void (*func)(struct callback_head *head);
 } __attribute__((aligned(sizeof(void *))));
 #define rcu_head callback_head

@@ -710,6 +710,7 @@ int __irq_set_trigger(struct irq_desc *desc, unsigned long flags)
 	if (chip->flags & IRQCHIP_SET_TYPE_MASKED) {
 		if (!irqd_irq_masked(&desc->irq_data))
 			mask_irq(desc);
+		
 		if (!irqd_irq_disabled(&desc->irq_data))
 			unmask = 1;
 	}
@@ -843,6 +844,7 @@ again:
 	 * serialization.
 	 */
 	if (unlikely(irqd_irq_inprogress(&desc->irq_data))) {
+		
 		raw_spin_unlock_irq(&desc->lock);
 		chip_bus_sync_unlock(desc);
 		cpu_relax();
@@ -919,6 +921,12 @@ irq_thread_check_affinity(struct irq_desc *desc, struct irqaction *action) { }
  * interrupts rely on the implicit bh/preempt disable of the hard irq
  * context. So we need to disable bh here to avoid deadlocks and other
  * side effects.
+ *
+ * setup_irq()
+ *  __setup_irq()
+ *   setup_irq_thread()
+ *    irq_thread()
+ *     irq_forced_thread_fn()
  */
 static irqreturn_t
 irq_forced_thread_fn(struct irq_desc *desc, struct irqaction *action)
@@ -936,6 +944,12 @@ irq_forced_thread_fn(struct irq_desc *desc, struct irqaction *action)
  * Interrupts explicitly requested as threaded interrupts want to be
  * preemtible - many of them need to sleep and wait for slow busses to
  * complete.
+ *
+ * setup_irq()
+ *  __setup_irq()
+ *   setup_irq_thread()
+ *    irq_thread()
+ *     irq_thread_fn()
  */
 static irqreturn_t irq_thread_fn(struct irq_desc *desc,
 		struct irqaction *action)
@@ -944,6 +958,8 @@ static irqreturn_t irq_thread_fn(struct irq_desc *desc,
 
 	ret = action->thread_fn(action->irq, action->dev_id);
 	irq_finalize_oneshot(desc, action);
+
+	
 	return ret;
 }
 
@@ -994,6 +1010,11 @@ static void irq_wake_secondary(struct irq_desc *desc, struct irqaction *action)
 
 /*
  * Interrupt handler thread
+ *
+ * setup_irq()
+ *  __setup_irq()
+ *   setup_irq_thread()
+ *    irq_thread()
  */
 static int irq_thread(void *data)
 {
@@ -1009,6 +1030,7 @@ static int irq_thread(void *data)
 	else
 		handler_fn = irq_thread_fn;
 
+    //
 	init_task_work(&on_exit_work, irq_thread_dtor);
 	task_work_add(current, &on_exit_work, false);
 
@@ -1020,8 +1042,10 @@ static int irq_thread(void *data)
 		irq_thread_check_affinity(desc, action);
 
 		action_ret = handler_fn(desc, action);
+		
 		if (action_ret == IRQ_HANDLED)
 			atomic_inc(&desc->threads_handled);
+		
 		if (action_ret == IRQ_WAKE_THREAD)
 			irq_wake_secondary(desc, action);
 
@@ -1121,6 +1145,11 @@ static void irq_release_resources(struct irq_desc *desc)
 		c->irq_release_resources(d);
 }
 
+/*
+ * setup_irq()
+ *  __setup_irq()
+ *   setup_irq_thread()
+ */
 static int
 setup_irq_thread(struct irqaction *new, unsigned int irq, bool secondary)
 {
@@ -1176,6 +1205,9 @@ setup_irq_thread(struct irqaction *new, unsigned int irq, bool secondary)
  * chip_bus_lock and desc->lock are sufficient for all other management and
  * interrupt related functions. desc->request_mutex solely serializes
  * request/free_irq().
+ *
+ * setup_irq()
+ *  __setup_irq()
  */
 static int
 __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)

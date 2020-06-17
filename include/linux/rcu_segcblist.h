@@ -27,7 +27,9 @@
 #ifndef __INCLUDE_LINUX_RCU_SEGCBLIST_H
 #define __INCLUDE_LINUX_RCU_SEGCBLIST_H
 
-/* Simple unsegmented callback lists. */
+/*
+ * Simple unsegmented callback lists. 
+ */
 struct rcu_cblist {
 	struct rcu_head *head;
 	struct rcu_head **tail;
@@ -46,11 +48,14 @@ struct rcu_cblist {
  *
  * [head, *tails[RCU_DONE_TAIL]):
  *	Callbacks whose grace period has elapsed, and thus can be invoked.
+ *
  * [*tails[RCU_DONE_TAIL], *tails[RCU_WAIT_TAIL]):
  *	Callbacks waiting for the current GP from the current CPU's viewpoint.
+ *
  * [*tails[RCU_WAIT_TAIL], *tails[RCU_NEXT_READY_TAIL]):
  *	Callbacks that arrived before the next GP started, again from
  *	the current CPU's viewpoint.  These can be handled by the next GP.
+ *
  * [*tails[RCU_NEXT_READY_TAIL], *tails[RCU_NEXT_TAIL]):
  *	Callbacks that might have arrived after the next GP started.
  *	There is some uncertainty as to when a given GP starts and
@@ -67,6 +72,7 @@ struct rcu_cblist {
  * is non-empty, and it is never valid for RCU_DONE_TAIL (whose callbacks
  * are already ready to invoke) or for RCU_NEXT_TAIL (whose callbacks have
  * not yet been assigned a grace-period number).
+ *
  */
 #define RCU_DONE_TAIL		0	/* Also RCU_WAIT head. */
 #define RCU_WAIT_TAIL		1	/* Also RCU_NEXT_READY head. */
@@ -74,6 +80,9 @@ struct rcu_cblist {
 #define RCU_NEXT_TAIL		3
 #define RCU_CBLIST_NSEGS	4
 
+/*
+ * rcu_data->cblist成员
+ */
 struct rcu_segcblist {
 	struct rcu_head *head;
 	struct rcu_head **tails[RCU_CBLIST_NSEGS];

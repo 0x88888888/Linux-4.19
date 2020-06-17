@@ -18,6 +18,15 @@ EXPORT_SYMBOL(__init_swait_queue_head);
  *
  * If for some reason it would return 0, that means the previously waiting
  * task is already running, so it will observe condition true (or has already).
+ *
+ * rcu_spawn_one_nocb_kthread()
+ *  ......
+ *    rcu_nocb_kthread()
+ *     nocb_leader_wait()
+ *      rcu_nocb_wait_gp()
+ *       rcu_gp_kthread_wake()
+ *        swake_up_one()
+ *         swake_up_locked()
  */
 void swake_up_locked(struct swait_queue_head *q)
 {
@@ -32,6 +41,15 @@ void swake_up_locked(struct swait_queue_head *q)
 }
 EXPORT_SYMBOL(swake_up_locked);
 
+/*
+ * rcu_spawn_one_nocb_kthread()
+ *  ......
+ *    rcu_nocb_kthread()
+ *     nocb_leader_wait()
+ *      rcu_nocb_wait_gp()
+ *       rcu_gp_kthread_wake()
+ *        swake_up_one()
+ */
 void swake_up_one(struct swait_queue_head *q)
 {
 	unsigned long flags;
