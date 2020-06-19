@@ -68,6 +68,8 @@ struct hmm;
 #endif
 
 struct page {
+
+    // 在enum pageflags中
 	unsigned long flags;		/* Atomic flags, some possibly
 					 * updated asynchronously */
 	/*
@@ -84,7 +86,10 @@ struct page {
 			 * by the page owner.
 			 */
 			struct list_head lru;
-			/* See page-flags.h for PAGE_MAPPING_FLAGS */
+			/* See page-flags.h for PAGE_MAPPING_FLAGS 
+			 *
+			 * 指向address_space对象或者anon_vma对象
+			 */
 			struct address_space *mapping;
 			pgoff_t index;		/* Our offset within mapping. */
 			/**
