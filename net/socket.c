@@ -1108,7 +1108,15 @@ out_release:
 }
 EXPORT_SYMBOL(sock_create_lite);
 
-/* No kernel lock held - perfect */
+/* No kernel lock held - perfect 
+ *
+ * SYSCALL_DEFINE3(poll 
+ *  do_sys_poll()
+ *   do_poll()
+ *    do_pollfd()
+ *     vfs_poll()
+ *      sock_poll()
+ */
 static __poll_t sock_poll(struct file *file, poll_table *wait)
 {
 	struct socket *sock = file->private_data;
@@ -1126,6 +1134,8 @@ static __poll_t sock_poll(struct file *file, poll_table *wait)
 		flag = POLL_BUSY_LOOP;
 	}
 
+	// inet_stream_ops->poll == tcp_poll
+	// inet_dgram_ops->poll = udp_poll
 	return sock->ops->poll(file, sock, wait) | flag;
 }
 

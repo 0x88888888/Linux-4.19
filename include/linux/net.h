@@ -130,6 +130,10 @@ struct sk_buff;
 typedef int (*sk_read_actor_t)(read_descriptor_t *, struct sk_buff *,
 			       unsigned int, size_t);
 
+/*
+ * inet_stream_ops, inet_dgram_ops
+ * netlink_ops, inet_sockraw_ops
+ */
 struct proto_ops {
 	int		family;
 	struct module	*owner;

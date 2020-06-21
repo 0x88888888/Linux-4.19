@@ -193,6 +193,14 @@ static bool sync_rcu_preempt_exp_done_unlocked(struct rcu_node *rnp)
  * iteratively!)
  *
  * Caller must hold the specified rcu_node structure's ->lock.
+ *
+ * schedule()
+ *  __schedule()
+ *   rcu_note_context_switch()
+ *    rcu_sched_qs()
+ *     rcu_report_exp_rdp()
+ *      rcu_report_exp_cpu_mult()
+ *       __rcu_report_exp_rnp()
  */
 static void __rcu_report_exp_rnp(struct rcu_state *rsp, struct rcu_node *rnp,
 				 bool wake, unsigned long flags)
@@ -241,6 +249,13 @@ static void __maybe_unused rcu_report_exp_rnp(struct rcu_state *rsp,
 /*
  * Report expedited quiescent state for multiple CPUs, all covered by the
  * specified leaf rcu_node structure.
+ *
+ * schedule()
+ *  __schedule()
+ *   rcu_note_context_switch()
+ *    rcu_sched_qs()
+ *     rcu_report_exp_rdp()
+ *      rcu_report_exp_cpu_mult()
  */
 static void rcu_report_exp_cpu_mult(struct rcu_state *rsp, struct rcu_node *rnp,
 				    unsigned long mask, bool wake)
@@ -258,6 +273,12 @@ static void rcu_report_exp_cpu_mult(struct rcu_state *rsp, struct rcu_node *rnp,
 
 /*
  * Report expedited quiescent state for specified rcu_data (CPU).
+ *
+ * schedule()
+ *  __schedule()
+ *   rcu_note_context_switch()
+ *    rcu_sched_qs()
+ *     rcu_report_exp_rdp()
  */
 static void rcu_report_exp_rdp(struct rcu_state *rsp, struct rcu_data *rdp,
 			       bool wake)

@@ -2598,6 +2598,14 @@ int compat_udp_getsockopt(struct sock *sk, int level, int optname,
  *	then it could get return from select indicating data available
  *	but then block when reading it. Add special case code
  *	to work around these arguably broken applications.
+ *
+ * SYSCALL_DEFINE3(poll 
+ *  do_sys_poll()
+ *   do_poll()
+ *    do_pollfd()
+ *     vfs_poll()
+ *      sock_poll()
+ *       udp_poll()
  */
 __poll_t udp_poll(struct file *file, struct socket *sock, poll_table *wait)
 {

@@ -499,6 +499,14 @@ static inline bool tcp_stream_is_readable(const struct tcp_sock *tp,
  *	Note that we don't need to lock the socket, as the upper poll layers
  *	take care of normal races (between the test and the event) and we don't
  *	go look at any of the socket buffers directly.
+ *
+ * SYSCALL_DEFINE3(poll 
+ *  do_sys_poll()
+ *   do_poll()
+ *    do_pollfd()
+ *     vfs_poll()
+ *      sock_poll()
+ *       tcp_poll()
  */
 __poll_t tcp_poll(struct file *file, struct socket *sock, poll_table *wait)
 {

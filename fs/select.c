@@ -118,6 +118,11 @@ struct poll_table_page {
 static void __pollwait(struct file *filp, wait_queue_head_t *wait_address,
 		       poll_table *p);
 
+/*
+ * SYSCALL_DEFINE3(poll 
+ *  do_sys_poll()
+ *   poll_initwait()
+ */
 void poll_initwait(struct poll_wqueues *pwq)
 {
 	init_poll_funcptr(&pwq->pt, __pollwait);
@@ -803,6 +808,11 @@ struct poll_list {
  * matching that mask is both recorded in pollfd->revents and returned. The
  * pwait poll_table will be used by the fd-provided poll handler for waiting,
  * if pwait->_qproc is non-NULL.
+ *
+ * SYSCALL_DEFINE3(poll 
+ *  do_sys_poll()
+ *   do_poll()
+ *    do_pollfd()
  */
 static inline __poll_t do_pollfd(struct pollfd *pollfd, poll_table *pwait,
 				     bool *can_busy_poll,
@@ -834,6 +844,11 @@ out:
 	return mask;
 }
 
+/*
+ * SYSCALL_DEFINE3(poll 
+ *  do_sys_poll()
+ *   do_poll()
+ */
 static int do_poll(struct poll_list *list, struct poll_wqueues *wait,
 		   struct timespec64 *end_time)
 {
@@ -853,15 +868,18 @@ static int do_poll(struct poll_list *list, struct poll_wqueues *wait,
 	if (end_time && !timed_out)
 		slack = select_estimate_accuracy(end_time);
 
+    //死循环
 	for (;;) {
 		struct poll_list *walk;
 		bool can_busy_loop = false;
 
+		//2层循环，遍历所有的pollfd
 		for (walk = list; walk != NULL; walk = walk->next) {
 			struct pollfd * pfd, * pfd_end;
 
 			pfd = walk->entries;
 			pfd_end = pfd + walk->len;
+			//循环每个pollfd
 			for (; pfd != pfd_end; pfd++) {
 				/*
 				 * Fish for events. If we found one, record it
@@ -917,12 +935,17 @@ static int do_poll(struct poll_list *list, struct poll_wqueues *wait,
 		if (!poll_schedule_timeout(wait, TASK_INTERRUPTIBLE, to, slack))
 			timed_out = 1;
 	}
+	
 	return count;
 }
 
 #define N_STACK_PPS ((sizeof(stack_pps) - sizeof(struct poll_list))  / \
 			sizeof(struct pollfd))
 
+/*
+ * SYSCALL_DEFINE3(poll 
+ *  do_sys_poll()
+ */
 static int do_sys_poll(struct pollfd __user *ufds, unsigned int nfds,
 		struct timespec64 *end_time)
 {

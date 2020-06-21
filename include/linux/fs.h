@@ -1726,6 +1726,7 @@ struct iov_iter;
 
 /*
  * bpf: bpf_prog_fops 看 bpf_prog_new_fd
+ * socket_file_ops
  *
  */
 struct file_operations {
