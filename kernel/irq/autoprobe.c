@@ -26,6 +26,9 @@ static DEFINE_MUTEX(probing_active);
  *	Commence probing for an interrupt. The interrupts are scanned
  *	and a mask of potential interrupt lines is returned.
  *
+ * g_NCR5380_probe_irq()
+ *  probe_irq_on()
+ *  
  */
 unsigned long probe_irq_on(void)
 {
@@ -41,9 +44,12 @@ unsigned long probe_irq_on(void)
 	/*
 	 * something may have generated an irq long ago and we want to
 	 * flush such a longstanding irq before considering it as spurious.
+	 *
+	 * 遍历所有的irq desc
 	 */
 	for_each_irq_desc_reverse(i, desc) {
 		raw_spin_lock_irq(&desc->lock);
+		//action 必须为NULL
 		if (!desc->action && irq_settings_can_probe(desc)) {
 			/*
 			 * Some chips need to know about probing in
