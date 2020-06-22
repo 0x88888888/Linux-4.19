@@ -64,6 +64,11 @@ static int cmp_ex_sort(const void *a, const void *b)
 	return 0;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  sort_main_extable()
+ *   sort_extable(__start___ex_table, __stop___ex_table)
+ */
 void sort_extable(struct exception_table_entry *start,
 		  struct exception_table_entry *finish)
 {

@@ -1897,9 +1897,16 @@ static inline bool ptlock_init(struct page *page) { return true; }
 static inline void pte_lock_deinit(struct page *page) {}
 #endif /* USE_SPLIT_PTE_PTLOCKS */
 
+/*
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   pgtable_init()
+ */
 static inline void pgtable_init(void)
-{
+{ 
+    //空函数
 	ptlock_cache_init();
+	//空函数
 	pgtable_cache_init();
 }
 

@@ -337,6 +337,11 @@ static void __init relocate_initrd(void)
 		relocated_ramdisk, relocated_ramdisk + ramdisk_size - 1);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   early_reserve_initrd()
+ */
 static void __init early_reserve_initrd(void)
 {
 	/* Assume only end is not page aligned */
@@ -816,10 +821,14 @@ dump_kernel_offset(struct notifier_block *self, unsigned long v, void *p)
  * setup_arch - architecture-specific boot-time initializations
  *
  * Note: On x86_64, fixmaps are ready for use even before this is called.
+ *
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
  */
 
 void __init setup_arch(char **cmdline_p)
 {
+    //预留内存
 	memblock_reserve(__pa_symbol(_text),
 			 (unsigned long)__bss_stop - (unsigned long)_text);
 
@@ -848,6 +857,7 @@ void __init setup_arch(char **cmdline_p)
 			initial_page_table + KERNEL_PGD_BOUNDARY,
 			KERNEL_PGD_PTRS);
 
+    //加载pgd到cr3了
 	load_cr3(swapper_pg_dir);
 	/*
 	 * Note: Quark X1000 CPUs advertise PGE incorrectly and require

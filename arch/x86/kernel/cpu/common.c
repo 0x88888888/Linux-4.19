@@ -531,7 +531,13 @@ void load_direct_gdt(int cpu)
 }
 EXPORT_SYMBOL_GPL(load_direct_gdt);
 
-/* Load a fixmap remapping of the per-cpu GDT */
+/* Load a fixmap remapping of the per-cpu GDT 
+ *
+ * start_kernel()  [init/main.c]
+ *  trap_init()
+ *   cpu_init()
+ *    load_fixmap_gdt()
+ */
 void load_fixmap_gdt(int cpu)
 {
 	struct desc_ptr gdt_descr;
@@ -545,6 +551,11 @@ EXPORT_SYMBOL_GPL(load_fixmap_gdt);
 /*
  * Current gdt points %fs at the "master" per-cpu area: after this,
  * it's on the real one.
+ *
+ * start_kernel()  [init/main.c]
+ *  smp_prepare_boot_cpu()
+ *   native_smp_prepare_boot_cpu()
+ *    switch_to_new_gdt()
  */
 void switch_to_new_gdt(int cpu)
 {
@@ -1528,7 +1539,13 @@ DEFINE_PER_CPU(unsigned int, irq_count) __visible = -1;
 DEFINE_PER_CPU(int, __preempt_count) = INIT_PREEMPT_COUNT;
 EXPORT_PER_CPU_SYMBOL(__preempt_count);
 
-/* May not be marked __init: used by software suspend */
+/* May not be marked __init: used by software suspend 
+ *
+ * start_kernel()  [init/main.c]
+ *  trap_init()
+ *   cpu_init()
+ *    syscall_init()
+ */
 void syscall_init(void)
 {
 	extern char _entry_trampoline[];
@@ -1557,6 +1574,8 @@ void syscall_init(void)
 	wrmsrl_safe(MSR_IA32_SYSENTER_ESP, (unsigned long)(cpu_entry_stack(cpu) + 1));
 	wrmsrl_safe(MSR_IA32_SYSENTER_EIP, (u64)entry_SYSENTER_compat);
 #else
+
+    //通过 SYSENTER来进行系统调用
 	wrmsrl(MSR_CSTAR, (unsigned long)ignore_sysret);
 	wrmsrl_safe(MSR_IA32_SYSENTER_CS, (u64)GDT_ENTRY_INVALID_SEG);
 	wrmsrl_safe(MSR_IA32_SYSENTER_ESP, 0ULL);
@@ -1678,6 +1697,11 @@ static void wait_for_master_cpu(int cpu)
  */
 #ifdef CONFIG_X86_64
 
+/*
+ * start_kernel()  [init/main.c]
+ *  trap_init()
+ *   cpu_init()
+ */
 void cpu_init(void)
 {
 	struct orig_ist *oist;

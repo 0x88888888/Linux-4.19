@@ -371,6 +371,9 @@ static inline void smp_prepare_cpus(unsigned int maxcpus) { }
  * We also need to store the touched command line since the parameter
  * parsing is performed in place, and we should allow a component to
  * store reference of name/value for future reference.
+ *
+ * start_kernel()  [init/main.c]
+ *  setup_command_line()
  */
 static void __init setup_command_line(char *command_line)
 {
@@ -461,13 +464,22 @@ static int __init do_early_param(char *param, char *val,
 	return 0;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  parse_early_param()
+ *   parse_early_options()
+ */
 void __init parse_early_options(char *cmdline)
 {
 	parse_args("early options", cmdline, NULL, 0, 0, 0, NULL,
 		   do_early_param);
 }
 
-/* Arch code calls this early on, or if not, just before other parsing. */
+/* Arch code calls this early on, or if not, just before other parsing. 
+ *
+ * start_kernel()  [init/main.c]
+ *  parse_early_param()
+ */
 void __init parse_early_param(void)
 {
 	static int done __initdata;
@@ -509,6 +521,9 @@ static inline void initcall_debug_enable(void)
 
 /*
  * Set up kernel memory allocators
+ *
+ * start_kernel()  [init/main.c]
+ *  mm_init()
  */
 static void __init mm_init(void)
 {
@@ -516,10 +531,14 @@ static void __init mm_init(void)
 	 * page_ext requires contiguous pages,
 	 * bigger than MAX_ORDER unless SPARSEMEM.
 	 */
+	//空函数
 	page_ext_init_flatmem();
+	
 	mem_init();
+	
 	kmem_cache_init();
 	pgtable_init();
+	
 	vmalloc_init();
 	ioremap_huge_init();
 	/* Should be run before the first non-init thread is created */
@@ -528,39 +547,58 @@ static void __init mm_init(void)
 	pti_init();
 }
 
+//到这个函数的时候，已经进入保护模式了
 asmlinkage __visible void __init start_kernel(void)
 {
 	char *command_line;
 	char *after_dashes;
 
 	set_task_stack_end_magic(&init_task);
+
+	//x64中为空函数
 	smp_setup_processor_id();
+	
 	debug_objects_early_init();
 
 	cgroup_init_early();
 
+
+	//关中断
 	local_irq_disable();
 	early_boot_irqs_disabled = true;
 
 	/*
 	 * Interrupts are still disabled. Do necessary setups, then
 	 * enable them.
+	 * 标记当前cpu在 __cpu_online_mask ,__cpu_active_mask ,
+	 *               __cpu_present_mask, __cpu_possible_mask中的值
 	 */
 	boot_cpu_init();
+
+	//初始化page_address_htable[], 这个表应该是在 kmap会用到,vmalloc 不会用到
 	page_address_init();
+	
 	pr_notice("%s", linux_banner);
+	
 	setup_arch(&command_line);
 	/*
 	 * Set up the the initial canary and entropy after arch
 	 * and after adding latent and command line entropy.
 	 */
 	add_latent_entropy();
+	
 	add_device_randomness(command_line, strlen(command_line));
+	
 	boot_init_stack_canary();
+	
 	mm_init_cpumask(&init_mm);
+	//复制command_line到saved_command_line
 	setup_command_line(command_line);
+	
 	setup_nr_cpu_ids();
 	setup_per_cpu_areas();
+
+	//根据cpu id装载gdt
 	smp_prepare_boot_cpu();	/* arch-specific boot-cpu hooks */
 	boot_cpu_hotplug_init();
 
@@ -568,6 +606,7 @@ asmlinkage __visible void __init start_kernel(void)
 	page_alloc_init();
 
 	pr_notice("Kernel command line: %s\n", boot_command_line);
+	
 	parse_early_param();
 	after_dashes = parse_args("Booting kernel",
 				  static_command_line, __start___param,
@@ -584,9 +623,14 @@ asmlinkage __visible void __init start_kernel(void)
 	 * kmem_cache_init()
 	 */
 	setup_log_buf(0);
+	
 	vfs_caches_init_early();
+	
 	sort_main_extable();
+
+	//设置中断处理函数和内部异常处理函数
 	trap_init();
+	
 	mm_init();
 
 	ftrace_init();

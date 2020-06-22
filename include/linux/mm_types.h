@@ -507,7 +507,11 @@ struct mm_struct {
 
 extern struct mm_struct init_mm;
 
-/* Pointer magic because the dynamic array size confuses some compilers. */
+/* Pointer magic because the dynamic array size confuses some compilers. 
+ *
+ * start_kernel()  [init/main.c] 
+ *  mm_init_cpumask()
+ */
 static inline void mm_init_cpumask(struct mm_struct *mm)
 {
 	unsigned long cpu_bitmap = (unsigned long)mm;

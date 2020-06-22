@@ -1327,6 +1327,10 @@ void arch_enable_nonboot_cpus_end(void)
 
 /*
  * Early setup to make printk work.
+ *
+ * start_kernel()  [init/main.c]
+ *  smp_prepare_boot_cpu()
+ *   native_smp_prepare_boot_cpu()
  */
 void __init native_smp_prepare_boot_cpu(void)
 {

@@ -223,6 +223,12 @@ static int slab_early_init = 1;
 
 #define INDEX_NODE kmalloc_index(sizeof(struct kmem_cache_node))
 
+/*
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   kmem_cache_init()
+ *    kmem_cache_node_init()
+ */
 static void kmem_cache_node_init(struct kmem_cache_node *parent)
 {
 	INIT_LIST_HEAD(&parent->slabs_full);
@@ -1234,6 +1240,10 @@ static void __init set_up_node(struct kmem_cache *cachep, int index)
 /*
  * Initialisation.  Called after the page allocator have been initialised and
  * before smp_init().
+ *
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   kmem_cache_init()
  */
 void __init kmem_cache_init(void)
 {

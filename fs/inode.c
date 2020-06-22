@@ -1927,6 +1927,10 @@ __setup("ihash_entries=", set_ihash_entries);
 
 /*
  * Initialize the waitqueues and inode hash table.
+ *
+ * start_kernel()  [init/main.c]
+ *  vfs_caches_init_early()
+ *   inode_init_early()
  */
 void __init inode_init_early(void)
 {

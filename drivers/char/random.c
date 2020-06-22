@@ -1097,6 +1097,9 @@ struct timer_rand_state {
  * None of this adds any entropy; it is meant to avoid the problem of
  * the entropy pool having similar initial state across largely
  * identical devices.
+ *
+ * start_kernel()  [init/main.c]
+ *  add_device_randomness()
  */
 void add_device_randomness(const void *buf, unsigned int size)
 {

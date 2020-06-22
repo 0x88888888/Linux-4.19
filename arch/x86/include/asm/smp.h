@@ -76,8 +76,13 @@ static inline void stop_other_cpus(void)
 	smp_ops.stop_other_cpus(1);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  smp_prepare_boot_cpu()
+ */
 static inline void smp_prepare_boot_cpu(void)
 {
+    //smp_ops.smp_prepare_boot_cpu == native_smp_prepare_boot_cpu
 	smp_ops.smp_prepare_boot_cpu();
 }
 

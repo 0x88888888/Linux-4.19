@@ -27,6 +27,11 @@ static int __init set_nohugeiomap(char *str)
 }
 early_param("nohugeiomap", set_nohugeiomap);
 
+/*
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   ioremap_huge_init()
+ */
 void __init ioremap_huge_init(void)
 {
 	if (!ioremap_huge_disabled) {

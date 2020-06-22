@@ -216,6 +216,14 @@ static inline void idt_init_desc(gate_desc *gate, const struct idt_data *d)
 #endif
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  trap_init()
+ *   idt_setup_traps()
+ *    idt_setup_from_table(idt_table, def_idts, ARRAY_SIZE(def_idts), true)
+ *
+ * 初始化中断向量
+ */
 static void
 idt_setup_from_table(gate_desc *idt, const struct idt_data *t, int size, bool sys)
 {
@@ -261,6 +269,10 @@ void __init idt_setup_early_traps(void)
 
 /**
  * idt_setup_traps - Initialize the idt table with default traps
+ *
+ * start_kernel()  [init/main.c]
+ *  trap_init()
+ *   idt_setup_traps()
  */
 void __init idt_setup_traps(void)
 {

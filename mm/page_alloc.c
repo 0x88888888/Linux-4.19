@@ -5386,6 +5386,11 @@ static void __build_all_zonelists(void *data)
 	spin_unlock(&lock);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  build_all_zonelists(NULL)
+ *   build_all_zonelists_init()
+ */
 static noinline void __init
 build_all_zonelists_init(void)
 {
@@ -5418,6 +5423,10 @@ build_all_zonelists_init(void)
  *
  * __ref due to call of __init annotated helper build_all_zonelists_init
  * [protected by SYSTEM_BOOTING].
+ *
+ * start_kernel()  [init/main.c]
+ *  build_all_zonelists(NULL)
+ *
  */
 void __ref build_all_zonelists(pg_data_t *pgdat)
 {
@@ -7122,6 +7131,10 @@ static int page_alloc_cpu_dead(unsigned int cpu)
 	return 0;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  page_alloc_init()
+ */
 void __init page_alloc_init(void)
 {
 	int ret;

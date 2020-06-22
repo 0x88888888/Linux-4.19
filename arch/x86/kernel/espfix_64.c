@@ -100,6 +100,12 @@ static inline unsigned long espfix_base_addr(unsigned int cpu)
 
 #define PGTABLE_PROT	  ((_KERNPG_TABLE & ~_PAGE_RW) | _PAGE_NX)
 
+/*
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   init_espfix_bsp()
+ *    init_espfix_random()
+ */
 static void init_espfix_random(void)
 {
 	unsigned long rand;
@@ -119,6 +125,11 @@ static void init_espfix_random(void)
 		& (ESPFIX_PAGE_SPACE - 1);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   init_espfix_bsp()
+ */
 void __init init_espfix_bsp(void)
 {
 	pgd_t *pgd;
@@ -136,6 +147,12 @@ void __init init_espfix_bsp(void)
 	init_espfix_ap(0);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   init_espfix_bsp()
+ *    init_espfix_ap(0)
+ */
 void init_espfix_ap(int cpu)
 {
 	unsigned int page;

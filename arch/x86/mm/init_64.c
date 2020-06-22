@@ -1171,16 +1171,27 @@ int __ref arch_remove_memory(u64 start, u64 size, struct vmem_altmap *altmap)
 
 static struct kcore_list kcore_vsyscall;
 
+/*
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   mem_init()
+ *    register_page_bootmem_info()
+ */
 static void __init register_page_bootmem_info(void)
 {
 #ifdef CONFIG_NUMA
 	int i;
 
 	for_each_online_node(i)
-		register_page_bootmem_info_node(NODE_DATA(i));
+		register_page_bootmem_info_node(NODE_DATA(i)); //空函数
 #endif
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   mem_init()
+ */
 void __init mem_init(void)
 {
 	pci_iommu_alloc();

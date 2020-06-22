@@ -3091,6 +3091,12 @@ static int __init set_dhash_entries(char *str)
 }
 __setup("dhash_entries=", set_dhash_entries);
 
+
+/*
+ * start_kernel()  [init/main.c]
+ *  vfs_caches_init_early()
+ *   dcache_init_early()
+ */
 static void __init dcache_init_early(void)
 {
 	/* If hashes are distributed across NUMA nodes, defer
@@ -3144,6 +3150,10 @@ static void __init dcache_init(void)
 struct kmem_cache *names_cachep __read_mostly;
 EXPORT_SYMBOL(names_cachep);
 
+/*
+ * start_kernel()  [init/main.c]
+ *  vfs_caches_init_early()
+ */
 void __init vfs_caches_init_early(void)
 {
 	int i;
@@ -3151,7 +3161,9 @@ void __init vfs_caches_init_early(void)
 	for (i = 0; i < ARRAY_SIZE(in_lookup_hashtable); i++)
 		INIT_HLIST_BL_HEAD(&in_lookup_hashtable[i]);
 
+    //分配dentry_hashtable空间
 	dcache_init_early();
+	//分配inode_hashtable空间
 	inode_init_early();
 }
 

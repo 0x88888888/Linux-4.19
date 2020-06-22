@@ -2240,6 +2240,10 @@ void init_cpu_online(const struct cpumask *src)
 
 /*
  * Activate the first processor.
+ * 标记当前cpu的状态
+ *
+ * start_kernel()  [init/main.c]
+ *  boot_cpu_init()
  */
 void __init boot_cpu_init(void)
 {
@@ -2251,6 +2255,7 @@ void __init boot_cpu_init(void)
 	set_cpu_present(cpu, true);
 	set_cpu_possible(cpu, true);
 
+    //标记主cpu了
 #ifdef CONFIG_SMP
 	__boot_cpu_id = cpu;
 #endif

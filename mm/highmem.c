@@ -412,15 +412,18 @@ void *page_address(const struct page *page)
 	void *ret;
 	struct page_address_slot *pas;
 
+    //不属于high memory范围内
 	if (!PageHighMem(page))
 		return lowmem_page_address(page);
 
+    //在hash table 中找到对应的bucket
 	pas = page_slot(page);
 	ret = NULL;
 	spin_lock_irqsave(&pas->lock, flags);
 	if (!list_empty(&pas->lh)) {
 		struct page_address_map *pam;
 
+        //遍历，比较
 		list_for_each_entry(pam, &pas->lh, list) {
 			if (pam->page == page) {
 				ret = pam->virtual;
@@ -448,6 +451,7 @@ void set_page_address(struct page *page, void *virtual)
 
 	BUG_ON(!PageHighMem(page));
 
+    //在page_address_htable[]中的bucket
 	pas = page_slot(page);
 	if (virtual) {		/* Add */
 		pam = &page_address_maps[PKMAP_NR((unsigned long)virtual)];
@@ -472,6 +476,10 @@ done:
 	return;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  page_address_init()
+ */
 void __init page_address_init(void)
 {
 	int i;

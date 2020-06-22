@@ -79,7 +79,14 @@ static void percpu_setup_debug_store(int cpu)
 #endif
 }
 
-/* Setup the fixmap mappings only once per-processor */
+/* Setup the fixmap mappings only once per-processor 
+ *
+ *
+ * start_kernel()  [init/main.c]
+ *  trap_init()
+ *   setup_cpu_entry_areas()
+ *    setup_cpu_entry_area()
+ */
 static void __init setup_cpu_entry_area(int cpu)
 {
 #ifdef CONFIG_X86_64
@@ -200,6 +207,11 @@ static __init void setup_cpu_entry_area_ptes(void)
 #endif
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  trap_init()
+ *   setup_cpu_entry_areas()
+ */
 void __init setup_cpu_entry_areas(void)
 {
 	unsigned int cpu;
@@ -212,6 +224,8 @@ void __init setup_cpu_entry_areas(void)
 	/*
 	 * This is the last essential update to swapper_pgdir which needs
 	 * to be synchronized to initial_page_table on 32bit.
+	 * 
+	 * x64为空
 	 */
 	sync_initial_page_table();
 }

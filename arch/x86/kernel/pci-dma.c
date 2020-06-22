@@ -59,6 +59,13 @@ struct device x86_dma_fallback_dev = {
 };
 EXPORT_SYMBOL(x86_dma_fallback_dev);
 
+
+/*
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   mem_init()
+ *    pci_iommu_alloc()
+ */
 void __init pci_iommu_alloc(void)
 {
 	struct iommu_table_entry *p;

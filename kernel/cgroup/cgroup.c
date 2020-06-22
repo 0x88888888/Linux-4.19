@@ -1848,6 +1848,13 @@ out_unlock:
 	read_unlock(&tasklist_lock);
 }
 
+
+/*
+ * start_kernel()  [init/main.c]
+ *  cgroup_init_early()
+ *   init_cgroup_root()
+ *    init_cgroup_housekeeping()
+ */
 static void init_cgroup_housekeeping(struct cgroup *cgrp)
 {
 	struct cgroup_subsys *ss;
@@ -1873,6 +1880,11 @@ static void init_cgroup_housekeeping(struct cgroup *cgrp)
 	INIT_WORK(&cgrp->release_agent_work, cgroup1_release_agent);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  cgroup_init_early()
+ *   init_cgroup_root()
+ */
 void init_cgroup_root(struct cgroup_root *root, struct cgroup_sb_opts *opts)
 {
 	struct cgroup *cgrp = &root->cgrp;
@@ -1880,6 +1892,7 @@ void init_cgroup_root(struct cgroup_root *root, struct cgroup_sb_opts *opts)
 	INIT_LIST_HEAD(&root->root_list);
 	atomic_set(&root->nr_cgrps, 1);
 	cgrp->root = root;
+	
 	init_cgroup_housekeeping(cgrp);
 	idr_init(&root->cgroup_idr);
 
@@ -5192,6 +5205,11 @@ static struct kernfs_syscall_ops cgroup_kf_syscall_ops = {
 	.show_path		= cgroup_show_path,
 };
 
+/*
+ * start_kernel()  [init/main.c]
+ *  cgroup_init_early()
+ *   cgroup_init_subsys()
+ */
 static void __init cgroup_init_subsys(struct cgroup_subsys *ss, bool early)
 {
 	struct cgroup_subsys_state *css;
@@ -5250,6 +5268,9 @@ static void __init cgroup_init_subsys(struct cgroup_subsys *ss, bool early)
  *
  * Initialize cgroups at system boot, and initialize any
  * subsystems that request early init.
+ *
+ * start_kernel()  [init/main.c]
+ *  cgroup_init_early()
  */
 int __init cgroup_init_early(void)
 {

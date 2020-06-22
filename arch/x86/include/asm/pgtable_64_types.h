@@ -20,6 +20,8 @@ typedef unsigned long	pgprotval_t;
 
 typedef struct { pteval_t pte; } pte_t;
 
+
+//没有定义CONFIG_X86_5LEVEL
 #ifdef CONFIG_X86_5LEVEL
 extern unsigned int __pgtable_l5_enabled;
 
@@ -47,6 +49,8 @@ extern unsigned int ptrs_per_p4d;
 
 #define SHARED_KERNEL_PMD	0
 
+
+//没有定义CONFIG_X86_5LEVEL
 #ifdef CONFIG_X86_5LEVEL
 
 /*
@@ -67,6 +71,7 @@ extern unsigned int ptrs_per_p4d;
 #define MAX_POSSIBLE_PHYSMEM_BITS	52
 
 #else /* CONFIG_X86_5LEVEL */
+// 用这里的定义
 
 /*
  * PGDIR_SHIFT determines what a top-level page table entry can map
@@ -95,11 +100,11 @@ extern unsigned int ptrs_per_p4d;
  */
 #define PTRS_PER_PTE	512
 
-#define PMD_SIZE	(_AC(1, UL) << PMD_SHIFT)
+#define PMD_SIZE	(_AC(1, UL) << PMD_SHIFT /* 21 */)
 #define PMD_MASK	(~(PMD_SIZE - 1))
-#define PUD_SIZE	(_AC(1, UL) << PUD_SHIFT)
+#define PUD_SIZE	(_AC(1, UL) << PUD_SHIFT /* 30 */)
 #define PUD_MASK	(~(PUD_SIZE - 1))
-#define PGDIR_SIZE	(_AC(1, UL) << PGDIR_SHIFT)
+#define PGDIR_SIZE	(_AC(1, UL) << PGDIR_SHIFT /* 39 */ )
 #define PGDIR_MASK	(~(PGDIR_SIZE - 1))
 
 /*
@@ -126,6 +131,7 @@ extern unsigned int ptrs_per_p4d;
 #define __VMEMMAP_BASE_L4	0xffffea0000000000UL
 #define __VMEMMAP_BASE_L5	0xffd4000000000000UL
 
+//这个宏有定义
 #ifdef CONFIG_DYNAMIC_MEMORY_LAYOUT
 # define VMALLOC_START		vmalloc_base
 # define VMALLOC_SIZE_TB	(pgtable_l5_enabled() ? VMALLOC_SIZE_TB_L5 : VMALLOC_SIZE_TB_L4)

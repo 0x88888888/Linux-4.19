@@ -422,6 +422,11 @@ static inline void load_debug_idt(void)
  * descriptor. It's also called when a CPU is being initialized, and
  * that doesn't need to disable interrupts, as nothing should be
  * bothering the CPU then.
+ *
+ * start_kernel()  [init/main.c]
+ *  trap_init()
+ *   cpu_init()
+ *    load_current_idt()
  */
 static inline void load_current_idt(void)
 {

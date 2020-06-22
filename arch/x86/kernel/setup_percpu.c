@@ -163,6 +163,10 @@ static inline void setup_percpu_segment(int cpu)
 #endif
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_per_cpu_areas()
+ */
 void __init setup_per_cpu_areas(void)
 {
 	unsigned int cpu;

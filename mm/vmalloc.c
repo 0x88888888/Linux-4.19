@@ -1238,6 +1238,11 @@ void __init vm_area_register_early(struct vm_struct *vm, size_t align)
 	vm_area_add_early(vm);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   vmalloc_init()
+ */
 void __init vmalloc_init(void)
 {
 	struct vmap_area *va;
@@ -1245,6 +1250,7 @@ void __init vmalloc_init(void)
 	int i;
 
 	for_each_possible_cpu(i) {
+		
 		struct vmap_block_queue *vbq;
 		struct vfree_deferred *p;
 
@@ -1263,6 +1269,7 @@ void __init vmalloc_init(void)
 		va->va_start = (unsigned long)tmp->addr;
 		va->va_end = va->va_start + tmp->size;
 		va->vm = tmp;
+		//插入到vmap_area_root中
 		__insert_vmap_area(va);
 	}
 

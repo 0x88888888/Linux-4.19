@@ -418,6 +418,13 @@ pti_clone_pgtable(unsigned long start, unsigned long end,
 /*
  * Clone a single p4d (i.e. a top-level entry on 4-level systems and a
  * next-level entry on 5-level systems.
+ *
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   pti_init()
+ *    pti_clone_user_shared()
+ *     pti_clone_user_shared()
+ *      pti_clone_p4d()
  */
 static void __init pti_clone_p4d(unsigned long addr)
 {
@@ -435,6 +442,12 @@ static void __init pti_clone_p4d(unsigned long addr)
 
 /*
  * Clone the CPU_ENTRY_AREA into the user space visible page table.
+ *
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   pti_init()
+ *    pti_clone_user_shared()
+ *     pti_clone_user_shared()
  */
 static void __init pti_clone_user_shared(void)
 {
@@ -448,6 +461,7 @@ static void __init pti_clone_user_shared(void)
  * one pgd/p4d for the whole kernel. Cloning that would map the whole
  * address space into the user page-tables, making PTI useless. So clone
  * the page-table on the PMD level to prevent that.
+ *
  */
 static void __init pti_clone_user_shared(void)
 {
@@ -592,6 +606,10 @@ void pti_set_kernel_image_nonglobal(void)
 
 /*
  * Initialize kernel page table isolation
+ *
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   pti_init()
  */
 void __init pti_init(void)
 {
@@ -600,6 +618,7 @@ void __init pti_init(void)
 
 	pr_info("enabled\n");
 
+//不会有这个宏定义
 #ifdef CONFIG_X86_32
 	/*
 	 * We check for X86_FEATURE_PCID here. But the init-code will

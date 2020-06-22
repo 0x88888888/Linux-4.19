@@ -986,7 +986,7 @@ static inline int pgd_none(pgd_t pgd)
  * this macro returns the index of the entry in the pgd page which would
  * control the given virtual address
  */
-#define pgd_index(address) (((address) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
+#define pgd_index(address) (((address) >> PGDIR_SHIFT /* 39 */) & (PTRS_PER_PGD /* 512 */ - 1))
 
 /*
  * pgd_offset() returns a (pgd_t *)
@@ -1000,6 +1000,8 @@ static inline int pgd_none(pgd_t pgd)
 /*
  * a shortcut which implies the use of the kernel's pgd, instead
  * of a process's
+ *
+ * 
  */
 #define pgd_offset_k(address) pgd_offset(&init_mm, (address))
 
