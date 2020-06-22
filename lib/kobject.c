@@ -756,6 +756,12 @@ struct kobject *kobject_create(void)
  * it is no longer being used.
  *
  * If the kobject was not able to be created, NULL will be returned.
+ *
+ * start_kernel()  [init/main.c]
+ *  buffer_init()
+ *   vfs_caches_init()
+ *    mnt_init()
+ *     kobject_create_and_add("fs", NULL)
  */
 struct kobject *kobject_create_and_add(const char *name, struct kobject *parent)
 {

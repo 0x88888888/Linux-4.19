@@ -2072,6 +2072,10 @@ static int page_writeback_cpu_online(unsigned int cpu)
  *
  * But we might still want to scale the dirty_ratio by how
  * much memory the box has..
+ *
+ * start_kernel()  [init/main.c]
+ *  pagecache_init()
+ *   page_writeback_init()
  */
 void __init page_writeback_init(void)
 {

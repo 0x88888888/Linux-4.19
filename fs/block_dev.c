@@ -807,6 +807,12 @@ static struct file_system_type bd_type = {
 struct super_block *blockdev_superblock __read_mostly;
 EXPORT_SYMBOL_GPL(blockdev_superblock);
 
+/*
+ * start_kernel()  [init/main.c]
+ *  buffer_init()
+ *   vfs_caches_init()
+ *    bdev_cache_init()
+ */
 void __init bdev_cache_init(void)
 {
 	int err;

@@ -437,6 +437,10 @@ out_free_cache:
  * %SLAB_HWCACHE_ALIGN - Align the objects in this cache to a hardware
  * cacheline.  This can be beneficial if you're counting cycles as closely
  * as davem.
+ *
+ * start_kernel()  [init/main.c]
+ *  uts_ns_init()
+ *   kmem_cache_create_usercopy()
  */
 struct kmem_cache *
 kmem_cache_create_usercopy(const char *name,
@@ -490,6 +494,7 @@ kmem_cache_create_usercopy(const char *name,
 		goto out_unlock;
 	}
 
+    //创建kmem_cache对象
 	s = create_cache(cache_name, size,
 			 calculate_alignment(flags, align, size),
 			 flags, useroffset, usersize, ctor, NULL, NULL);

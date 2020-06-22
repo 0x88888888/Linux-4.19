@@ -942,6 +942,14 @@ static struct mount *skip_mnt_tree(struct mount *p)
 	return p;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *	buffer_init()
+ *	 vfs_caches_init()
+ *	  mnt_init()
+ *     init_mount_tree()
+ *      vfs_kern_mount(rootfs_fs_type, 0, "rootfs", NULL);
+ */
 struct vfsmount *
 vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void *data)
 {
@@ -951,6 +959,7 @@ vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void 
 	if (!type)
 		return ERR_PTR(-ENODEV);
 
+    //分配一个mount对象
 	mnt = alloc_vfsmnt(name);
 	if (!mnt)
 		return ERR_PTR(-ENOMEM);
@@ -3165,6 +3174,13 @@ out0:
 	return error;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *	buffer_init()
+ *	 vfs_caches_init()
+ *	  mnt_init()
+ *     init_mount_tree()
+ */
 static void __init init_mount_tree(void)
 {
 	struct vfsmount *mnt;
@@ -3175,6 +3191,7 @@ static void __init init_mount_tree(void)
 	type = get_fs_type("rootfs");
 	if (!type)
 		panic("Can't find rootfs type");
+	
 	mnt = vfs_kern_mount(type, 0, "rootfs", NULL);
 	put_filesystem(type);
 	if (IS_ERR(mnt))
@@ -3195,6 +3212,12 @@ static void __init init_mount_tree(void)
 	set_fs_root(current->fs, &root);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  buffer_init()
+ *   vfs_caches_init()
+ *    mnt_init()
+ */
 void __init mnt_init(void)
 {
 	int err;
@@ -3222,9 +3245,11 @@ void __init mnt_init(void)
 	if (err)
 		printk(KERN_WARNING "%s: sysfs_init error: %d\n",
 			__func__, err);
+	
 	fs_kobj = kobject_create_and_add("fs", NULL);
 	if (!fs_kobj)
 		printk(KERN_WARNING "%s: kobj create error\n", __func__);
+	
 	init_rootfs();
 	init_mount_tree();
 }
@@ -3237,6 +3262,14 @@ void put_mnt_ns(struct mnt_namespace *ns)
 	free_mnt_ns(ns);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  buffer_init()
+ *   vfs_caches_init()
+ *    bdev_cache_init()
+ *     kern_mount(bd_type)
+ *      kern_mount_data(bd_type, NULL)
+ */
 struct vfsmount *kern_mount_data(struct file_system_type *type, void *data)
 {
 	struct vfsmount *mnt;

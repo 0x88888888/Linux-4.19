@@ -1952,6 +1952,12 @@ void __init inode_init_early(void)
 					0);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  buffer_init()
+ *   vfs_caches_init()
+ *    inode_init()
+ */
 void __init inode_init(void)
 {
 	/* inode slab cache */

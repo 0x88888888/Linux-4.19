@@ -967,6 +967,10 @@ static wait_queue_head_t *page_waitqueue(struct page *page)
 	return &page_wait_table[hash_ptr(page, PAGE_WAIT_TABLE_BITS)];
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  pagecache_init()
+ */
 void __init pagecache_init(void)
 {
 	int i;

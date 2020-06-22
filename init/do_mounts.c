@@ -594,6 +594,16 @@ out:
 }
 
 static bool is_tmpfs;
+/*
+ * start_kernel()  [init/main.c]
+ *	buffer_init()
+ *	 vfs_caches_init()
+ *	  mnt_init()
+ *     init_mount_tree()
+ *      vfs_kern_mount(rootfs_fs_type, 0, "rootfs", NULL)
+ *       mount_fs(rootfs_fs_type, 0, "rootfs", NULL)
+ *        rootfs_mount(rootfs_fs_type, 0, "rootfs", NULL)
+ */
 static struct dentry *rootfs_mount(struct file_system_type *fs_type,
 	int flags, const char *dev_name, void *data)
 {
@@ -615,6 +625,13 @@ static struct file_system_type rootfs_fs_type = {
 	.kill_sb	= kill_litter_super,
 };
 
+/*
+ * start_kernel()  [init/main.c]
+ *  buffer_init()
+ *   vfs_caches_init()
+ *    mnt_init()
+ *     init_rootfs()
+ */
 int __init init_rootfs(void)
 {
 	int err = register_filesystem(&rootfs_fs_type);

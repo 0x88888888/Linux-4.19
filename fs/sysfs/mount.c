@@ -58,6 +58,13 @@ static struct file_system_type sysfs_fs_type = {
 	.fs_flags	= FS_USERNS_MOUNT,
 };
 
+/*
+ * start_kernel()  [init/main.c]
+ *  buffer_init()
+ *   vfs_caches_init()
+ *    mnt_init()
+ *     sysfs_init()
+ */
 int __init sysfs_init(void)
 {
 	int err;

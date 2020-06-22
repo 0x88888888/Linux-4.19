@@ -217,6 +217,18 @@ static int ramfs_parse_options(char *data, struct ramfs_mount_opts *opts)
 	return 0;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *	buffer_init()
+ *	 vfs_caches_init()
+ *	  mnt_init()
+ *     init_mount_tree()
+ *      vfs_kern_mount(rootfs_fs_type, 0, "rootfs", NULL)
+ *       mount_fs(rootfs_fs_type, 0, "rootfs", NULL)
+ *        rootfs_mount(rootfs_fs_type, 0, "rootfs", NULL)
+ *         mount_nodev(rootfs_fs_type, 0, NULL, fill_super==ramfs_fill_super)
+ *          ramfs_fill_super()
+ */
 int ramfs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct ramfs_fs_info *fsi;
@@ -266,6 +278,14 @@ static struct file_system_type ramfs_fs_type = {
 	.fs_flags	= FS_USERNS_MOUNT,
 };
 
+/*
+ * start_kernel()  [init/main.c]
+ *  buffer_init()
+ *   vfs_caches_init()
+ *    mnt_init()
+ *     init_rootfs()
+ *      init_ramfs_fs()
+ */
 int __init init_ramfs_fs(void)
 {
 	static unsigned long once;

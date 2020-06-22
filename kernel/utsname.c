@@ -172,6 +172,10 @@ const struct proc_ns_operations utsns_operations = {
 	.owner		= utsns_owner,
 };
 
+/*
+ * start_kernel()  [init/main.c]
+ *  uts_ns_init()
+ */
 void __init uts_ns_init(void)
 {
 	uts_ns_cache = kmem_cache_create_usercopy(

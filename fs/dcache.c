@@ -3118,6 +3118,12 @@ static void __init dcache_init_early(void)
 	d_hash_shift = 32 - d_hash_shift;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  buffer_init()
+ *   vfs_caches_init()
+ *    dcache_init()
+ */
 static void __init dcache_init(void)
 {
 	/*
@@ -3167,6 +3173,11 @@ void __init vfs_caches_init_early(void)
 	inode_init_early();
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  buffer_init()
+ *   vfs_caches_init()
+ */
 void __init vfs_caches_init(void)
 {
 	names_cachep = kmem_cache_create_usercopy("names_cache", PATH_MAX, 0,

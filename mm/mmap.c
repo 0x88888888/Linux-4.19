@@ -3587,6 +3587,10 @@ void mm_drop_all_locks(struct mm_struct *mm)
 
 /*
  * initialise the percpu counter for VM
+ *
+ * start_kernel()  [init/main.c]
+ *  proc_caches_init()
+ *   mmap_init()
  */
 void __init mmap_init(void)
 {

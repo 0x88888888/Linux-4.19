@@ -270,6 +270,11 @@ out:
 	return err;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  proc_caches_init()
+ *   nsproxy_cache_init()
+ */
 int __init nsproxy_cache_init(void)
 {
 	nsproxy_cachep = KMEM_CACHE(nsproxy, SLAB_PANIC);

@@ -400,6 +400,13 @@ struct super_block *kernfs_pin_sb(struct kernfs_root *root, const void *ns)
 	return sb;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  buffer_init()
+ *   vfs_caches_init()
+ *    mnt_init()
+ *     kernfs_init()
+ */
 void __init kernfs_init(void)
 {
 

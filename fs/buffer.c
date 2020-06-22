@@ -3483,6 +3483,10 @@ int bh_submit_read(struct buffer_head *bh)
 }
 EXPORT_SYMBOL(bh_submit_read);
 
+/*
+ * start_kernel()  [init/main.c]
+ *  buffer_init()
+ */
 void __init buffer_init(void)
 {
 	unsigned long nrpages;

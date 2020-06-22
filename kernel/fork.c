@@ -2326,6 +2326,10 @@ static void sighand_ctor(void *data)
 	init_waitqueue_head(&sighand->signalfd_wqh);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  proc_caches_init()
+ */
 void __init proc_caches_init(void)
 {
 	unsigned int mm_size;

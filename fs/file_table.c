@@ -366,6 +366,12 @@ void __fput_sync(struct file *file)
 
 EXPORT_SYMBOL(fput);
 
+/*
+ * start_kernel()  [init/main.c]
+ *  buffer_init()
+ *   vfs_caches_init()
+ *    files_init()
+ */
 void __init files_init(void)
 {
 	filp_cachep = kmem_cache_create("filp", sizeof(struct file), 0,
@@ -376,6 +382,11 @@ void __init files_init(void)
 /*
  * One file with associated inode and dcache is very roughly 1K. Per default
  * do not use more than 10% of our memory for files.
+ *
+ * start_kernel()  [init/main.c]
+ *  buffer_init()
+ *   vfs_caches_init()
+ *    files_maxfiles_init()
  */
 void __init files_maxfiles_init(void)
 {

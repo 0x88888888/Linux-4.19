@@ -1190,7 +1190,17 @@ void kill_block_super(struct super_block *sb)
 
 EXPORT_SYMBOL(kill_block_super);
 #endif
-
+/*
+ * start_kernel()  [init/main.c]
+ *	buffer_init()
+ *	 vfs_caches_init()
+ *	  mnt_init()
+ *     init_mount_tree()
+ *      vfs_kern_mount(rootfs_fs_type, 0, "rootfs", NULL)
+ *       mount_fs(rootfs_fs_type, 0, "rootfs", NULL)
+ *        rootfs_mount(rootfs_fs_type, 0, "rootfs", NULL)
+ *         mount_nodev(rootfs_fs_type, 0, NULL, fill_super==ramfs_fill_super)
+ */
 struct dentry *mount_nodev(struct file_system_type *fs_type,
 	int flags, void *data,
 	int (*fill_super)(struct super_block *, void *, int))
@@ -1240,6 +1250,15 @@ struct dentry *mount_single(struct file_system_type *fs_type,
 }
 EXPORT_SYMBOL(mount_single);
 
+/*
+ * start_kernel()  [init/main.c]
+ *	buffer_init()
+ *	 vfs_caches_init()
+ *	  mnt_init()
+ *     init_mount_tree()
+ *      vfs_kern_mount(rootfs_fs_type, 0, "rootfs", NULL)
+ *       mount_fs(rootfs_fs_type, 0, "rootfs", NULL)
+ */
 struct dentry *
 mount_fs(struct file_system_type *type, int flags, const char *name, void *data)
 {
@@ -1258,6 +1277,9 @@ mount_fs(struct file_system_type *type, int flags, const char *name, void *data)
 			goto out_free_secdata;
 	}
 
+    /*
+     * rootfs_fs_type->mount == rootfs_mount
+     */
 	root = type->mount(type, flags, name, data);
 	if (IS_ERR(root)) {
 		error = PTR_ERR(root);

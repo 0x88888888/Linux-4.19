@@ -783,15 +783,30 @@ asmlinkage __visible void __init start_kernel(void)
 	cred_init();
 	fork_init();
 
-	
+	/*
+	 * 创建sighand_cachep, signal_cachep, files_cachep,
+	 *     fs_cachep, mm_cachep, vm_area_cachep, nsproxy_cachep对象
+	 */
 	proc_caches_init();
+
+	//创建uts_ns_cache对象
 	uts_ns_init();
+
+	//创建bh_cachep，用于分配buffer_head对象
 	buffer_init();
 	key_init();
 	security_init();
+
+	//空函数
 	dbg_late_init();
+	/*
+	 * 创建了很多kmem_cache对象
+	 * 挂载rootfs_fs_type, bd_type
+	 */
 	vfs_caches_init();
+	
 	pagecache_init();
+	//到这里
 	signals_init();
 	seq_file_init();
 	proc_root_init();
