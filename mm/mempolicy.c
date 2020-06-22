@@ -2607,6 +2607,10 @@ static inline void __init check_numabalancing_enable(void)
 #endif /* CONFIG_NUMA_BALANCING */
 
 /* assumes fs == KERNEL_DS */
+/*
+ * start_kernel()  [init/main.c]
+ *  numa_policy_init()
+ */
 void __init numa_policy_init(void)
 {
 	nodemask_t interleave_nodes;

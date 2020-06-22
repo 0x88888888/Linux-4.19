@@ -221,6 +221,12 @@ int memcg_update_all_caches(int num_memcgs)
 	return ret;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   kmem_cache_init()
+ *    memcg_link_cache()
+ */
 void memcg_link_cache(struct kmem_cache *s)
 {
 	if (is_root_cache(s)) {
@@ -933,7 +939,13 @@ bool slab_is_available(void)
 }
 
 #ifndef CONFIG_SLOB
-/* Create a cache during boot when no slab services are available yet */
+/* Create a cache during boot when no slab services are available yet 
+ *
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   kmem_cache_init()
+ *    create_boot_cache(s == kmem_cache_boot)
+ */
 void __init create_boot_cache(struct kmem_cache *s, const char *name,
 		unsigned int size, slab_flags_t flags,
 		unsigned int useroffset, unsigned int usersize)

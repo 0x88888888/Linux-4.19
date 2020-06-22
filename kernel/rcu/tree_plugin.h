@@ -67,11 +67,18 @@ static bool __read_mostly rcu_nocb_poll;    /* Offload kthread are to poll. */
 /*
  * Check the RCU kernel configuration parameters and print informative
  * messages about anything out of the ordinary.
+ *
+ * start_kernel()  [init/main.c]
+ *  rcu_init()
+ *   rcu_bootup_announce()
+ *    rcu_bootup_announce_oddness()
  */
 static void __init rcu_bootup_announce_oddness(void)
 {
+    //没有定义
 	if (IS_ENABLED(CONFIG_RCU_TRACE))
 		pr_info("\tRCU event tracing is enabled.\n");
+	
 	if ((IS_ENABLED(CONFIG_64BIT) && RCU_FANOUT != 64) ||
 	    (!IS_ENABLED(CONFIG_64BIT) && RCU_FANOUT != 32))
 		pr_info("\tCONFIG_RCU_FANOUT set to non-default value of %d.\n",
@@ -121,6 +128,8 @@ static void __init rcu_bootup_announce_oddness(void)
 	rcupdate_announce_bootup_oddness();
 }
 
+
+//没有定义
 #ifdef CONFIG_PREEMPT_RCU
 
 RCU_STATE_INITIALIZER(rcu_preempt, 'p', call_rcu);
@@ -912,6 +921,10 @@ static struct rcu_state *const rcu_state_p = &rcu_sched_state;
 
 /*
  * Tell them what RCU they are running.
+ *
+ * start_kernel()  [init/main.c]
+ *  rcu_init()
+ *   rcu_bootup_announce()
  */
 static void __init rcu_bootup_announce(void)
 {
@@ -1383,6 +1396,12 @@ static void __init rcu_spawn_boost_kthreads(void)
 		(void)rcu_spawn_one_boost_kthread(rcu_state_p, rnp);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  rcu_init()
+ *   rcutree_prepare_cpu()
+ *    rcu_prepare_kthreads()
+ */
 static void rcu_prepare_kthreads(int cpu)
 {
 	struct rcu_data *rdp = per_cpu_ptr(rcu_state_p->rda, cpu);
@@ -2458,6 +2477,10 @@ static void do_nocb_deferred_wakeup(struct rcu_data *rdp)
 		do_nocb_deferred_wakeup_common(rdp);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  rcu_init_nohz()
+ */
 void __init rcu_init_nohz(void)
 {
 	int cpu;
@@ -2499,6 +2522,7 @@ void __init rcu_init_nohz(void)
 	for_each_rcu_flavor(rsp) {
 		for_each_cpu(cpu, rcu_nocb_mask)
 			init_nocb_callback_list(per_cpu_ptr(rsp->rda, cpu));
+		
 		rcu_organize_nocb_kthreads(rsp);
 	}
 }
@@ -2566,6 +2590,11 @@ static void rcu_spawn_one_nocb_kthread(struct rcu_state *rsp, int cpu)
 /*
  * If the specified CPU is a no-CBs CPU that does not already have its
  * rcuo kthreads, spawn them.
+ *
+ * start_kernel()  [init/main.c]
+ *  rcu_init()
+ *   rcutree_prepare_cpu()
+ *    rcu_spawn_all_nocb_kthreads()
  */
 static void rcu_spawn_all_nocb_kthreads(int cpu)
 {
@@ -2596,6 +2625,10 @@ module_param(rcu_nocb_leader_stride, int, 0444);
 
 /*
  * Initialize leader-follower relationships for all no-CBs CPU.
+ *
+ * start_kernel()  [init/main.c]
+ *  rcu_init_nohz() 
+ *   rcu_organize_nocb_kthreads()
  */
 static void __init rcu_organize_nocb_kthreads(struct rcu_state *rsp)
 {

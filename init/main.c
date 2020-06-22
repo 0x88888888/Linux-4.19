@@ -543,7 +543,10 @@ static void __init mm_init(void)
 	ioremap_huge_init();
 	/* Should be run before the first non-init thread is created */
 	init_espfix_bsp();
-	/* Should be run after espfix64 is set up. */
+	/* Should be run after espfix64 is set up.
+	 *
+	 * pti 就是page table isolation的意思了
+	 */
 	pti_init();
 }
 
@@ -623,14 +626,16 @@ asmlinkage __visible void __init start_kernel(void)
 	 * kmem_cache_init()
 	 */
 	setup_log_buf(0);
-	
+
+	//初始化dentry_hashtable, inode_hashtable
 	vfs_caches_init_early();
 	
 	sort_main_extable();
 
 	//设置中断处理函数和内部异常处理函数
 	trap_init();
-	
+
+	//这个函数结束 slab allocator已经建立好了
 	mm_init();
 
 	ftrace_init();
@@ -672,21 +677,31 @@ asmlinkage __visible void __init start_kernel(void)
 	/* Trace events are available after this */
 	trace_init();
 
-	if (initcall_debug)
-		initcall_debug_enable();
+	if (initcall_debug) //默认为0
+		initcall_debug_enable(); //空函数
 
+    //空函数
 	context_tracking_init();
 	/* init some links before init_ISA_irqs() */
 	early_irq_init();
 	init_IRQ();
+	
 	tick_init();
 	rcu_init_nohz();
+	
 	init_timers();
 	hrtimers_init();
+
+	//初始化tasklet_vec,tasklet_hi_vec
 	softirq_init();
+	
 	timekeeping_init();
+	//设置late_time_init == x86_late_time_init
 	time_init();
+
+	//跳过，不看
 	printk_safe_init();
+	
 	perf_event_init();
 	profile_init();
 	call_function_init();
@@ -724,6 +739,7 @@ asmlinkage __visible void __init start_kernel(void)
 	 */
 	mem_encrypt_init();
 
+//有定义
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (initrd_start && !initrd_below_start_ok &&
 	    page_to_pfn(virt_to_page((void *)initrd_start)) < min_low_pfn) {
@@ -733,25 +749,41 @@ asmlinkage __visible void __init start_kernel(void)
 		initrd_start = 0;
 	}
 #endif
+
 	page_ext_init();
+
+    //空函数
 	kmemleak_init();
+	//空函数
 	debug_objects_mem_init();
+	
 	setup_per_cpu_pageset();
+	
 	numa_policy_init();
 	acpi_early_init();
+
+	//late_time_init == x86_late_time_init
 	if (late_time_init)
 		late_time_init();
+	
 	sched_clock_init();
 	calibrate_delay();
+	//初始化 init_pid_ns
 	pid_idr_init();
+	//创建anon_vma_cachep
 	anon_vma_init();
 #ifdef CONFIG_X86
 	if (efi_enabled(EFI_RUNTIME_SERVICES))
 		efi_enter_virtual_mode();
 #endif
+
+    //空函数
 	thread_stack_cache_init();
+
 	cred_init();
 	fork_init();
+
+	
 	proc_caches_init();
 	uts_ns_init();
 	buffer_init();

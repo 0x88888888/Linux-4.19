@@ -328,6 +328,11 @@ static void irq_sysfs_add(int irq, struct irq_desc *desc) {}
 
 static RADIX_TREE(irq_desc_tree, GFP_KERNEL);
 
+/*
+ * start_kernel()  [init/main.c]
+ *  early_irq_init()
+ *   irq_insert_desc()
+ */
 static void irq_insert_desc(unsigned int irq, struct irq_desc *desc)
 {
 	radix_tree_insert(&irq_desc_tree, irq, desc);
@@ -497,6 +502,10 @@ static int irq_expand_nr_irqs(unsigned int nr)
 	return 0;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  early_irq_init()
+ */
 int __init early_irq_init(void)
 {
 	int i, initcnt, node = first_online_node;

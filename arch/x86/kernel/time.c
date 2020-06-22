@@ -68,6 +68,12 @@ static struct irqaction irq0  = {
 	.name = "timer"
 };
 
+/*
+ * start_kernel()  [init/main.c]
+ *  x86_late_time_init()
+ *   hpet_time_init()
+ *    setup_default_timer_irq()
+ */
 static void __init setup_default_timer_irq(void)
 {
 	/*
@@ -78,20 +84,33 @@ static void __init setup_default_timer_irq(void)
 		pr_info("Failed to register legacy timer interrupt\n");
 }
 
-/* Default timer init function */
+/* Default timer init function 
+ *
+ * start_kernel()  [init/main.c]
+ *  x86_late_time_init()
+ *   hpet_time_init()
+ */
 void __init hpet_time_init(void)
 {
-	if (!hpet_enable())
+	if (!hpet_enable()) //如果启动hpet了
 		setup_pit_timer();
+	
 	setup_default_timer_irq();
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  x86_late_time_init()
+ */
 static __init void x86_late_time_init(void)
 {
+    //x86_init.timers.timer_init == hpet_time_init
 	x86_init.timers.timer_init();
 	/*
 	 * After PIT/HPET timers init, select and setup
 	 * the final interrupt mode for delivering IRQs.
+	 *
+	 * x86_init.irqs.intr_mode_init==apic_intr_mode_init
 	 */
 	x86_init.irqs.intr_mode_init();
 	tsc_init();
@@ -100,6 +119,9 @@ static __init void x86_late_time_init(void)
 /*
  * Initialize TSC and delay the periodic timer init to
  * late x86_late_time_init() so ioremap works.
+ *
+ * start_kernel()  [init/main.c]
+ *  time_init()
  */
 void __init time_init(void)
 {

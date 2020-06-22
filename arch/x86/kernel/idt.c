@@ -317,6 +317,11 @@ void __init idt_setup_debugidt_traps(void)
 
 /**
  * idt_setup_apic_and_irq_gates - Setup APIC/SMP and normal interrupt gates
+ *
+ * start_kernel()  [init/main.c]
+ *  init_IRQ()
+ *   native_init_IRQ()
+ *    idt_setup_apic_and_irq_gates()
  */
 void __init idt_setup_apic_and_irq_gates(void)
 {

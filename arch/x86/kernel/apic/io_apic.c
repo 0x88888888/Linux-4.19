@@ -230,6 +230,13 @@ void mp_save_irq(struct mpc_intsrc *m)
 		panic("Max # of irq sources exceeded!!\n");
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  early_irq_init()
+ *   arch_early_irq_init()
+ *    arch_early_ioapic_init()
+ *     alloc_ioapic_saved_registers()
+ */
 static void alloc_ioapic_saved_registers(int idx)
 {
 	size_t size;
@@ -249,6 +256,12 @@ static void free_ioapic_saved_registers(int idx)
 	ioapics[idx].saved_registers = NULL;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  early_irq_init()
+ *   arch_early_irq_init()
+ *    arch_early_ioapic_init()
+ */
 int __init arch_early_ioapic_init(void)
 {
 	int i;

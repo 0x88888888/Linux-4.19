@@ -2878,6 +2878,13 @@ void trace_printk_init_buffers(void)
 		tracing_start_cmdline_record();
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  trace_init()
+ *   trace_event_init()
+ *    event_trace_enable()
+ *     trace_printk_start_comm()
+ */
 void trace_printk_start_comm(void)
 {
 	/* Start tracing comms if trace printk is set */
@@ -8463,6 +8470,11 @@ out:
 	return ret;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *	early_trace_init()
+ *   tracer_alloc_buffers()
+ */
 __init static int tracer_alloc_buffers(void)
 {
 	int ring_buf_size;
@@ -8586,9 +8598,14 @@ out:
 	return ret;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  early_trace_init()
+ */
 void __init early_trace_init(void)
 {
 	if (tracepoint_printk) {
+		
 		tracepoint_print_iter =
 			kmalloc(sizeof(*tracepoint_print_iter), GFP_KERNEL);
 		if (WARN_ON(!tracepoint_print_iter))
@@ -8599,6 +8616,10 @@ void __init early_trace_init(void)
 	tracer_alloc_buffers();
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  trace_init()
+ */
 void __init trace_init(void)
 {
 	trace_event_init();

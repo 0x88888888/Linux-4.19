@@ -5683,6 +5683,9 @@ static void __init wq_numa_init(void)
  * and allows early boot code to create workqueues and queue/cancel work
  * items.  Actual work item execution starts only after kthreads can be
  * created and scheduled right before early initcalls.
+ *
+ * start_kernel()  [init/main.c]
+ *  workqueue_init_early()
  */
 int __init workqueue_init_early(void)
 {

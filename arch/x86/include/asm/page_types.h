@@ -6,6 +6,7 @@
 #include <linux/types.h>
 #include <linux/mem_encrypt.h>
 
+// 看这个文件的内容要先看 arch/x86/include/asm/pgtable_64_types.h
 /* PAGE_SHIFT determines the page size */
 #define PAGE_SHIFT		12
 #define PAGE_SIZE		(_AC(1,UL) << PAGE_SHIFT)

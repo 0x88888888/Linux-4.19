@@ -449,6 +449,10 @@ struct pid *find_ge_pid(int nr, struct pid_namespace *ns)
 	return idr_get_next(&ns->idr, &nr);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  pid_idr_init()
+ */
 void __init pid_idr_init(void)
 {
 	/* Verify no one has done anything silly: */

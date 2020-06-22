@@ -1946,6 +1946,12 @@ int timers_dead_cpu(unsigned int cpu)
 
 #endif /* CONFIG_HOTPLUG_CPU */
 
+/*
+ * start_kernel()  [init/main.c]
+ *  init_timers()
+ *   init_timer_cpus()
+ *    init_timer_cpu()
+ */
 static void __init init_timer_cpu(int cpu)
 {
 	struct timer_base *base;
@@ -1959,14 +1965,23 @@ static void __init init_timer_cpu(int cpu)
 	}
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  init_timers()
+ *   init_timer_cpus()
+ */
 static void __init init_timer_cpus(void)
 {
 	int cpu;
 
 	for_each_possible_cpu(cpu)
-		init_timer_cpu(cpu);
+		init_timer_cpu(cpu); //初始化timer_bases
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  init_timers()
+ */
 void __init init_timers(void)
 {
 	init_timer_cpus();

@@ -166,6 +166,7 @@ static void tick_sched_handle(struct tick_sched *ts, struct pt_regs *regs)
 }
 #endif
 
+//有定义
 #ifdef CONFIG_NO_HZ_FULL
 cpumask_var_t tick_nohz_full_mask;
 bool tick_nohz_full_running;
@@ -387,7 +388,12 @@ out:
 	local_irq_restore(flags);
 }
 
-/* Get the boot-time nohz CPU list from the kernel parameters. */
+/* Get the boot-time nohz CPU list from the kernel parameters. 
+ *
+ * start_kernel()  [init/main.c]
+ *  housekeeping_init()
+ *   tick_nohz_full_setup()
+ */
 void __init tick_nohz_full_setup(cpumask_var_t cpumask)
 {
 	alloc_bootmem_cpumask_var(&tick_nohz_full_mask);
@@ -407,10 +413,16 @@ static int tick_nohz_cpu_down(unsigned int cpu)
 	return 0;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  tick_init()
+ *   tick_nohz_init()
+ */
 void __init tick_nohz_init(void)
 {
 	int cpu, ret;
 
+    //在tick_nohz_full_setup中设置为true了
 	if (!tick_nohz_full_running)
 		return;
 

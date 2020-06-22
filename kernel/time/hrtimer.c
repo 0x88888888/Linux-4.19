@@ -1799,6 +1799,12 @@ COMPAT_SYSCALL_DEFINE2(nanosleep, struct compat_timespec __user *, rqtp,
 
 /*
  * Functions related to boot-time initialization:
+ *
+ * start_kernel()  [init/main.c]
+ *  hrtimers_init()
+ *   hrtimers_prepare_cpu()
+ *
+ * 初始化hrtimer_bases
  */
 int hrtimers_prepare_cpu(unsigned int cpu)
 {
@@ -1900,6 +1906,10 @@ int hrtimers_dead_cpu(unsigned int scpu)
 
 #endif /* CONFIG_HOTPLUG_CPU */
 
+/*
+ * start_kernel()  [init/main.c]
+ *  hrtimers_init()
+ */
 void __init hrtimers_init(void)
 {
 	hrtimers_prepare_cpu(smp_processor_id());

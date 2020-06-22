@@ -2240,6 +2240,11 @@ static __init unsigned long __maxindex(unsigned int height)
 	return ~0UL >> shift;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  radix_tree_init()
+ *   radix_tree_init_maxnodes()
+ */
 static __init void radix_tree_init_maxnodes(void)
 {
 	unsigned long height_to_maxindex[RADIX_TREE_MAX_PATH + 1];
@@ -2247,6 +2252,7 @@ static __init void radix_tree_init_maxnodes(void)
 
 	for (i = 0; i < ARRAY_SIZE(height_to_maxindex); i++)
 		height_to_maxindex[i] = __maxindex(i);
+	
 	for (i = 0; i < ARRAY_SIZE(height_to_maxnodes); i++) {
 		for (j = i; j > 0; j--)
 			height_to_maxnodes[i] += height_to_maxindex[j - 1] + 1;
@@ -2271,16 +2277,22 @@ static int radix_tree_cpu_dead(unsigned int cpu)
 	return 0;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  radix_tree_init()
+ */
 void __init radix_tree_init(void)
 {
 	int ret;
 
 	BUILD_BUG_ON(RADIX_TREE_MAX_TAGS + __GFP_BITS_SHIFT > 32);
 	BUILD_BUG_ON(ROOT_IS_IDR & ~GFP_ZONEMASK);
+	
 	radix_tree_node_cachep = kmem_cache_create("radix_tree_node",
 			sizeof(struct radix_tree_node), 0,
 			SLAB_PANIC | SLAB_RECLAIM_ACCOUNT,
 			radix_tree_node_ctor);
+	
 	radix_tree_init_maxnodes();
 	ret = cpuhp_setup_state_nocalls(CPUHP_RADIX_DEAD, "lib/radix:dead",
 					NULL, radix_tree_cpu_dead);

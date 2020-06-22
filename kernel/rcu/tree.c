@@ -158,6 +158,8 @@ EXPORT_SYMBOL_GPL(rcu_scheduler_active);
  * It might later prove better for people registering RCU callbacks during
  * early boot to take responsibility for these callbacks, but one step at
  * a time.
+ *
+ * 在rcu_spawn_gp_kthread()中设置为 1
  */
 static int rcu_scheduler_fully_active __read_mostly;
 
@@ -353,6 +355,12 @@ static void rcu_dynticks_eqs_exit(void)
  * The non-atomic test/increment sequence works because the upper bits
  * of the ->dynticks counter are manipulated only by the corresponding CPU,
  * or when the corresponding CPU is offline.
+ *
+ * start_kernel()  [init/main.c]
+ *  rcu_init()
+ *   rcutree_prepare_cpu()
+ *    rcu_init_percpu_data()
+ *     rcu_dynticks_eqs_online()
  */
 static void rcu_dynticks_eqs_online(void)
 {
@@ -3956,6 +3964,11 @@ rcu_boot_init_percpu_data(int cpu, struct rcu_state *rsp)
  * offline event can be happening at a given time.  Note also that we can
  * accept some slop in the rsp->gp_seq access due to the fact that this
  * CPU cannot possibly have any RCU callbacks in flight yet.
+ *
+ * start_kernel()  [init/main.c]
+ *  rcu_init()
+ *   rcutree_prepare_cpu()
+ *    rcu_init_percpu_data()
  */
 static void
 rcu_init_percpu_data(int cpu, struct rcu_state *rsp)
@@ -3998,6 +4011,10 @@ rcu_init_percpu_data(int cpu, struct rcu_state *rsp)
 /*
  * Invoked early in the CPU-online process, when pretty much all
  * services are available.  The incoming CPU is not present.
+ *
+ * start_kernel()  [init/main.c]
+ *  rcu_init()
+ *   rcutree_prepare_cpu()
  */
 int rcutree_prepare_cpu(unsigned int cpu)
 {
@@ -4112,6 +4129,10 @@ static DEFINE_PER_CPU(int, rcu_cpu_started);
  * Note that this function is special in that it is invoked directly
  * from the incoming CPU rather than from the cpuhp_step mechanism.
  * This is because this function must be invoked at a precise location.
+ *
+ * start_kernel()  [init/main.c]
+ *  rcu_init()
+ *   rcu_cpu_starting()
  */
 void rcu_cpu_starting(unsigned int cpu)
 {
@@ -4355,8 +4376,13 @@ void rcu_scheduler_starting(void)
 /*
  * Helper function for rcu_init() that initializes one rcu_state structure.
  *
- * rcu_init()
- *  rcu_init_one()
+ * start_kernel()  [init/main.c]
+ *  rcu_init()
+ *   rcu_init_one(rcu_bh_state)
+ *
+ * start_kernel()  [init/main.c]
+ *  rcu_init()
+ *   rcu_init_one(rcu_sched_state)
  */
 static void __init rcu_init_one(struct rcu_state *rsp)
 {
@@ -4443,6 +4469,10 @@ static void __init rcu_init_one(struct rcu_state *rsp)
  * Compute the rcu_node tree geometry from kernel parameters.  This cannot
  * replace the definitions in tree.h because those are needed to size
  * the ->node array in the rcu_state structure.
+ *
+ * start_kernel()  [init/main.c]
+ *  rcu_init()
+ *   rcu_init_geometry()
  */
 static void __init rcu_init_geometry(void)
 {
@@ -4543,10 +4573,15 @@ static void __init rcu_dump_rcu_node_tree(struct rcu_state *rsp)
 struct workqueue_struct *rcu_gp_wq;
 struct workqueue_struct *rcu_par_gp_wq;
 
+/*
+ * start_kernel()  [init/main.c]
+ *  rcu_init()
+ */
 void __init rcu_init(void)
 {
 	int cpu;
 
+    //空函数
 	rcu_early_boot_tests();
 
 	rcu_bootup_announce();
@@ -4556,7 +4591,7 @@ void __init rcu_init(void)
 	if (dump_tree)
 		rcu_dump_rcu_node_tree(&rcu_sched_state);
 	
-	__rcu_init_preempt();
+	__rcu_init_preempt(); //空函数
 	open_softirq(RCU_SOFTIRQ, rcu_process_callbacks);
 
 	/*
@@ -4565,6 +4600,7 @@ void __init rcu_init(void)
 	 * or the scheduler are operational.
 	 */
 	pm_notifier(rcu_pm_notify, 0);
+	
 	for_each_online_cpu(cpu) {
 		rcutree_prepare_cpu(cpu);
 		rcu_cpu_starting(cpu);

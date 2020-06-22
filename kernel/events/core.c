@@ -11557,6 +11557,11 @@ int perf_event_init_task(struct task_struct *child)
 	return 0;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  perf_event_init()
+ *   perf_event_init_all_cpus()
+ */
 static void __init perf_event_init_all_cpus(void)
 {
 	struct swevent_htable *swhash;
@@ -11682,6 +11687,10 @@ static struct notifier_block perf_reboot_notifier = {
 	.priority = INT_MIN,
 };
 
+/*
+ * start_kernel()  [init/main.c]
+ *  perf_event_init()
+ */
 void __init perf_event_init(void)
 {
 	int ret;

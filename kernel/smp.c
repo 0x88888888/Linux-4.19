@@ -39,6 +39,11 @@ static DEFINE_PER_CPU_SHARED_ALIGNED(struct llist_head, call_single_queue);
 
 static void flush_smp_call_function_queue(bool warn_cpu_offline);
 
+/*
+ * start_kernel()  [init/main.c]
+ *  call_function_init()
+ *   smpcfd_prepare_cpu()
+ */
 int smpcfd_prepare_cpu(unsigned int cpu)
 {
 	struct call_function_data *cfd = &per_cpu(cfd_data, cpu);
@@ -86,6 +91,10 @@ int smpcfd_dying_cpu(unsigned int cpu)
 	return 0;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  call_function_init()
+ */
 void __init call_function_init(void)
 {
 	int i;

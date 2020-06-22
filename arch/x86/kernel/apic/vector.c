@@ -666,6 +666,12 @@ void lapic_assign_legacy_vector(unsigned int irq, bool replace)
 	irq_matrix_assign_system(vector_matrix, ISA_IRQ_VECTOR(irq), replace);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  init_IRQ()
+ *   native_init_IRQ()
+ *    lapic_assign_system_vectors()
+ */
 void __init lapic_assign_system_vectors(void)
 {
 	unsigned int i, vector = 0;
@@ -686,6 +692,11 @@ void __init lapic_assign_system_vectors(void)
 	}
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  early_irq_init()
+ *   arch_early_irq_init()
+ */
 int __init arch_early_irq_init(void)
 {
 	struct fwnode_handle *fn;

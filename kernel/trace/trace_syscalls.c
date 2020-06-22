@@ -30,6 +30,7 @@ syscall_get_enter_fields(struct trace_event_call *call)
 extern struct syscall_metadata *__start_syscalls_metadata[];
 extern struct syscall_metadata *__stop_syscalls_metadata[];
 
+//在init_ftrace_syscalls()中初始化
 static struct syscall_metadata **syscalls_metadata;
 
 #ifndef ARCH_HAS_SYSCALL_MATCH_SYM_NAME
@@ -529,6 +530,12 @@ unsigned long __init __weak arch_syscall_addr(int nr)
 	return (unsigned long)sys_call_table[nr];
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  trace_init()
+ *   trace_event_init()
+ *    init_ftrace_syscalls()
+ */
 void __init init_ftrace_syscalls(void)
 {
 	struct syscall_metadata *meta;

@@ -735,6 +735,10 @@ static void task_struct_whitelist(unsigned long *offset, unsigned long *size)
 		*offset += offsetof(struct task_struct, thread);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  fork_init()
+ */
 void __init fork_init(void)
 {
 	int i;

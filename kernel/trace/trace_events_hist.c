@@ -5661,6 +5661,14 @@ static struct event_command trigger_hist_cmd = {
 	.set_filter		= set_trigger_filter,
 };
 
+/*
+ * start_kernel()  [init/main.c]
+ *  trace_init()
+ *   trace_event_init()
+ *    event_trace_enable()
+ *     register_trigger_cmds()
+ *      register_trigger_hist_cmd()
+ */
 __init int register_trigger_hist_cmd(void)
 {
 	int ret;
@@ -5790,6 +5798,14 @@ static __init void unregister_trigger_hist_enable_disable_cmds(void)
 	unregister_event_command(&trigger_hist_disable_cmd);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  trace_init()
+ *   trace_event_init()
+ *    event_trace_enable()
+ *     register_trigger_cmds()
+ *      register_trigger_hist_enable_disable_cmds()
+ */
 __init int register_trigger_hist_enable_disable_cmds(void)
 {
 	int ret;

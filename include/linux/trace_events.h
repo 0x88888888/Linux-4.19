@@ -308,6 +308,14 @@ static inline bool bpf_prog_array_valid(struct trace_event_call *call)
 }
 #endif
 
+/*
+ * start_kernel()  [init/main.c]
+ *  trace_init()
+ *   trace_event_init()
+ *    event_trace_enable()
+ *     event_init()
+ *      trace_event_name()
+ */
 static inline const char *
 trace_event_name(struct trace_event_call *call)
 {

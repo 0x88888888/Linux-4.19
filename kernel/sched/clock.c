@@ -69,6 +69,7 @@ EXPORT_SYMBOL_GPL(sched_clock);
 
 static DEFINE_STATIC_KEY_FALSE(sched_clock_running);
 
+//有定义
 #ifdef CONFIG_HAVE_UNSTABLE_SCHED_CLOCK
 /*
  * We must start with !__sched_clock_stable because the unstable -> stable
@@ -195,6 +196,11 @@ void clear_sched_clock_stable(void)
 		__clear_sched_clock_stable();
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  sched_clock_init()
+ *   __sched_clock_gtod_offset()
+ */
 static void __sched_clock_gtod_offset(void)
 {
 	struct sched_clock_data *scd = this_scd();
@@ -203,6 +209,10 @@ static void __sched_clock_gtod_offset(void)
 	__gtod_offset = (scd->tick_raw + __sched_clock_offset) - scd->tick_gtod;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  sched_clock_init()
+ */
 void __init sched_clock_init(void)
 {
 	/*
@@ -213,6 +223,7 @@ void __init sched_clock_init(void)
 	 * can't really be out of sync.
 	 */
 	local_irq_disable();
+	
 	__sched_clock_gtod_offset();
 	local_irq_enable();
 

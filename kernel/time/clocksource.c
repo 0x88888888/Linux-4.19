@@ -105,6 +105,10 @@ EXPORT_SYMBOL_GPL(clocks_calc_mult_shift);
  */
 static struct clocksource *curr_clocksource;
 static struct clocksource *suspend_clocksource;
+
+/*
+ * 链表中 clocksource_jiffies ,clocksource_hpet,clocksource_tsc_early
+ */
 static LIST_HEAD(clocksource_list);
 static DEFINE_MUTEX(clocksource_mutex);
 static char override_name[CS_NAME_LEN];
@@ -839,6 +843,8 @@ fs_initcall(clocksource_done_booting);
 
 /*
  * Enqueue the clocksource sorted by rating
+ *
+ * cs 会有clocksource_hpet,clocksource_jiffies, clocksource_tsc_early
  */
 static void clocksource_enqueue(struct clocksource *cs)
 {

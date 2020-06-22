@@ -38,6 +38,7 @@ struct page_ext {
 
 extern void pgdat_page_ext_init(struct pglist_data *pgdat);
 
+//有定义
 #ifdef CONFIG_SPARSEMEM
 static inline void page_ext_init_flatmem(void)
 {

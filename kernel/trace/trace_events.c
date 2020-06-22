@@ -2079,6 +2079,13 @@ static void event_remove(struct trace_event_call *call)
 	list_del(&call->list);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  trace_init()
+ *   trace_event_init()
+ *    event_trace_enable()
+ *     event_init()
+ */
 static int event_init(struct trace_event_call *call)
 {
 	int ret = 0;
@@ -2251,6 +2258,15 @@ void trace_event_eval_update(struct trace_eval_map **map, int len)
 	up_write(&trace_event_sem);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  trace_init()
+ *   trace_event_init()
+ *    event_trace_enable()
+ *     __trace_early_add_events()
+ *      __trace_early_add_new_event()
+ *       trace_create_new_event()
+ */
 static struct trace_event_file *
 trace_create_new_event(struct trace_event_call *call,
 		       struct trace_array *tr)
@@ -2288,6 +2304,13 @@ __trace_add_new_event(struct trace_event_call *call, struct trace_array *tr)
  * Just create a decriptor for early init. A descriptor is required
  * for enabling events at boot. We want to enable events before
  * the filesystem is initialized.
+ *
+ * start_kernel()  [init/main.c]
+ *  trace_init()
+ *   trace_event_init()
+ *    event_trace_enable()
+ *     __trace_early_add_events()
+ *      __trace_early_add_new_event()
  */
 static __init int
 __trace_early_add_new_event(struct trace_event_call *call,
@@ -2820,6 +2843,13 @@ static struct ftrace_func_command event_disable_cmd = {
 	.func			= event_enable_func,
 };
 
+/*
+ * start_kernel()  [init/main.c]
+ *  trace_init()
+ *   trace_event_init()
+ *    event_trace_enable()
+ *     register_event_cmds()
+ */
 static __init int register_event_cmds(void)
 {
 	int ret;
@@ -2827,6 +2857,7 @@ static __init int register_event_cmds(void)
 	ret = register_ftrace_command(&event_enable_cmd);
 	if (WARN_ON(ret < 0))
 		return ret;
+	
 	ret = register_ftrace_command(&event_disable_cmd);
 	if (WARN_ON(ret < 0))
 		unregister_ftrace_command(&event_enable_cmd);
@@ -2863,6 +2894,12 @@ __trace_early_add_event_dirs(struct trace_array *tr)
  * a list of events that can be enabled. This must be done before
  * the filesystem is set up in order to allow events to be traced
  * early.
+ *
+ * start_kernel()  [init/main.c]
+ *  trace_init()
+ *   trace_event_init()
+ *    event_trace_enable()
+ *     __trace_early_add_events()
  */
 static __init void
 __trace_early_add_events(struct trace_array *tr)
@@ -3050,6 +3087,12 @@ int event_trace_del_tracer(struct trace_array *tr)
 	return 0;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  trace_init()
+ *   trace_event_init()
+ *    event_trace_memsetup()
+ */
 static __init int event_trace_memsetup(void)
 {
 	field_cachep = KMEM_CACHE(ftrace_event_field, SLAB_PANIC);
@@ -3057,6 +3100,13 @@ static __init int event_trace_memsetup(void)
 	return 0;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  trace_init()
+ *   trace_event_init()
+ *    event_trace_enable()
+ *     early_enable_events()
+ */
 static __init void
 early_enable_events(struct trace_array *tr, bool disable_first)
 {
@@ -3086,6 +3136,12 @@ early_enable_events(struct trace_array *tr, bool disable_first)
 	}
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  trace_init()
+ *   trace_event_init()
+ *    event_trace_enable()
+ */
 static __init int event_trace_enable(void)
 {
 	struct trace_array *tr = top_trace_array();
@@ -3185,6 +3241,11 @@ __init int event_trace_init(void)
 	return 0;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  trace_init()
+ *   trace_event_init()
+ */
 void __init trace_event_init(void)
 {
 	event_trace_memsetup();

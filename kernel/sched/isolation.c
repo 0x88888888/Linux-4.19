@@ -48,6 +48,11 @@ bool housekeeping_test_cpu(int cpu, enum hk_flags flags)
 }
 EXPORT_SYMBOL_GPL(housekeeping_test_cpu);
 
+
+/*
+ * start_kernel()  [init/main.c]
+ *  housekeeping_init()
+ */
 void __init housekeeping_init(void)
 {
 	if (!housekeeping_flags)
@@ -56,7 +61,7 @@ void __init housekeeping_init(void)
 	static_branch_enable(&housekeeping_overriden);
 
 	if (housekeeping_flags & HK_FLAG_TICK)
-		sched_tick_offload_init();
+		sched_tick_offload_init(); //空函数
 
 	/* We need at least one CPU to handle housekeeping work */
 	WARN_ON_ONCE(cpumask_empty(housekeeping_mask));
@@ -96,7 +101,10 @@ static int __init housekeeping_setup(char *str, enum hk_flags flags)
 	}
 
 	if ((flags & HK_FLAG_TICK) && !(housekeeping_flags & HK_FLAG_TICK)) {
+
+	    //有定义
 		if (IS_ENABLED(CONFIG_NO_HZ_FULL)) {
+			
 			tick_nohz_full_setup(non_housekeeping_mask);
 		} else {
 			pr_warn("Housekeeping: nohz unsupported."

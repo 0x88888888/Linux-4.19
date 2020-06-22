@@ -1339,7 +1339,13 @@ void __init init_bsp_APIC(void)
 	apic_write(APIC_LVT1, value);
 }
 
-/* Init the interrupt delivery mode for the BSP */
+/* Init the interrupt delivery mode for the BSP 
+ *
+ * start_kernel()  [init/main.c]
+ *  x86_late_time_init()
+ *   apic_intr_mode_init()
+ */
+
 void __init apic_intr_mode_init(void)
 {
 	bool upmode = IS_ENABLED(CONFIG_UP_LATE_INIT);

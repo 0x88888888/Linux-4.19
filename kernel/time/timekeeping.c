@@ -128,6 +128,11 @@ static void tk_xtime_add(struct timekeeper *tk, const struct timespec64 *ts)
 	tk_normalize_xtime(tk);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  timekeeping_init()
+ *   tk_set_wall_to_mono()
+ */
 static void tk_set_wall_to_mono(struct timekeeper *tk, struct timespec64 wtm)
 {
 	struct timespec64 tmp;
@@ -280,6 +285,13 @@ static inline u64 timekeeping_get_delta(const struct tk_read_base *tkr)
  * pair and interval request.
  *
  * Unless you're the timekeeping code, you should not be using this!
+ *
+ * start_kernel()  [init/main.c]
+ *  timekeeping_init()
+ *   tk_setup_internals(clock 实际上是 clocksource_jiffies)
+ *
+ *
+ * 给timekeeper 设置clocksource对象
  */
 static void tk_setup_internals(struct timekeeper *tk, struct clocksource *clock)
 {
@@ -612,6 +624,9 @@ EXPORT_SYMBOL_GPL(pvclock_gtod_unregister_notifier);
 
 /*
  * tk_update_leap_state - helper to update the next_leap_ktime
+ *
+ * timekeeping_update()
+ *  tk_update_leap_state()
  */
 static inline void tk_update_leap_state(struct timekeeper *tk)
 {
@@ -623,6 +638,9 @@ static inline void tk_update_leap_state(struct timekeeper *tk)
 
 /*
  * Update the ktime_t based scalar nsec members of the timekeeper
+ *
+ * timekeeping_update()
+ *  tk_update_ktime_data()
  */
 static inline void tk_update_ktime_data(struct timekeeper *tk)
 {
@@ -654,7 +672,12 @@ static inline void tk_update_ktime_data(struct timekeeper *tk)
 	tk->tkr_raw.base = ns_to_ktime(tk->raw_sec * NSEC_PER_SEC);
 }
 
-/* must hold timekeeper_lock */
+/* must hold timekeeper_lock 
+ *
+ * start_kernel()  [init/main.c]
+ *  timekeeping_init()
+ *   timekeeping_update()
+ */
 static void timekeeping_update(struct timekeeper *tk, unsigned int action)
 {
 	if (action & TK_CLEAR_NTP) {
@@ -1545,10 +1568,14 @@ static bool persistent_clock_exists;
 
 /*
  * timekeeping_init - Initializes the clocksource and common timekeeping values
+ *
+ * start_kernel()  [init/main.c]
+ *  timekeeping_init()
  */
 void __init timekeeping_init(void)
 {
 	struct timespec64 wall_time, boot_offset, wall_to_mono;
+	
 	struct timekeeper *tk = &tk_core.timekeeper;
 	struct clocksource *clock;
 	unsigned long flags;
@@ -1575,9 +1602,11 @@ void __init timekeeping_init(void)
 	write_seqcount_begin(&tk_core.seq);
 	ntp_init();
 
+    //返回系统中的default clocksource, 这里返回clocksource_fiffies对象
 	clock = clocksource_default_clock();
 	if (clock->enable)
 		clock->enable(clock);
+	//给timekeeper 设置clocksource对象
 	tk_setup_internals(tk, clock);
 
 	tk_set_xtime(tk, &wall_time);

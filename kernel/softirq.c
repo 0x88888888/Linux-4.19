@@ -694,6 +694,10 @@ void tasklet_hrtimer_init(struct tasklet_hrtimer *ttimer,
 }
 EXPORT_SYMBOL_GPL(tasklet_hrtimer_init);
 
+/*
+ * start_kernel()  [init/main.c]
+ *  softirq_init()
+ */
 void __init softirq_init(void)
 {
 	int cpu;

@@ -1005,11 +1005,17 @@ int __tick_broadcast_oneshot_control(enum tick_broadcast_state state)
 }
 #endif
 
+/*
+ * start_kernel()  [init/main.c]
+ *  tick_init()
+ *   tick_broadcast_init()
+ */
 void __init tick_broadcast_init(void)
 {
 	zalloc_cpumask_var(&tick_broadcast_mask, GFP_NOWAIT);
 	zalloc_cpumask_var(&tick_broadcast_on, GFP_NOWAIT);
 	zalloc_cpumask_var(&tmpmask, GFP_NOWAIT);
+	//有定义
 #ifdef CONFIG_TICK_ONESHOT
 	zalloc_cpumask_var(&tick_broadcast_oneshot_mask, GFP_NOWAIT);
 	zalloc_cpumask_var(&tick_broadcast_pending_mask, GFP_NOWAIT);

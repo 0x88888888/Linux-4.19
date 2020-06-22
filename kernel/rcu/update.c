@@ -867,6 +867,8 @@ static void __init rcu_tasks_bootup_oddness(void)
 
 #endif /* #ifndef CONFIG_TINY_RCU */
 
+
+//没有定义
 #ifdef CONFIG_PROVE_RCU
 
 /*

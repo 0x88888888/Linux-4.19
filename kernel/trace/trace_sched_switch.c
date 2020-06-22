@@ -87,6 +87,15 @@ static void tracing_sched_unregister(void)
 	unregister_trace_sched_wakeup(probe_sched_wakeup, NULL);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  trace_init()
+ *   trace_event_init()
+ *	  event_trace_enable()
+ *	   trace_printk_start_comm()
+ *	    tracing_start_cmdline_record()
+ *		 tracing_start_sched_switch(RECORD_CMDLINE)
+ */
 static void tracing_start_sched_switch(int ops)
 {
 	bool sched_register = (!sched_cmdline_ref && !sched_tgid_ref);
@@ -126,6 +135,14 @@ static void tracing_stop_sched_switch(int ops)
 	mutex_unlock(&sched_register_mutex);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  trace_init()
+ *   trace_event_init()
+ *    event_trace_enable()
+ *     trace_printk_start_comm()
+ *      tracing_start_cmdline_record()
+ */
 void tracing_start_cmdline_record(void)
 {
 	tracing_start_sched_switch(RECORD_CMDLINE);

@@ -5498,6 +5498,11 @@ static int ftrace_cmp_ips(const void *a, const void *b)
 	return 0;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  ftrace_init()
+ *   ftrace_process_locs()
+ */
 static int ftrace_process_locs(struct module *mod,
 			       unsigned long *start,
 			       unsigned long *end)
@@ -6124,6 +6129,11 @@ void __init ftrace_free_init_mem(void)
 	ftrace_free_mem(NULL, start, end);
 }
 
+
+/*
+ * start_kernel()  [init/main.c]
+ *  ftrace_init()
+ */
 void __init ftrace_init(void)
 {
 	extern unsigned long __start_mcount_loc[];
@@ -6132,6 +6142,7 @@ void __init ftrace_init(void)
 	int ret;
 
 	local_irq_save(flags);
+	//空函数，直接返回0
 	ret = ftrace_dyn_arch_init();
 	local_irq_restore(flags);
 	if (ret)

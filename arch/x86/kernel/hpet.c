@@ -861,6 +861,13 @@ static struct clocksource clocksource_hpet = {
 	.resume		= hpet_resume_counter,
 };
 
+/*
+ * start_kernel()  [init/main.c]
+ *  x86_late_time_init()
+ *   hpet_time_init()
+ *    hpet_enable()
+ *     hpet_clocksource_register()
+ */
 static int hpet_clocksource_register(void)
 {
 	u64 start, now;
@@ -898,6 +905,11 @@ static u32 *hpet_boot_cfg;
 
 /**
  * hpet_enable - Try to setup the HPET timer. Returns 1 on success.
+ *
+ * start_kernel()  [init/main.c]
+ *  x86_late_time_init()
+ *   hpet_time_init()
+ *    hpet_enable()
  */
 int __init hpet_enable(void)
 {

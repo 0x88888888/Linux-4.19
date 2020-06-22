@@ -498,6 +498,7 @@ extern struct rcu_state rcu_sched_state;
 
 extern struct rcu_state rcu_bh_state;
 
+//没有定义CONFIG_PREEMPT_RCU
 #ifdef CONFIG_PREEMPT_RCU
 extern struct rcu_state rcu_preempt_state;
 #endif /* #ifdef CONFIG_PREEMPT_RCU */

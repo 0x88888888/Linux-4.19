@@ -73,6 +73,11 @@ static struct page_ext_operations *page_ext_ops[] = {
 static unsigned long total_usage;
 static unsigned long extra_mem;
 
+/*
+ * start_kernel()  [init/main.c]
+ *  page_ext_init()
+ *   invoke_need_callbacks()
+ */
 static bool __init invoke_need_callbacks(void)
 {
 	int i;
@@ -91,6 +96,11 @@ static bool __init invoke_need_callbacks(void)
 	return need;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  page_ext_init()
+ *   invoke_init_callbacks()
+ */
 static void __init invoke_init_callbacks(void)
 {
 	int i;
@@ -370,6 +380,10 @@ static int __meminit page_ext_callback(struct notifier_block *self,
 
 #endif
 
+/*
+ * start_kernel()  [init/main.c]
+ *  page_ext_init()
+ */
 void __init page_ext_init(void)
 {
 	unsigned long pfn;
@@ -403,6 +417,7 @@ void __init page_ext_init(void)
 			 */
 			if (early_pfn_to_nid(pfn) != nid)
 				continue;
+			
 			if (init_section_page_ext(pfn, nid))
 				goto oom;
 			cond_resched();

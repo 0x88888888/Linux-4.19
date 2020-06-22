@@ -1013,6 +1013,10 @@ static int __init acpi_bus_init_irq(void)
  *
  * Doing this before switching the EFI runtime services to virtual mode allows
  * the EfiBootServices memory to be freed slightly earlier on boot.
+ *
+ *
+ * start_kernel()  [init/main.c]
+ *  acpi_early_init()
  */
 void __init acpi_early_init(void)
 {

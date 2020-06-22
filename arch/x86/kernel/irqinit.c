@@ -76,6 +76,11 @@ void __init init_ISA_irqs(void)
 		irq_set_chip_and_handler(i, chip, handle_level_irq);
 }
 
+
+/*
+ * start_kernel()  [init/main.c]
+ *  init_IRQ()
+ */
 void __init init_IRQ(void)
 {
 	int i;
@@ -91,9 +96,15 @@ void __init init_IRQ(void)
 	for (i = 0; i < nr_legacy_irqs(); i++)
 		per_cpu(vector_irq, 0)[ISA_IRQ_VECTOR(i)] = irq_to_desc(i);
 
+    //x86_init.irqs.intr_init == native_init_IRQ
 	x86_init.irqs.intr_init();
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  init_IRQ()
+ *   native_init_IRQ()
+ */
 void __init native_init_IRQ(void)
 {
 	/* Execute any quirks before the call gates are initialised: */
@@ -105,5 +116,6 @@ void __init native_init_IRQ(void)
 	if (!acpi_ioapic && !of_ioapic && nr_legacy_irqs())
 		setup_irq(2, &irq2);
 
+    //空函数
 	irq_ctx_init(smp_processor_id());
 }

@@ -1007,6 +1007,11 @@ core_initcall(cpufreq_register_tsc_scaling);
 
 /*
  * If ART is present detect the numerator:denominator to convert to TSC
+ *
+ * start_kernel()  [init/main.c]
+ *  x86_late_time_init()
+ *   tsc_init()
+ *    detect_art()
  */
 static void __init detect_art(void)
 {
@@ -1444,6 +1449,11 @@ void __init tsc_early_init(void)
 	tsc_enable_sched_clock();
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  x86_late_time_init()
+ *   tsc_init()
+ */
 void __init tsc_init(void)
 {
 	/*

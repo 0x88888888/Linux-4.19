@@ -1326,6 +1326,10 @@ void __init kmem_cache_init(void)
 	create_kmalloc_caches(ARCH_KMALLOC_FLAGS);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  kmem_cache_init_late()
+ */
 void __init kmem_cache_init_late(void)
 {
 	struct kmem_cache *cachep;
@@ -1340,6 +1344,7 @@ void __init kmem_cache_init_late(void)
 	/* Done! */
 	slab_state = FULL;
 
+//有定义
 #ifdef CONFIG_NUMA
 	/*
 	 * Register a memory hotplug callback that initializes and frees

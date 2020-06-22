@@ -4,6 +4,7 @@
 
 #include <asm/cpufeature.h>
 
+//有定义
 #ifdef CONFIG_X86_LOCAL_APIC
 static inline bool arch_irq_work_has_interrupt(void)
 {

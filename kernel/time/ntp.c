@@ -346,6 +346,11 @@ static void ntp_update_offset(long offset)
 
 /**
  * ntp_clear - Clears the NTP state variables
+ *
+ * start_kernel()  [init/main.c]
+ *  timekeeping_init()
+ *   ntp_init()
+ *    ntp_clear()
  */
 void ntp_clear(void)
 {
@@ -1030,6 +1035,11 @@ static int __init ntp_tick_adj_setup(char *str)
 
 __setup("ntp_tick_adj=", ntp_tick_adj_setup);
 
+/*
+ * start_kernel()  [init/main.c]
+ *  timekeeping_init()
+ *   ntp_init()
+ */
 void __init ntp_init(void)
 {
 	ntp_clear();

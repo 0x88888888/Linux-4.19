@@ -98,7 +98,10 @@ int profile_setup(char *str)
 }
 __setup("profile=", profile_setup);
 
-
+/*
+ * start_kernel()  [init/main.c]
+ *  profile_init()
+ */
 int __ref profile_init(void)
 {
 	int buffer_bytes;

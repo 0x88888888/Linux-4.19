@@ -12,6 +12,7 @@
 #include <linux/cpumask.h>
 #include <linux/sched.h>
 
+//有定义
 #ifdef CONFIG_GENERIC_CLOCKEVENTS
 extern void __init tick_init(void);
 /* Should be core only, but ARM BL switcher requires it */

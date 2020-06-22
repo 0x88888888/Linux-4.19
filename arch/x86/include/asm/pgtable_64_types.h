@@ -1,12 +1,14 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _ASM_X86_PGTABLE_64_DEFS_H
 #define _ASM_X86_PGTABLE_64_DEFS_H
+//这个文件和 arch/x86/include/asm/page_types.h一起看
 
 #include <asm/sparsemem.h>
 
 #ifndef __ASSEMBLY__
 #include <linux/types.h>
 #include <asm/kaslr.h>
+
 
 /*
  * These are used to make use of C type-checking..
@@ -72,7 +74,6 @@ extern unsigned int ptrs_per_p4d;
 
 #else /* CONFIG_X86_5LEVEL */
 // 用这里的定义
-
 /*
  * PGDIR_SHIFT determines what a top-level page table entry can map
  */

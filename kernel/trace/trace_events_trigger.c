@@ -1120,6 +1120,14 @@ static struct event_command trigger_snapshot_cmd = {
 	.set_filter		= set_trigger_filter,
 };
 
+/*
+ * start_kernel()  [init/main.c]
+ *  trace_init()
+ *   trace_event_init()
+ *    event_trace_enable()
+ *     register_trigger_cmds()
+ *      register_trigger_snapshot_cmd()
+ */
 static __init int register_trigger_snapshot_cmd(void)
 {
 	int ret;
@@ -1210,6 +1218,14 @@ static struct event_command trigger_stacktrace_cmd = {
 	.set_filter		= set_trigger_filter,
 };
 
+/*
+ * start_kernel()  [init/main.c]
+ *  trace_init()
+ *   trace_event_init()
+ *    event_trace_enable()
+ *     register_trigger_cmds()
+ *      register_trigger_stacktrace_cmd()
+ */
 static __init int register_trigger_stacktrace_cmd(void)
 {
 	int ret;
@@ -1594,6 +1610,14 @@ static __init void unregister_trigger_enable_disable_cmds(void)
 	unregister_event_command(&trigger_disable_cmd);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  trace_init()
+ *   trace_event_init()
+ *    event_trace_enable()
+ *     register_trigger_cmds()
+ *      register_trigger_enable_disable_cmds()
+ */
 static __init int register_trigger_enable_disable_cmds(void)
 {
 	int ret;
@@ -1608,6 +1632,14 @@ static __init int register_trigger_enable_disable_cmds(void)
 	return ret;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  trace_init()
+ *   trace_event_init()
+ *    event_trace_enable()
+ *     register_trigger_cmds()
+ *      register_trigger_traceon_traceoff_cmds()
+ */
 static __init int register_trigger_traceon_traceoff_cmds(void)
 {
 	int ret;
@@ -1622,6 +1654,13 @@ static __init int register_trigger_traceon_traceoff_cmds(void)
 	return ret;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  trace_init()
+ *   trace_event_init()
+ *    event_trace_enable()
+ *     register_trigger_cmds()
+ */
 __init int register_trigger_cmds(void)
 {
 	register_trigger_traceon_traceoff_cmds();

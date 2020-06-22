@@ -207,6 +207,7 @@ void __init context_tracking_cpu_set(int cpu)
 	initialized = true;
 }
 
+//没有定义
 #ifdef CONFIG_CONTEXT_TRACKING_FORCE
 void __init context_tracking_init(void)
 {

@@ -5710,6 +5710,9 @@ void __meminit setup_zone_pageset(struct zone *zone)
 /*
  * Allocate per cpu pagesets and initialize them.
  * Before this call only boot pagesets were available.
+ *
+ * start_kernel()  [init/main.c]
+ *  setup_per_cpu_pageset()
  */
 void __init setup_per_cpu_pageset(void)
 {

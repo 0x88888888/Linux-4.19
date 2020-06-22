@@ -145,6 +145,10 @@ static inline void idr_init_base(struct idr *idr, int base)
  *
  * Initialise a dynamically allocated IDR.  To initialise a
  * statically allocated IDR, use DEFINE_IDR().
+ *
+ * start_kernel()  [init/main.c]
+ *  perf_event_init()
+ *   idr_init(idr== pmu_idr)
  */
 static inline void idr_init(struct idr *idr)
 {

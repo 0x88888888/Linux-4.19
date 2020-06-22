@@ -10191,6 +10191,11 @@ void show_numa_stats(struct task_struct *p, struct seq_file *m)
 #endif /* CONFIG_NUMA_BALANCING */
 #endif /* CONFIG_SCHED_DEBUG */
 
+/*
+ * start_kernel()  [init/main.c]
+ *  sched_init()
+ *   init_sched_fair_class()
+ */
 __init void init_sched_fair_class(void)
 {
 #ifdef CONFIG_SMP

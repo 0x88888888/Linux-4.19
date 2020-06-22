@@ -532,6 +532,9 @@ void tick_unfreeze(void)
 
 /**
  * tick_init - initialize the tick control
+ *
+ * start_kernel()  [init/main.c]
+ *  tick_init()
  */
 void __init tick_init(void)
 {
