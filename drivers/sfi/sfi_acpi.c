@@ -113,6 +113,11 @@ static int __init sfi_acpi_parse_xsdt(struct sfi_table_header *th)
 	return 0;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  sfi_init_late()
+ *   sfi_acpi_init()
+ */
 int __init sfi_acpi_init(void)
 {
 	struct sfi_table_key xsdt_key = { .sig = SFI_SIG_XSDT };

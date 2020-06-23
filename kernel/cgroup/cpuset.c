@@ -2113,8 +2113,10 @@ struct cgroup_subsys cpuset_cgrp_subsys = {
  * cpuset_init - initialize cpusets at system boot
  *
  * Description: Initialize top_cpuset and the cpuset internal file system,
+ *
+ * start_kernel()  [init/main.c]
+ *  cpuset_init()
  **/
-
 int __init cpuset_init(void)
 {
 	int err = 0;

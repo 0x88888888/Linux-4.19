@@ -369,6 +369,10 @@ void __init efi_reserve_boot_services(void)
 	}
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  efi_free_boot_services()
+ */
 void __init efi_free_boot_services(void)
 {
 	phys_addr_t new_phys, new_size;

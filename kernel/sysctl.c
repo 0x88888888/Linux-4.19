@@ -1901,6 +1901,12 @@ static struct ctl_table dev_table[] = {
 	{ }
 };
 
+/*
+ * start_kernel()  [init/main.c]
+ *  proc_root_init()
+ *   proc_sys_init()
+ *    sysctl_init()
+ */
 int __init sysctl_init(void)
 {
 	struct ctl_table_header *hdr;

@@ -550,7 +550,13 @@ static void __init mm_init(void)
 	pti_init();
 }
 
-//到这个函数的时候，已经进入保护模式了
+/*
+ * secondary_startup_64 () at arch/x86/kernel/head_64.S
+ *  start_kernel()
+ *
+ * 到这个函数的时候，已经进入保护模式了
+ *
+ */
 asmlinkage __visible void __init start_kernel(void)
 {
 	char *command_line;
@@ -804,22 +810,31 @@ asmlinkage __visible void __init start_kernel(void)
 	 * 挂载rootfs_fs_type, bd_type
 	 */
 	vfs_caches_init();
-	
+	//page_wait_table[]初始化
 	pagecache_init();
 	//到这里
 	signals_init();
 	seq_file_init();
+
+	//初始化proc文件系统
 	proc_root_init();
+	
 	nsfs_init();
 	cpuset_init();
 	cgroup_init();
+	
 	taskstats_init_early();
 	delayacct_init();
 
+    //硬件检查
 	check_bugs();
 
 	acpi_subsystem_init();
+
+	//空函数
 	arch_post_acpi_subsys_init();
+
+	//sfi == Simple Firmware Interface
 	sfi_init_late();
 
 	if (efi_enabled(EFI_RUNTIME_SERVICES)) {

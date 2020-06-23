@@ -1905,6 +1905,11 @@ void init_cgroup_root(struct cgroup_root *root, struct cgroup_sb_opts *opts)
 		set_bit(CGRP_CPUSET_CLONE_CHILDREN, &root->cgrp.flags);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  cgroup_init()
+ *   cgroup_setup_root()
+ */
 int cgroup_setup_root(struct cgroup_root *root, u16 ss_mask, int ref_flags)
 {
 	LIST_HEAD(tmp_links);
@@ -5309,6 +5314,9 @@ static u16 cgroup_disable_mask __initdata;
  *
  * Register cgroup filesystem and /proc file, and initialize
  * any subsystems that didn't request early init.
+ *
+ * start_kernel()  [init/main.c]
+ *  cgroup_init()
  */
 int __init cgroup_init(void)
 {

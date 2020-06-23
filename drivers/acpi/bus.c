@@ -1100,6 +1100,9 @@ void __init acpi_early_init(void)
  * Doing this too early is generally unsafe, but at the same time it needs to be
  * done before all things that really depend on ACPI.  The right spot appears to
  * be before finalizing the EFI initialization.
+ *
+ * start_kernel()  [init/main.c]
+ *  acpi_subsystem_init()
  */
 void __init acpi_subsystem_init(void)
 {

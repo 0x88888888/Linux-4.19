@@ -1687,6 +1687,11 @@ void retire_sysctl_set(struct ctl_table_set *set)
 	WARN_ON(!RB_EMPTY_ROOT(&set->dir.root));
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  proc_root_init()
+ *   proc_sys_init()
+ */
 int __init proc_sys_init(void)
 {
 	struct proc_dir_entry *proc_sys_root;

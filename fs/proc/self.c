@@ -67,6 +67,11 @@ int proc_setup_self(struct super_block *s)
 	return 0;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  proc_root_init()
+ *   proc_self_init()
+ */
 void __init proc_self_init(void)
 {
 	proc_alloc_inum(&self_inum);

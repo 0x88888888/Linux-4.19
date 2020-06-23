@@ -55,6 +55,10 @@ static u64 __ro_after_init x86_spec_ctrl_mask = SPEC_CTRL_IBRS;
 u64 __ro_after_init x86_amd_ls_cfg_base;
 u64 __ro_after_init x86_amd_ls_cfg_ssbd_mask;
 
+/*
+ * start_kernel()  [init/main.c]
+ *  check_bugs()
+ */
 void __init check_bugs(void)
 {
 	identify_boot_cpu();
@@ -110,6 +114,7 @@ void __init check_bugs(void)
 
 	fpu__init_check_bugs();
 #else /* CONFIG_X86_64 */
+    //走这里
 	alternative_instructions();
 
 	/*

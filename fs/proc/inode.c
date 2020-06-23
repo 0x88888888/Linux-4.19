@@ -93,6 +93,11 @@ static void init_once(void *foo)
 	inode_init_once(&ei->vfs_inode);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  proc_root_init()
+ *   proc_init_kmemcache()
+ */
 void __init proc_init_kmemcache(void)
 {
 	proc_inode_cachep = kmem_cache_create("proc_inode_cache",

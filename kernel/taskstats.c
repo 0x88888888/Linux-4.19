@@ -669,7 +669,11 @@ static struct genl_family family __ro_after_init = {
 	.n_ops		= ARRAY_SIZE(taskstats_ops),
 };
 
-/* Needed early in initialization */
+/* Needed early in initialization
+ *
+ * start_kernel()  [init/main.c]
+ *  taskstats_init_early()
+ */
 void __init taskstats_init_early(void)
 {
 	unsigned int i;

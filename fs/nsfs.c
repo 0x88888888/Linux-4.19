@@ -274,6 +274,10 @@ static struct file_system_type nsfs = {
 	.kill_sb = kill_anon_super,
 };
 
+/*
+ * start_kernel()  [init/main.c]
+ *  nsfs_init()
+ */
 void __init nsfs_init(void)
 {
 	nsfs_mnt = kern_mount(&nsfs);

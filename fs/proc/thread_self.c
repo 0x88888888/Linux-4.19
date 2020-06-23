@@ -67,6 +67,11 @@ int proc_setup_thread_self(struct super_block *s)
 	return 0;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  proc_root_init()
+ *   proc_thread_self_init()
+ */
 void __init proc_thread_self_init(void)
 {
 	proc_alloc_inum(&thread_self_inum);

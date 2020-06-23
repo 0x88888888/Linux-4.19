@@ -498,6 +498,10 @@ void __init sfi_init(void)
 	return;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  sfi_init_late()
+ */
 void __init sfi_init_late(void)
 {
 	int length;

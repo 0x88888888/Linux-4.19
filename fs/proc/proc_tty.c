@@ -161,6 +161,10 @@ void proc_tty_unregister_driver(struct tty_driver *driver)
 
 /*
  * Called by proc_root_init() to initialize the /proc/tty subtree
+ *
+ * start_kernel()  [init/main.c]
+ *  proc_root_init()
+ *   proc_tty_init()
  */
 void __init proc_tty_init(void)
 {

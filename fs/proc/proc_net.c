@@ -364,6 +364,11 @@ static struct pernet_operations __net_initdata proc_net_ns_ops = {
 	.exit = proc_net_ns_exit,
 };
 
+/*
+ * start_kernel()  [init/main.c]
+ *  proc_root_init()
+ *   proc_net_init()
+ */
 int __init proc_net_init(void)
 {
 	proc_symlink("net", NULL, "self/net");

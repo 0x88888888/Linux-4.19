@@ -3609,6 +3609,11 @@ static const struct file_operations proc_task_operations = {
 	.llseek		= generic_file_llseek,
 };
 
+/*
+ * start_kernel()  [init/main.c]
+ *  proc_root_init()
+ *   set_proc_pid_nlink()
+ */
 void __init set_proc_pid_nlink(void)
 {
 	nlink_tid = pid_entry_nlink(tid_base_stuff, ARRAY_SIZE(tid_base_stuff));

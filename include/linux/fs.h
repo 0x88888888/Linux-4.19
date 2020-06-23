@@ -1773,6 +1773,8 @@ struct file_operations {
 
 /*
  * ext2_dir_inode_operations, ext2_special_inode_operations
+ *
+ * proc_link_inode_operations,
  */
 struct inode_operations {
 	struct dentry * (*lookup) (struct inode *,struct dentry *, unsigned int);
@@ -2120,7 +2122,8 @@ int sync_inode_metadata(struct inode *inode, int wait);
 
 /*
  * rootfs_fs_type, ramfs_fs_type, bd_type
- *
+ * proc_fs_type, cpuset_fs_type
+ * cgroup_fs_type, cgroup2_fs_type
  */
 struct file_system_type {
 	const char *name;

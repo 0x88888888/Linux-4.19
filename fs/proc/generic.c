@@ -433,6 +433,16 @@ out:
 	return ent;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  proc_root_init()
+ *   proc_symlink("mounts")
+ *
+ * start_kernel()  [init/main.c]
+ *  proc_root_init()
+ *   proc_net_init()
+ *    proc_symlink("net")
+ */
 struct proc_dir_entry *proc_symlink(const char *name,
 		struct proc_dir_entry *parent, const char *dest)
 {
@@ -485,6 +495,18 @@ struct proc_dir_entry *proc_mkdir_mode(const char *name, umode_t mode,
 }
 EXPORT_SYMBOL(proc_mkdir_mode);
 
+/*
+ * start_kernel()  [init/main.c]
+ *  proc_root_init()
+ *   proc_mkdir("fs", NULL)
+ *   proc_mkdir("drivers", NULL)
+ *   proc_mkdir("bus", NULL)
+ *
+ * start_kernel()  [init/main.c]
+ *  proc_root_init()
+ *   proc_sys_init()
+ *    proc_mkdir("sys", NULL)
+ */
 struct proc_dir_entry *proc_mkdir(const char *name,
 		struct proc_dir_entry *parent)
 {
@@ -492,6 +514,11 @@ struct proc_dir_entry *proc_mkdir(const char *name,
 }
 EXPORT_SYMBOL(proc_mkdir);
 
+/*
+ * start_kernel()  [init/main.c]
+ *  proc_root_init()
+ *   proc_create_mount_point("fs/nfsd")
+ */
 struct proc_dir_entry *proc_create_mount_point(const char *name)
 {
 	umode_t mode = S_IFDIR | S_IRUGO | S_IXUGO;
