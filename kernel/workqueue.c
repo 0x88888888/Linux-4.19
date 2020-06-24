@@ -5766,6 +5766,13 @@ int __init workqueue_init_early(void)
  * Workqueues have been created and work items queued on them, but there
  * are no kworkers executing the work items yet.  Populate the worker pools
  * with the initial workers and enable future kworker creations.
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      workqueue_init()
  */
 int __init workqueue_init(void)
 {

@@ -102,8 +102,8 @@ static void setup_idt(void)
  * Actual invocation sequence
  *
  * _start() [arch/x86/boot/header.S]
- *  main()
- *   go_to_protected_mode()
+ *  main()  [arxh/x86/boot/main.c]
+ *   go_to_protected_mode() [arxh/x86/boot/pm.c]
  */
 void go_to_protected_mode(void)
 {

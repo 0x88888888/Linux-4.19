@@ -22,5 +22,7 @@
 
 5.Linux内核启动
   https://zhuanlan.zhihu.com/c_1122808218635739136  
-
+  
+6.linux 内核启动过程  
+ http://blog.chinaunix.net/uid-23024886-id-2570396.html
 

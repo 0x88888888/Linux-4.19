@@ -409,6 +409,16 @@ static void __init copy_bootdata(char *real_mode_data)
 	sme_unmap_bootdata(real_mode_data);
 }
 
+/*
+ * _start() [arch/x86/boot/header.S]
+ *  main()  [arxh/x86/boot/main.c]
+ *   go_to_protected_mode() [arxh/x86/boot/pm.c]
+ *    protected_mode_jump() [arch/x86/boot/pmjump.S]
+ *     in_pm32() [arch/x86/boot/pmjump.S] 已经进入保护模式了
+ *      startup_64() [arch/x86/kernel/head_64.S]  vmlinux的入口,地址为0x1000000或者0x81000000
+ *       secondary_startup_64()
+ *        x86_64_start_kernel()
+ */
 asmlinkage __visible void __init x86_64_start_kernel(char * real_mode_data)
 {
 	/*
@@ -445,6 +455,7 @@ asmlinkage __visible void __init x86_64_start_kernel(char * real_mode_data)
 
 	idt_setup_early_handler();
 
+    //复制启动参数到boot_command_line和boot_params中
 	copy_bootdata(__va(real_mode_data));
 
 	/*
@@ -458,6 +469,18 @@ asmlinkage __visible void __init x86_64_start_kernel(char * real_mode_data)
 	x86_64_start_reservations(real_mode_data);
 }
 
+
+/*
+ * _start() [arch/x86/boot/header.S]
+ *  main()  [arxh/x86/boot/main.c]
+ *   go_to_protected_mode() [arxh/x86/boot/pm.c]
+ *    protected_mode_jump() [arch/x86/boot/pmjump.S]
+ *     in_pm32() [arch/x86/boot/pmjump.S] 已经进入保护模式了
+ *      startup_64() [arch/x86/kernel/head_64.S]  vmlinux的入口,地址为0x1000000或者0x81000000
+ *       secondary_startup_64()
+ *        x86_64_start_kernel()
+ *         x86_64_start_reservations()
+ */
 void __init x86_64_start_reservations(char *real_mode_data)
 {
 	/* version is always not zero if it is copied */

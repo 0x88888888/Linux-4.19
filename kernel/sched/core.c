@@ -5879,6 +5879,14 @@ int sched_cpu_dying(unsigned int cpu)
 }
 #endif
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      sched_init_smp()
+ */
 void __init sched_init_smp(void)
 {
 	sched_init_numa();

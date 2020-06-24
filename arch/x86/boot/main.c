@@ -134,7 +134,7 @@ static void init_heap(void)
 
 /*
  * _start() [arch/x86/boot/header.S]
- *  main()
+ *  main()  [arxh/x86/boot/main.c]
  */
 void main(void)
 {

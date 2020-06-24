@@ -397,6 +397,10 @@ static void __init setup_command_line(char *command_line)
 
 static __initdata DECLARE_COMPLETION(kthreadd_done);
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ */
 static noinline void __ref rest_init(void)
 {
 	struct task_struct *tsk;
@@ -554,6 +558,17 @@ static void __init mm_init(void)
  * secondary_startup_64() at arch/x86/kernel/head_64.S
  *  start_kernel()
  *
+ * _start() [arch/x86/boot/header.S]
+ *  main()  [arxh/x86/boot/main.c]
+ *   go_to_protected_mode() [arxh/x86/boot/pm.c]
+ *    protected_mode_jump() [arch/x86/boot/pmjump.S]
+ *     in_pm32() [arch/x86/boot/pmjump.S] 已经进入保护模式了
+ *      startup_64() [arch/x86/kernel/head_64.S]  vmlinux的入口,地址为0x1000000或者0x81000000
+ *       secondary_startup_64()
+ *        x86_64_start_kernel() //这个应该是没有的
+ *         x86_64_start_reservations() //这个也应该是没有的
+ *          start_kernel() //直接到这里
+ * 
  * 到这个函数的时候，已经进入保护模式了
  *
  */
@@ -978,6 +993,15 @@ static inline void do_trace_initcall_finish(initcall_t fn, int ret)
 }
 #endif /* !TRACEPOINTS_ENABLED */
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      do_pre_smp_initcalls()
+ *       do_one_initcall()
+ */
 int __init_or_module do_one_initcall(initcall_t fn)
 {
 	int count = preempt_count();
@@ -1085,6 +1109,14 @@ static void __init do_basic_setup(void)
 	do_initcalls();
 }
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      do_pre_smp_initcalls()
+ */
 static void __init do_pre_smp_initcalls(void)
 {
 	initcall_entry_t *fn;
@@ -1162,6 +1194,12 @@ static inline void mark_readonly(void)
 }
 #endif
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ */
 static int __ref kernel_init(void *unused)
 {
 	int ret;
@@ -1216,6 +1254,13 @@ static int __ref kernel_init(void *unused)
 	      "See Linux Documentation/admin-guide/init.rst for guidance.");
 }
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ */
 static noinline void __init kernel_init_freeable(void)
 {
 	/*
@@ -1240,9 +1285,12 @@ static noinline void __init kernel_init_freeable(void)
 	init_mm_internals();
 
 	do_pre_smp_initcalls();
+	//死锁检测
 	lockup_detector_init();
 
+    //空函数
 	smp_init();
+	
 	sched_init_smp();
 
 	page_alloc_init_late();

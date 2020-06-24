@@ -1947,6 +1947,14 @@ static int vmstat_cpu_dead(unsigned int cpu)
 
 struct workqueue_struct *mm_percpu_wq;
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      init_mm_internals()
+ */
 void __init init_mm_internals(void)
 {
 	int ret __maybe_unused;
