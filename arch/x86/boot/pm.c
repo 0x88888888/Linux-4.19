@@ -100,6 +100,10 @@ static void setup_idt(void)
 
 /*
  * Actual invocation sequence
+ *
+ * _start() [arch/x86/boot/header.S]
+ *  main()
+ *   go_to_protected_mode()
  */
 void go_to_protected_mode(void)
 {
@@ -115,12 +119,15 @@ void go_to_protected_mode(void)
 	/* Reset coprocessor (IGNNE#) */
 	reset_coprocessor();
 
-	/* Mask all interrupts in the PIC */
+	/* Mask all interrupts in the PIC 
+	 * 在pic中关闭中断
+	 */
 	mask_all_interrupts();
 
 	/* Actual transition to protected mode... */
-	setup_idt();
-	setup_gdt();
+	setup_idt(); //加载中断描述符
+	setup_gdt(); //加载gdt, boot_gdt
+	//这个函数定义在pmjump.S中
 	protected_mode_jump(boot_params.hdr.code32_start,
 			    (u32)&boot_params + (ds() << 4));
 }

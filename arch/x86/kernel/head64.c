@@ -109,6 +109,9 @@ static bool __head check_la57_support(unsigned long physaddr)
  * that function. Clang actually does not generate them, which leads to
  * boot-time crashes. To work around this problem, every global pointer must
  * be adjusted using fixup_pointer().
+ *
+ * startup_64() []arch/x86/kernel/head_64.S]
+ *  __startup_64()
  */
 unsigned long __head __startup_64(unsigned long physaddr,
 				  struct boot_params *bp)
@@ -125,6 +128,8 @@ unsigned long __head __startup_64(unsigned long physaddr,
 	int i;
 	unsigned int *next_pgt_ptr;
 
+ 
+    //4级页表，直接返回false了
 	la57 = check_la57_support(physaddr);
 
 	/* Is the address too large? */
@@ -134,6 +139,8 @@ unsigned long __head __startup_64(unsigned long physaddr,
 	/*
 	 * Compute the delta between the address I am compiled to run at
 	 * and the address I am actually running at.
+	 *
+	 * load_delta表示将当前内核段真实被装载到内存中的地址和编译过程中期望被装载到内存中的地址的差值赋值给%rb
 	 */
 	load_delta = physaddr - (unsigned long)(_text - __START_KERNEL_map);
 
@@ -167,7 +174,7 @@ unsigned long __head __startup_64(unsigned long physaddr,
 	pud[511] += load_delta;
 
 	pmd = fixup_pointer(level2_fixmap_pgt, physaddr);
-	for (i = FIXMAP_PMD_TOP; i > FIXMAP_PMD_TOP - FIXMAP_PMD_NUM; i--)
+	for (i = FIXMAP_PMD_TOP /* 507 */; i > FIXMAP_PMD_TOP - FIXMAP_PMD_NUM; i--)
 		pmd[i] += load_delta;
 
 	/*

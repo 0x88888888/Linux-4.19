@@ -551,7 +551,7 @@ static void __init mm_init(void)
 }
 
 /*
- * secondary_startup_64 () at arch/x86/kernel/head_64.S
+ * secondary_startup_64() at arch/x86/kernel/head_64.S
  *  start_kernel()
  *
  * 到这个函数的时候，已经进入保护模式了

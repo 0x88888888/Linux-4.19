@@ -1,0 +1,11 @@
+
+1.gdb链接到本地qemu上的linux
+   target remote localhost:1234
+   
+2.查看函数的汇编
+   disassemble function_name
+
+   
+   
+
+

@@ -1,0 +1,12 @@
+Kernel Exploring
+  https://richardweiyang-2.gitbook.io/kernel-exploring/
+
+Linux 内核揭秘
+  https://xinqiu.gitbooks.io/linux-insides-cn/content/  
+  
+轩脉刃de刀光剑影
+  https://www.cnblogs.com/yjf512/category/385367.html
+
+Linux内核启动
+  https://zhuanlan.zhihu.com/c_1122808218635739136  
+    

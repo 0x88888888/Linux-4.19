@@ -132,6 +132,10 @@ static void init_heap(void)
 	}
 }
 
+/*
+ * _start() [arch/x86/boot/header.S]
+ *  main()
+ */
 void main(void)
 {
 	/* First, copy the boot header into the "zeropage" */

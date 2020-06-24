@@ -1,0 +1,26 @@
+1.Linux源代码阅读——内核引导 
+  http://home.ustc.edu.cn/~boj/courses/linux_kernel/1_boot.html
+
+2.电子书<<Linux Insides>>
+  https://xinqiu.gitbooks.io/linux-insides-cn/content/Booting/linux-bootstrap-1.html
+  
+3.Linux内存初始化
+  https://blog.csdn.net/omnispace/article/details/61415968 （汇编部分）
+  https://blog.csdn.net/omnispace/article/details/61415973 （C语言部分
+  
+4.linux源码分析
+  linux源码分析（一）
+  https://www.cnblogs.com/yjf512/p/5992038.html
+  linux源码分析（二）－启动过程
+  https://www.cnblogs.com/yjf512/p/5996308.html  
+  linux源码分析（三）－start_kernel
+  https://www.cnblogs.com/yjf512/p/5999532.html
+  linux源码分析（四）－start_kernel－cgroup
+  https://www.cnblogs.com/yjf512/p/6003094.html
+  linux源码分析（五）－start_kernel
+  https://www.cnblogs.com/yjf512/p/6008465.html
+
+5.Linux内核启动
+  https://zhuanlan.zhihu.com/c_1122808218635739136  
+
+
