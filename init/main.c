@@ -555,6 +555,12 @@ static void __init mm_init(void)
 }
 
 /*
+ * 从 arch/x86/boot/header.S中的_start 开始，
+ * 到 arxh/x86/boot/main.c 中的main 初始化参数，
+ * 再到 arxh/x86/boot/pm.c 中的 go_to_protected_mode 跳转到 arch/x86/boot/pmjump.S 中的 protected_mode_jump 进入保护模式，
+ * 然后载入 vmlinuz 并自解压，
+ * 在 startup_32.S 中开启分页机制、初始化中断向量表、检测 CPU 类型等，完成 x86 体系结构的保护模式初始化
+ *
  * secondary_startup_64() at arch/x86/kernel/head_64.S
  *  start_kernel()
  *
@@ -564,7 +570,7 @@ static void __init mm_init(void)
  *    protected_mode_jump() [arch/x86/boot/pmjump.S]
  *     in_pm32() [arch/x86/boot/pmjump.S] 已经进入保护模式了
  *      startup_64() [arch/x86/kernel/head_64.S]  vmlinux的入口,地址为0x1000000或者0x81000000
- *       secondary_startup_64()
+ *       secondary_startup_64() [arch/x86/kernel/head_64.S]
  *        x86_64_start_kernel() //这个应该是没有的
  *         x86_64_start_reservations() //这个也应该是没有的
  *          start_kernel() //直接到这里

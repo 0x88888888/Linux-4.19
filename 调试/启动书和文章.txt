@@ -24,5 +24,13 @@
   https://zhuanlan.zhihu.com/c_1122808218635739136  
   
 6.linux 内核启动过程  
- http://blog.chinaunix.net/uid-23024886-id-2570396.html
+  http://blog.chinaunix.net/uid-23024886-id-2570396.html
+ 
+7.amd64 arch启动代码早期paging相关的疑问 
+  http://bbs.chinaunix.net/thread-4315664-1-1.html
+  
+8.binss 的文章
+  https://www.binss.me/blog/boot-process-of-linux/ （Linux启动流程)
+  https://www.binss.me/blog/boot-process-of-linux-grub/ (Linux启动流程：从启动到 GRUB)
+  https://www.binss.me/blog/boot-process-of-linux-decompress-kernel/ (Linux启动流程：内核解压)
 
