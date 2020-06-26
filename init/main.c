@@ -565,15 +565,20 @@ static void __init mm_init(void)
  *  start_kernel()
  *
  * _start() [arch/x86/boot/header.S]
- *  main()  [arxh/x86/boot/main.c]
- *   go_to_protected_mode() [arxh/x86/boot/pm.c]
- *    protected_mode_jump() [arch/x86/boot/pmjump.S]
- *     in_pm32() [arch/x86/boot/pmjump.S] 已经进入保护模式了
- *      startup_64() [arch/x86/kernel/head_64.S]  vmlinux的入口,地址为0x1000000或者0x81000000
- *       secondary_startup_64() [arch/x86/kernel/head_64.S]
- *        x86_64_start_kernel() //这个应该是没有的
- *         x86_64_start_reservations() //这个也应该是没有的
- *          start_kernel() //直接到这里
+ *  start_of_setup() [arch/x86/boot/header.S]
+ *   main()  [arxh/x86/boot/main.c]
+ *    go_to_protected_mode() [arxh/x86/boot/pm.c]
+ * 	   protected_mode_jump() [arch/x86/boot/pmjump.S] 实模式
+ * 	    in_pm32() [arch/x86/boot/pmjump.S] 保护模式
+ * 	     startup_32 [arch/x86/boot/compressed/head_64.S] 
+ * 	      startup_64 [arch/x86/boot/compressed/head_64.S] 已经进入64位模式了
+ * 		   relocated 这个是从startup_64()中jmp过来的
+ * 		    startup_64() [arch/x86/kernel/head_64.S]  这个是vmlinux的入口，位于0x1000000 
+ *           secondary_startup_64() [arch/x86/kernel/head_64.S] 从startup_64中jump过来的
+ * 		      Ljump_to_C_code() [arch/x86/kernel/head_64.S]
+ *             x86_64_start_kernel() [arch/x86/kernel/head64.c]
+ *              x86_64_start_reservations() [arch/x86/kernel/head64.c]
+ *               start_kernel()
  * 
  * 到这个函数的时候，已经进入保护模式了
  *
@@ -583,6 +588,10 @@ asmlinkage __visible void __init start_kernel(void)
 	char *command_line;
 	char *after_dashes;
 
+    //下面这句是自己添加的
+    __asm__ __volatile__("1: hlt\n" \
+                          "jmp 1b;\n" );
+	
 	set_task_stack_end_magic(&init_task);
 
 	//x64中为空函数

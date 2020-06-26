@@ -335,6 +335,17 @@ static void parse_elf(void *output)
  *             ^                                         ^
  *             |-------uncompressed kernel image---------|
  *
+ * _start() [arch/x86/boot/header.S]
+ *	start_of_setup() [arch/x86/boot/header.S]
+ *	 main()  [arxh/x86/boot/main.c]
+ *	  go_to_protected_mode() [arxh/x86/boot/pm.c]
+ *	   protected_mode_jump() [arch/x86/boot/pmjump.S] 实模式
+ *		in_pm32() [arch/x86/boot/pmjump.S] 保护模式
+ *		 startup_32 [arch/x86/boot/compressed/head_64.S] 这个是vmlinux的入口，位于0x1000000 
+ *		  startup_64 [arch/x86/boot/compressed/head_64.S] 已经进入64位模式了
+ *         relocated 这个是从startup_64()中jmp过来的
+ *          extract_kernel()
+ *
  */
 asmlinkage __visible void *extract_kernel(void *rmode, memptr heap,
 				  unsigned char *input_data,
@@ -342,6 +353,11 @@ asmlinkage __visible void *extract_kernel(void *rmode, memptr heap,
 				  unsigned char *output,
 				  unsigned long output_len)
 {
+
+    /*
+     * 计算解压后的内核大小
+     * VO__end 和 VO__text 定义在 arch/x86/boot/voffset.h 中，其定义根据 vmlinux 的符号表生成
+     */  
 	const unsigned long kernel_total_size = VO__end - VO__text;
 	unsigned long virt_addr = LOAD_PHYSICAL_ADDR;
 
@@ -367,6 +383,7 @@ asmlinkage __visible void *extract_kernel(void *rmode, memptr heap,
 	console_init();
 	debug_putstr("early console in extract_kernel\n");
 
+    /* 用于解压的临时堆内存 ，长度为 BOOT_HEAP_SIZE ，除 bzip2 (0x400000) 外为 0x10000 */
 	free_mem_ptr     = heap;	/* Heap */
 	free_mem_end_ptr = heap + BOOT_HEAP_SIZE;
 
@@ -387,6 +404,10 @@ asmlinkage __visible void *extract_kernel(void *rmode, memptr heap,
 	 * the entire decompressed kernel plus relocation table, or the
 	 * entire decompressed kernel plus .bss and .brk sections.
 	 */
+    /*
+     * kernel aslr(kernel Address Space Layout Randomization)
+     * 获得随机的解压后 kernel 的起始地址
+     */	 
 	choose_random_location((unsigned long)input_data, input_len,
 				(unsigned long *)&output,
 				max(output_len, kernel_total_size),
@@ -414,8 +435,10 @@ asmlinkage __visible void *extract_kernel(void *rmode, memptr heap,
 #endif
 
 	debug_putstr("\nDecompressing Linux... ");
+	/* 原地解压 kernel */
 	__decompress(input_data, input_len, NULL, NULL, output, output_len,
 			NULL, error);
+	/* 将解压后的内核 segment 放到合适位置 */
 	parse_elf(output);
 	handle_relocations(output, output_len, virt_addr);
 	debug_putstr("done.\nBooting the kernel.\n");

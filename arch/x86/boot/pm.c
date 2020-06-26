@@ -102,32 +102,38 @@ static void setup_idt(void)
  * Actual invocation sequence
  *
  * _start() [arch/x86/boot/header.S]
- *  main()  [arxh/x86/boot/main.c]
- *   go_to_protected_mode() [arxh/x86/boot/pm.c]
+ *  start_of_setup() [arch/x86/boot/header.S]
+ *   main()  [arxh/x86/boot/main.c]
+ *    go_to_protected_mode() [arxh/x86/boot/pm.c]
  */
 void go_to_protected_mode(void)
 {
 	/* Hook before leaving real mode, also disables interrupts */
+	/* 如果设置了 boot_params.hdr.realmode_swtch，调用该 hook；否则关闭外部中断和不可屏蔽中断(nmi) */
 	realmode_switch_hook();
 
 	/* Enable the A20 gate */
+	/* 启用 A20 地址线，如果失败，直接报错然后 hlt */
 	if (enable_a20()) {
 		puts("A20 gate not responding, unable to boot...\n");
 		die();
 	}
 
 	/* Reset coprocessor (IGNNE#) */
+	/* 清理并重置协处理器 */
 	reset_coprocessor();
 
 	/* Mask all interrupts in the PIC 
-	 * 在pic中关闭中断
+	 *
+	 *  屏蔽所有 PIC 中断(除了 primary PIC 用来连接 secondary PIC 的 IRQ2 引脚)
 	 */
 	mask_all_interrupts();
 
 	/* Actual transition to protected mode... */
-	setup_idt(); //加载中断描述符
+	/* 设置 IDTR，指向 null_idt */
+	setup_idt();  
 	setup_gdt(); //加载gdt, boot_gdt
-	//这个函数定义在pmjump.S中
+	// 切换到保护模式 ,这个函数定义在pmjump.S中
 	protected_mode_jump(boot_params.hdr.code32_start,
 			    (u32)&boot_params + (ds() << 4));
 }

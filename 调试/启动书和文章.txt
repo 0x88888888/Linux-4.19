@@ -33,4 +33,11 @@
   https://www.binss.me/blog/boot-process-of-linux/ （Linux启动流程)
   https://www.binss.me/blog/boot-process-of-linux-grub/ (Linux启动流程：从启动到 GRUB)
   https://www.binss.me/blog/boot-process-of-linux-decompress-kernel/ (Linux启动流程：内核解压)
+  
+9.Linux内核-编译与启动流程 
+  https://blog.csdn.net/feilengcui008/article/details/48605863  
+  
+  
+10.Early x86 Linux boot debug tricks
+  https://www.codeblueprint.co.uk/2015/04/15/early-x86-linux-boot-debug-tricks.html  
 

@@ -316,20 +316,46 @@ static void restore_screen(void)
 	store_cursor_position();
 }
 
+/*
+ * _start() [arch/x86/boot/header.S]
+ *  start_of_setup() [arch/x86/boot/header.S]
+ *   main()  [arxh/x86/boot/main.c]
+ *    set_video()
+ *
+ * 读取 bootloader 设置在 setup_header 的 video mode，
+ * 将其设置到支持该 mode 的 video driver 中。
+ */
 void set_video(void)
 {
+     /* vid_mode 由 bootloader 负责填充 */
 	u16 mode = boot_params.hdr.vid_mode;
 
+    /* 设置堆顶为 _end 变量 */
 	RESET_HEAP();
 
+   /*
+	* 保存显示参数到 boot_params.screen_info
+	* 根据 video mode 将 video_segment 设置为相应地址
+	* 保存字体大小到 boot_params.screen_info.orig_video_points
+	* 保存行数到 boot_params.screen_info.orig_video_lines
+	* 保存列数到 boot_params.screen_info.orig_video_cols
+	*/
 	store_mode_params();
+    /*
+     * 将 boot_params.screen_info 中设置的信息保存到 saved_screen 中
+     * 为 saved_screen.data 在堆中分配 行*列*u16 的空间，用于保存 video_segment 指向的内容(32Kb)
+     */   
 	save_screen();
+	/* 检查所有 video_cards(card_info) ，调用它们的 probe 函数获取它们支持的 mode */
 	probe_cards(0);
 
+    /* 尝试设置 video mode */
 	for (;;) {
+		/* 如果 vid_mode=ask，则提供菜单进行询问 */
 		if (mode == ASK_VGA)
 			mode = mode_menu();
 
+        /* 对支持该 mode 的第一个 card，调用其对应的 set_mode 函数进行设置 */
 		if (!set_mode(mode))
 			break;
 
@@ -337,9 +363,12 @@ void set_video(void)
 		mode = ASK_VGA;
 	}
 	boot_params.hdr.vid_mode = mode;
+	/* 存储 Extended Display Identification Data 信息 */
 	vesa_store_edid();
+	/* 再次保存显示参数 */
 	store_mode_params();
 
+    /* 用 saved_screen 中的信息恢复屏幕显示 */ 
 	if (do_restore)
 		restore_screen();
 }

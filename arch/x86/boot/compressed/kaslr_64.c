@@ -77,7 +77,21 @@ phys_addr_t physical_mask = (1ULL << __PHYSICAL_MASK_SHIFT) - 1;
  */
 static struct x86_mapping_info mapping_info;
 
-/* Locates and clears a region for a new top level page table. */
+/* Locates and clears a region for a new top level page table. 
+ *
+ * _start() [arch/x86/boot/header.S]
+ *	start_of_setup() [arch/x86/boot/header.S]
+ *	 main()  [arxh/x86/boot/main.c]
+ *	  go_to_protected_mode() [arxh/x86/boot/pm.c]
+ *	   protected_mode_jump() [arch/x86/boot/pmjump.S] 实模式
+ *		in_pm32() [arch/x86/boot/pmjump.S] 保护模式
+ *		 startup_32 [arch/x86/boot/compressed/head_64.S] 这个是vmlinux的入口，位于0x1000000 
+ *		  startup_64 [arch/x86/boot/compressed/head_64.S] 已经进入64位模式了
+ *         relocated 这个是从startup_64()中jmp过来的
+ *          extract_kernel()
+ *           choose_random_location()
+ *            initialize_identity_maps()
+ */
 void initialize_identity_maps(void)
 {
 	/* If running as an SEV guest, the encryption mask is required. */

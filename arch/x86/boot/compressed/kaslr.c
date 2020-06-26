@@ -756,6 +756,23 @@ static void process_e820_entries(unsigned long minimum,
 	}
 }
 
+/*
+ * _start() [arch/x86/boot/header.S]
+ *	start_of_setup() [arch/x86/boot/header.S]
+ *	 main()  [arxh/x86/boot/main.c]
+ *	  go_to_protected_mode() [arxh/x86/boot/pm.c]
+ *	   protected_mode_jump() [arch/x86/boot/pmjump.S] 实模式
+ *		in_pm32() [arch/x86/boot/pmjump.S] 保护模式
+ *		 startup_32 [arch/x86/boot/compressed/head_64.S] 这个是vmlinux的入口，位于0x1000000 
+ *		  startup_64 [arch/x86/boot/compressed/head_64.S] 已经进入64位模式了
+ *         relocated 这个是从startup_64()中jmp过来的
+ *          extract_kernel()
+ *           choose_random_location()
+ *            find_random_phys_addr()
+ *
+ * 遍历 boot_params->e820_map 中的 entry(先前通过 BIOS 例程找到) ，
+ * 将符合条件的区域以 slot_area 的形式添加到全局变量 slot_areas 中 
+ */
 static unsigned long find_random_phys_addr(unsigned long minimum,
 					   unsigned long image_size)
 {
@@ -769,7 +786,7 @@ static unsigned long find_random_phys_addr(unsigned long minimum,
 	minimum = ALIGN(minimum, CONFIG_PHYSICAL_ALIGN);
 
 	if (process_efi_entries(minimum, image_size))
-		return slots_fetch_random();
+		return slots_fetch_random(); // 随机从 slot_areas (满足条件的内存区域) 中选择一个，返回起始地址
 
 	process_e820_entries(minimum, image_size);
 	return slots_fetch_random();
@@ -801,6 +818,18 @@ static unsigned long find_random_virt_addr(unsigned long minimum,
 /*
  * Since this function examines addresses much more numerically,
  * it takes the input and output pointers as 'unsigned long'.
+ *
+ * _start() [arch/x86/boot/header.S]
+ *	start_of_setup() [arch/x86/boot/header.S]
+ *	 main()  [arxh/x86/boot/main.c]
+ *	  go_to_protected_mode() [arxh/x86/boot/pm.c]
+ *	   protected_mode_jump() [arch/x86/boot/pmjump.S] 实模式
+ *		in_pm32() [arch/x86/boot/pmjump.S] 保护模式
+ *		 startup_32 [arch/x86/boot/compressed/head_64.S] 这个是vmlinux的入口，位于0x1000000 
+ *		  startup_64 [arch/x86/boot/compressed/head_64.S] 已经进入64位模式了
+ *         relocated 这个是从startup_64()中jmp过来的
+ *          extract_kernel()
+ *           choose_random_location()
  */
 void choose_random_location(unsigned long input,
 			    unsigned long input_size,
@@ -810,11 +839,13 @@ void choose_random_location(unsigned long input,
 {
 	unsigned long random_addr, min_addr;
 
+    //如果在内核启动参数中设置了 nokaslr ，则直接返回
 	if (cmdline_find_option_bool("nokaslr")) {
 		warn("KASLR disabled: 'nokaslr' on cmdline.");
 		return;
 	}
 
+//傻逼，没有定义
 #ifdef CONFIG_X86_5LEVEL
 	if (__read_cr4() & X86_CR4_LA57) {
 		__pgtable_l5_enabled = 1;
@@ -826,25 +857,41 @@ void choose_random_location(unsigned long input,
 	boot_params->hdr.loadflags |= KASLR_FLAG;
 
 	/* Prepare to add new identity pagetables on demand. */
+	/*
+	 * 填充 mapping_info 。如果从 start_32 而来，
+	 * 那么 cr3 中已经加载了 `_pgtable` ，则将其保存到 level4p ，
+	 * 并在维护页表分配信息的 `pgt_data(mapping_info.context)` 中跳过 BOOT_INIT_PGT_SIZE ，
+	 * 然后将 pgt_data 区域清 0。否则需要新分配顶级页表页，设置到 level4p 中
+	 */
 	initialize_identity_maps();
 
-	/* Record the various known unsafe memory ranges. */
+	/* Record the various known unsafe memory ranges. 
+	 * 找出不安全的内存区域，根据类型(mem_avoid_index)保存到 mem_vector 的数组 mem_avoid 中
+	 */
 	mem_avoid_init(input, input_size, *output);
 
 	/*
 	 * Low end of the randomization range should be the
 	 * smaller of 512M or the initial kernel image
 	 * location:
+	 *
+	 * 设置内核解压的起始地址 min_addr ，其不能大于 output 地址 和 512MB
 	 */
 	min_addr = min(*output, 512UL << 20);
 
-	/* Walk available memory entries to find a random address. */
+	/* Walk available memory entries to find a random address. 
+	 *
+	 * 遍历 boot_params->e820_map 中的 entry(先前通过 BIOS 例程找到) ，
+	 * 将符合条件的区域以 slot_area 的形式添加到全局变量 slot_areas 中
+	 */
 	random_addr = find_random_phys_addr(min_addr, output_size);
 	if (!random_addr) {
 		warn("Physical KASLR disabled: no suitable memory region!");
 	} else {
 		/* Update the new physical address location. */
 		if (*output != random_addr) {
+			// 为随机出来的内存区域创建涉及到的各级页表页，
+			// 并将地址填充到上级页表中
 			add_identity_map(random_addr, output_size);
 			*output = random_addr;
 		}
@@ -855,6 +902,8 @@ void choose_random_location(unsigned long input,
 		 * is found for the kernel, otherwise we should keep
 		 * the old page table to make it be like the "nokaslr"
 		 * case.
+		 *
+		 * 将 identity mapping 的 4 级页表指针设置到 cr3 中，使其生效
 		 */
 		finalize_identity_maps();
 	}
@@ -862,6 +911,8 @@ void choose_random_location(unsigned long input,
 
 	/* Pick random virtual address starting from LOAD_PHYSICAL_ADDR. */
 	if (IS_ENABLED(CONFIG_X86_64))
+		//设置 kernel 的起始虚拟地址，在 32 位下虚拟地址就是output，
+		// 而在 64 位下需要随机选择(LOAD_PHYSICAL_ADDR + random_addr * CONFIG_PHYSICAL_ALIGN)
 		random_addr = find_random_virt_addr(LOAD_PHYSICAL_ADDR, output_size);
 	*virt_addr = random_addr;
 }

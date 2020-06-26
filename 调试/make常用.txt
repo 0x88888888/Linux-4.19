@@ -1,3 +1,10 @@
+内核make
+   1.make bzImage 
+      只编译内核(setup.elf, setup.bin,vmlinux),不编译模块
+	  对应的 Makefile 定义在 arch/x86/Makefile
+   2.make 
+      编译内核(setup.elf, setup.bin,vmlinux),也编译模块
+
 1.带入make参数“-n”或“--just-print”，那么其只是显示命令，但不会执行命令，这个功能很有利于我们调试我们的Makefile
 
 

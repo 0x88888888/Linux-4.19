@@ -1,34 +1,30 @@
-initrd_filename
-initrd_filename
-
-qemu-system-x86_64 -serial stdio  -enable-kvm -nographic -kernel /root/software/linux-3.10.18/arch/x86_64/boot/bzImage -initrd rootfs.img.gz -append "root=/dev/ram console=ttyS0 rdinit=sbin/init noapic"
-
-
-qemu-system-x86_64 -enable-kvm -nographic -kernel /root/software/linux-3.10.18/arch/x86_64/boot/bzImage -initrd rootfs.img.gz  -m 128M -nographic -append "rdinit=init console=ttyS0"
-
-
-pc_init1
-
-
-qemu-system-i386 -enable-kvm -nographic -kernel /root/software/kernel_debug/bzImage2.6.24 -initrd hwinitramfs  -append "console=ttyS0 rdinit=init"
-
-qemu-system-i386 -enable-kvm -nographic -kernel /root/software/linux-3.10.18/arch/x86/boot/bzImage -initrd hwinitramfs -append "console=ttyS0 rdinit=init" 
 
 
 ubuntu14使用qemu调试linux内核
 https://www.cnblogs.com/pingandezhufu/p/4392297.html
 
 
-qemu-system-i386 -enable-kvm -nographic -kernel /root/software/linux-3.18.6/arch/x86/boot/bzImage -initrd rootfs.img -append "console=ttyS0 rdinit=init"
 
-qemu-system-x86_64 -enable-kvm -nographic -kernel arch/x86_64/boot/bzImage -hda linux-0.2.img -append "root=/dev/sda"
 
-qemu-system-x86_64 -S -s -serial mon:stdio -nographic -kernel arch/x86_64/boot/bzImage -initrd ../rootfs/rootfs.img.gz  -append "root=/dev/ram console=ttyS0 rdinit=sbin/init noapic"
-
-qemu-system-x86_64 -S -s -serial mon:stdio -nographic -kernel arch/x86_64/boot/bzImage -initrd ../rootfs/rootfs.img.gz  -append "root=/dev/ram console=ttyS0 rdinit=sbin/init"
+qemu选项:
+  -s qemu启动时,cpu暂停执行
+  -S 等待gdb远程链接上来
+  -kernel 内核文件
+  -initrd
+  -serial mon:stdio
+  -append "nokaslr console=ttyS0 earlyprintk"  x86_64_start_kernel
+      nokaslr:禁止内核的地址随机化
+	  earlyprintk:
+	  debug:
+  -enable-kvm 开启cpu的虚拟化功能
+  
 
 这个好用
-qemu-system-x86_64 -s -S -kernel arch/x86_64/boot/bzImage -append "nokaslr console=ttyS0" -serial mon:stdio -nographic
+qemu-system-x86_64 -enable-kvm -serial mon:stdio -nographic -kernel arch/x86_64/boot/bzImage -append "nokaslr console=ttyS0 earlyprintk debug" 
+
+qemu-system-x86_64 -s -S -enable-kvm -serial mon:stdio -nographic -kernel arch/x86_64/boot/bzImage -append "nokaslr console=ttyS0 earlyprintk debug" 
+
+qemu-system-x86_64 -S -s -enable-kvm -serial mon:stdio -nographic -kernel arch/x86_64/boot/bzImage -initrd ../rootfs/rootfs.img.gz  -append "root=/dev/ram console=ttyS0 rdinit=sbin/init"
 
 
 gdb客户端启动:
@@ -39,6 +35,7 @@ gdb内部:
 
 编译qemu时的配置选项:
 ./configure --enable-kvm --enable-debug --enable-vnc --enable-werror --target-list=x86_64-softmmu,i386-softmmu
+用这个
 ./configure --enable-kvm --enable-debug --enable-vnc --target-list=x86_64-softmmu,i386-softmmu
 
 
