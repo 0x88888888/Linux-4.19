@@ -12,7 +12,7 @@ qemu选项:
   -kernel 内核文件
   -initrd
   -serial mon:stdio
-  -append "nokaslr console=ttyS0 earlyprintk"  x86_64_start_kernel
+  -append "nokaslr console=ttyS0 earlyprintk"  
       nokaslr:禁止内核的地址随机化
 	  earlyprintk:
 	  debug:
