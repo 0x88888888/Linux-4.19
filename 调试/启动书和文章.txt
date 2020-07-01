@@ -37,7 +37,12 @@
 9.Linux内核-编译与启动流程 
   https://blog.csdn.net/feilengcui008/article/details/48605863  
   
-  
 10.Early x86 Linux boot debug tricks
   https://www.codeblueprint.co.uk/2015/04/15/early-x86-linux-boot-debug-tricks.html  
+
+
+Linux内核的引导启动
+  https://frankjkl.github.io/2019/03/12/Linux%E5%86%85%E6%A0%B8-%E5%BC%95%E5%AF%BC%E5%90%AF%E5%8A%A8/
+
+
 

@@ -189,10 +189,13 @@ void main(void)
     /*
      * 初始化 console，如果有 earlyprintk 选项，选择对应的设备作为 console，如 serial,0x3f8,115200
      * 此后可以通过 puts => putchar 输出字符，本质上是通过 0x10 中断调用 BIOS 例程来打印字符
+     *
+     * 在此之后，可以用puts输出字符串信息
      */	
 	console_init();
 	if (cmdline_find_option_bool("debug"))
 		puts("early console in setup code\n");
+	
 
 	/* End of heap check */
 	/* 如果开启了 CAN_USE_HEAP，初始化堆 */

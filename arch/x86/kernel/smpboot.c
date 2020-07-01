@@ -688,6 +688,24 @@ static void __init smp_quirk_init_udelay(void)
  * Poke the other CPU in the eye via NMI to wake it up. Remember that the normal
  * INIT, INIT, STARTUP sequence will reset the chip hard for us, and this
  * won't ... remember to clear down the APIC, etc later.
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ * 	   kernel_init_freeable()
+ * 	    smp_init()
+ * 	     cpu_up()
+ * 	      do_cpu_up()
+ * 		   _cpu_up()
+ * 		    cpuhp_up_callbacks()
+ * 		     cpuhp_invoke_callback()
+ * 		      bringup_cpu()
+ * 			   __cpu_up()
+ * 			    native_cpu_up()
+ *               do_boot_cpu()
+ *                wakeup_cpu_via_init_nmi()
+ *                 wakeup_secondary_cpu_via_nmi()
  */
 int
 wakeup_secondary_cpu_via_nmi(int apicid, unsigned long start_eip)
@@ -698,7 +716,7 @@ wakeup_secondary_cpu_via_nmi(int apicid, unsigned long start_eip)
 	/* Target chip */
 	/* Boot on the stack */
 	/* Kick the second */
-	apic_icr_write(APIC_DM_NMI | apic->dest_logical, apicid);
+	apic_icr_write(APIC_DM_NMI | apic->dest_logical /* 是2048 */, apicid);
 
 	pr_debug("Waiting for send to finish...\n");
 	send_status = safe_apic_wait_icr_idle();
@@ -709,6 +727,7 @@ wakeup_secondary_cpu_via_nmi(int apicid, unsigned long start_eip)
 	udelay(200);
 	if (APIC_INTEGRATED(boot_cpu_apic_version)) {
 		maxlvt = lapic_get_maxlvt();
+		
 		if (maxlvt > 3)			/* Due to the Pentium erratum 3AP.  */
 			apic_write(APIC_ESR, 0);
 		accept_status = (apic_read(APIC_ESR) & 0xEF);
@@ -896,6 +915,23 @@ static int wakeup_cpu0_nmi(unsigned int cmd, struct pt_regs *regs)
  * (i.e. physically hot removed and then hot added), NMI won't wake it up.
  * We'll change this code in the future to wake up hard offlined CPU0 if
  * real platform and request are available.
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ * 	   kernel_init_freeable()
+ * 	    smp_init()
+ * 	     cpu_up()
+ * 	      do_cpu_up()
+ * 		   _cpu_up()
+ * 		    cpuhp_up_callbacks()
+ * 		     cpuhp_invoke_callback()
+ * 		      bringup_cpu()
+ * 			   __cpu_up()
+ * 			    native_cpu_up()
+ *               do_boot_cpu()
+ *                wakeup_cpu_via_init_nmi()
  */
 static int
 wakeup_cpu_via_init_nmi(int cpu, unsigned long start_ip, int apicid,
@@ -908,6 +944,8 @@ wakeup_cpu_via_init_nmi(int cpu, unsigned long start_ip, int apicid,
 
 	/*
 	 * Wake up AP by INIT, INIT, STARTUP sequence.
+	 *
+	 * 只能wakup secondary cpu
 	 */
 	if (cpu) {
 		boot_error = wakeup_secondary_cpu_via_init(apicid, start_ip);
@@ -959,6 +997,23 @@ void common_cpu_up(unsigned int cpu, struct task_struct *idle)
  * (ie clustered apic addressing mode), this is a LOGICAL apic ID.
  * Returns zero if CPU booted OK, else error code from
  * ->wakeup_secondary_cpu.
+ *
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ * 	   kernel_init_freeable()
+ * 	    smp_init()
+ * 	     cpu_up()
+ * 	      do_cpu_up()
+ * 		   _cpu_up()
+ * 		    cpuhp_up_callbacks()
+ * 		     cpuhp_invoke_callback()
+ * 		      bringup_cpu()
+ * 			   __cpu_up()
+ * 			    native_cpu_up()
+ *               do_boot_cpu()
  */
 static int do_boot_cpu(int apicid, int cpu, struct task_struct *idle,
 		       int *cpu0_nmi_registered)
@@ -979,22 +1034,23 @@ static int do_boot_cpu(int apicid, int cpu, struct task_struct *idle,
 	/* Enable the espfix hack for this CPU */
 	init_espfix_ap(cpu);
 
-	/* So we see what's up */
+	/* So we see what's up 
+	 * 打印cpu启动信息
+	 */
 	announce_cpu(cpu, apicid);
 
 	/*
 	 * This grunge runs the startup process for
 	 * the targeted processor.
 	 */
-
-	if (x86_platform.legacy.warm_reset) {
+	if (x86_platform.legacy.warm_reset) { //这个值为1
 
 		pr_debug("Setting warm reset code and vector.\n");
 
 		smpboot_setup_warm_reset_vector(start_ip);
 		/*
 		 * Be paranoid about clearing APIC errors.
-		*/
+		 */
 		if (APIC_INTEGRATED(boot_cpu_apic_version)) {
 			apic_write(APIC_ESR, 0);
 			apic_read(APIC_ESR);
@@ -1015,6 +1071,8 @@ static int do_boot_cpu(int apicid, int cpu, struct task_struct *idle,
 	 * - Use the method in the APIC driver if it's defined
 	 * Otherwise,
 	 * - Use an INIT boot APIC message for APs or NMI for BSP.
+	 *
+	 * apic->wakeup_secondary_cpu == 0
 	 */
 	if (apic->wakeup_secondary_cpu)
 		boot_error = apic->wakeup_secondary_cpu(apicid, start_ip);
@@ -1059,8 +1117,9 @@ static int do_boot_cpu(int apicid, int cpu, struct task_struct *idle,
 	/* mark "stuck" area as not stuck */
 	*trampoline_status = 0;
 
-	if (x86_platform.legacy.warm_reset) {
-		/*
+    //x86_platform.legacy.warm_reset == 1
+	if (x86_platform.legacy.warm_reset) { //这个值为1
+		/* 
 		 * Cleanup possible dangling ends...
 		 */
 		smpboot_restore_warm_reset_vector();
@@ -1069,6 +1128,22 @@ static int do_boot_cpu(int apicid, int cpu, struct task_struct *idle,
 	return boot_error;
 }
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      smp_init()
+ *       cpu_up()
+ *        do_cpu_up()
+ *         _cpu_up()
+ *          cpuhp_up_callbacks()
+ *           cpuhp_invoke_callback()
+ *            bringup_cpu()
+ *             __cpu_up()
+ *              native_cpu_up()
+ */
 int native_cpu_up(unsigned int cpu, struct task_struct *tidle)
 {
 	int apicid = apic->cpu_present_to_apicid(cpu);

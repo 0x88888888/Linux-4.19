@@ -2121,9 +2121,21 @@ static inline void init_idle_pids(struct task_struct *idle)
 	}
 }
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      smp_init()
+ *       idle_threads_init()
+ *        idle_init()
+ *         fork_idle()
+ */
 struct task_struct *fork_idle(int cpu)
 {
 	struct task_struct *task;
+	//从init task中fork出来一个内核进程
 	task = copy_process(CLONE_VM, 0, 0, NULL, &init_struct_pid, 0, 0,
 			    cpu_to_node(cpu));
 	if (!IS_ERR(task)) {

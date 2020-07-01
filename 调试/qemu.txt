@@ -14,15 +14,16 @@ qemu选项:
   -serial mon:stdio
   -append "nokaslr console=ttyS0 earlyprintk"  
       nokaslr:禁止内核的地址随机化
-	  earlyprintk:
+	  console=ttyS0:
+	  earlyprintk==ttyS0:
 	  debug:
   -enable-kvm 开启cpu的虚拟化功能
   
 
 这个好用
-qemu-system-x86_64 -enable-kvm -serial mon:stdio -nographic -kernel arch/x86_64/boot/bzImage -append "nokaslr console=ttyS0 earlyprintk debug" 
+qemu-system-x86_64 -enable-kvm -serial mon:stdio -nographic -kernel arch/x86_64/boot/bzImage -append "nokaslr console=ttyS0 earlyprintk=ttyS0 debug" 
 
-qemu-system-x86_64 -s -S -enable-kvm -serial mon:stdio -nographic -kernel arch/x86_64/boot/bzImage -append "nokaslr console=ttyS0 earlyprintk debug" 
+qemu-system-x86_64 -s -S -enable-kvm -serial mon:stdio -nographic -kernel arch/x86_64/boot/bzImage -append "nokaslr console=ttyS0 earlyprintk=ttyS0 debug" 
 
 qemu-system-x86_64 -S -s -enable-kvm -serial mon:stdio -nographic -kernel arch/x86_64/boot/bzImage -initrd ../rootfs/rootfs.img.gz  -append "root=/dev/ram console=ttyS0 rdinit=sbin/init"
 

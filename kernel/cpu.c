@@ -138,6 +138,18 @@ static struct cpuhp_step *cpuhp_get_step(enum cpuhp_state state)
  * @lastp:	For multi-instance rollback, remember how far we got
  *
  * Called from cpu hotplug and from the state register machinery.
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      smp_init()
+ *       cpu_up()
+ *        do_cpu_up()
+ *         _cpu_up()
+ *          cpuhp_up_callbacks()
+ *           cpuhp_invoke_callback()
  */
 static int cpuhp_invoke_callback(unsigned int cpu, enum cpuhp_state state,
 				 bool bringup, struct hlist_node *node,
@@ -160,6 +172,7 @@ static int cpuhp_invoke_callback(unsigned int cpu, enum cpuhp_state state,
 
 	if (!step->multi_instance) {
 		WARN_ON_ONCE(lastp && *lastp);
+		//cb是bringup_cpu
 		cb = bringup ? step->startup.single : step->teardown.single;
 		if (!cb)
 			return 0;
@@ -168,6 +181,7 @@ static int cpuhp_invoke_callback(unsigned int cpu, enum cpuhp_state state,
 		trace_cpuhp_exit(cpu, st->state, state, ret);
 		return ret;
 	}
+	
 	cbm = bringup ? step->startup.multi : step->teardown.multi;
 	if (!cbm)
 		return 0;
@@ -521,6 +535,20 @@ static int bringup_wait_for_ap(unsigned int cpu)
 	return cpuhp_kick_ap(st, st->target);
 }
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      smp_init()
+ *       cpu_up()
+ *        do_cpu_up()
+ *         _cpu_up()
+ *          cpuhp_up_callbacks()
+ *           cpuhp_invoke_callback()
+ *            bringup_cpu()
+ */
 static int bringup_cpu(unsigned int cpu)
 {
 	struct task_struct *idle = idle_thread_get(cpu);
@@ -551,6 +579,18 @@ static void undo_cpu_up(unsigned int cpu, struct cpuhp_cpu_state *st)
 		cpuhp_invoke_callback(cpu, st->state, false, NULL, NULL);
 }
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      smp_init()
+ *       cpu_up()
+ *        do_cpu_up()
+ *         _cpu_up()
+ *          cpuhp_up_callbacks()
+ */
 static int cpuhp_up_callbacks(unsigned int cpu, struct cpuhp_cpu_state *st,
 			      enum cpuhp_state target)
 {
@@ -1054,8 +1094,19 @@ void cpuhp_online_idle(enum cpuhp_state state)
 	complete_ap_thread(st, true);
 }
 
-/* Requires cpu_add_remove_lock to be held */
-static int _cpu_up(unsigned int cpu, int tasks_frozen, enum cpuhp_state target)
+/* Requires cpu_add_remove_lock to be held 
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      smp_init()
+ *       cpu_up()
+ *        do_cpu_up()
+ *         _cpu_up()
+ */
+static int _cpu_up(unsigned int cpu, int tasks_frozen, enum cpuhp_state target /* cpu将要转成的状态 */)
 {
 	struct cpuhp_cpu_state *st = per_cpu_ptr(&cpuhp_state, cpu);
 	struct task_struct *idle;
@@ -1071,6 +1122,8 @@ static int _cpu_up(unsigned int cpu, int tasks_frozen, enum cpuhp_state target)
 	/*
 	 * The caller of do_cpu_up might have raced with another
 	 * caller. Ignore it for now.
+	 *
+	 * 
 	 */
 	if (st->state >= target)
 		goto out;
@@ -1113,6 +1166,16 @@ out:
 	return ret;
 }
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      smp_init()
+ *       cpu_up()
+ *        do_cpu_up()
+ */
 static int do_cpu_up(unsigned int cpu, enum cpuhp_state target)
 {
 	int err = 0;
@@ -1147,8 +1210,18 @@ out:
 	return err;
 }
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      smp_init()
+ *       cpu_up()
+ */
 int cpu_up(unsigned int cpu)
 {
+    
 	return do_cpu_up(cpu, CPUHP_ONLINE);
 }
 EXPORT_SYMBOL_GPL(cpu_up);

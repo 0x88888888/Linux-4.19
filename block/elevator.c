@@ -149,7 +149,16 @@ static int __init elevator_setup(char *str)
 
 __setup("elevator=", elevator_setup);
 
-/* called during boot to load the elevator chosen by the elevator param */
+/* called during boot to load the elevator chosen by the elevator param 
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      load_default_modules()
+ *       load_default_elevator_module()
+ */
 void __init load_default_elevator_module(void)
 {
 	struct elevator_type *e;

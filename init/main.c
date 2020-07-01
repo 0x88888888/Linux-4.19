@@ -572,7 +572,7 @@ static void __init mm_init(void)
  * 	    in_pm32() [arch/x86/boot/pmjump.S] 保护模式
  * 	     startup_32 [arch/x86/boot/compressed/head_64.S] 
  * 	      startup_64 [arch/x86/boot/compressed/head_64.S] 已经进入64位模式了
- * 		   relocated 这个是从startup_64()中jmp过来的
+ * 		   relocated 这个是从startup_64()中jmp过来的,这里调用extract_kernel来解压vmlinux.bin.gz
  * 		    startup_64() [arch/x86/kernel/head_64.S]  这个是vmlinux的入口，位于0x1000000 
  *           secondary_startup_64() [arch/x86/kernel/head_64.S] 从startup_64中jump过来的
  * 		      Ljump_to_C_code() [arch/x86/kernel/head_64.S]
@@ -588,9 +588,6 @@ asmlinkage __visible void __init start_kernel(void)
 	char *command_line;
 	char *after_dashes;
 
-    //下面这句是自己添加的
-    __asm__ __volatile__("1: hlt\n" \
-                          "jmp 1b;\n" );
 	
 	set_task_stack_end_magic(&init_task);
 
@@ -1146,6 +1143,13 @@ static void __init do_pre_smp_initcalls(void)
  * called twice right after initrd is mounted and right before init is
  * exec'd.  If such modules are on either initrd or rootfs, they will be
  * loaded before control is passed to userland.
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      load_default_modules()
  */
 void __init load_default_modules(void)
 {
@@ -1214,11 +1218,14 @@ static inline void mark_readonly(void)
  *  rest_init()
  *   ......
  *    kernel_init()
+ *
+ * kernel_init是 1号进程，init进程，用户态进程
  */
 static int __ref kernel_init(void *unused)
 {
 	int ret;
 
+    //启动secondary cpu
 	kernel_init_freeable();
 	/* need to finish all async __init code before freeing the memory */
 	async_synchronize_full();
@@ -1270,6 +1277,7 @@ static int __ref kernel_init(void *unused)
 }
 
 /*
+ * 
  * start_kernle() [init/main.c]
  *  rest_init()
  *   ......
@@ -1285,6 +1293,7 @@ static noinline void __init kernel_init_freeable(void)
 
 	/* Now the scheduler is fully set up and can do blocking allocations */
 	gfp_allowed_mask = __GFP_BITS_MASK;
+
 
 	/*
 	 * init can allocate pages on any node
@@ -1303,7 +1312,8 @@ static noinline void __init kernel_init_freeable(void)
 	//死锁检测
 	lockup_detector_init();
 
-    //空函数
+
+    // 启动 secondary cpus
 	smp_init();
 	
 	sched_init_smp();
@@ -1339,6 +1349,8 @@ static noinline void __init kernel_init_freeable(void)
 	 *
 	 * rootfs is available now, try loading the public keys
 	 * and default modules
+	 *
+	 *
 	 */
 
 	integrity_load_keys();

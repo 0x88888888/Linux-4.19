@@ -96,8 +96,24 @@ static inline void smp_cpus_done(unsigned int max_cpus)
 	smp_ops.smp_cpus_done(max_cpus);
 }
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      smp_init()
+ *       cpu_up()
+ *        do_cpu_up()
+ *         _cpu_up()
+ *          cpuhp_up_callbacks()
+ *           cpuhp_invoke_callback()
+ *            bringup_cpu()
+ *             __cpu_up()
+ */
 static inline int __cpu_up(unsigned int cpu, struct task_struct *tidle)
 {
+    //smp_ops.cpu_up ==  native_cpu_up
 	return smp_ops.cpu_up(cpu, tidle);
 }
 

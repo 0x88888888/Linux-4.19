@@ -43,6 +43,13 @@ static void early_serial_init(int port, int baud)
 	early_serial_base = port;
 }
 
+/*
+ * _start() [arch/x86/boot/header.S]
+ *	start_of_setup() [arch/x86/boot/header.S]
+ *	 main()  [arxh/x86/boot/main.c]
+ *	  console_init() [arch/x86/boot/early_serial_console.c]
+ *     parse_earlyprintk() [arch/x86/boot/early_serial_console.c]
+ */
 static void parse_earlyprintk(void)
 {
 	int baud = DEFAULT_BAUD;
@@ -145,6 +152,12 @@ static void parse_console_uart8250(void)
 		early_serial_init(port, baud);
 }
 
+/*
+ * _start() [arch/x86/boot/header.S]
+ *  start_of_setup() [arch/x86/boot/header.S]
+ *   main()  [arxh/x86/boot/main.c]
+ *    console_init() [arch/x86/boot/early_serial_console.c]
+ */
 void console_init(void)
 {
 	parse_earlyprintk();

@@ -568,7 +568,15 @@ void __init setup_nr_cpu_ids(void)
 	nr_cpu_ids = find_last_bit(cpumask_bits(cpu_possible_mask),NR_CPUS) + 1;
 }
 
-/* Called by boot processor to activate the rest. */
+/* Called by boot processor to activate the rest. 
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      smp_init()
+ */
 void __init smp_init(void)
 {
 	int num_nodes, num_cpus;
@@ -584,7 +592,7 @@ void __init smp_init(void)
 		if (num_online_cpus() >= setup_max_cpus)
 			break;
 		if (!cpu_online(cpu))
-			cpu_up(cpu);
+			cpu_up(cpu); //启动secondary cpu
 	}
 
 	num_nodes = num_online_nodes();

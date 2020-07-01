@@ -6121,6 +6121,13 @@ void ftrace_free_mem(struct module *mod, void *start_ptr, void *end_ptr)
 	}
 }
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     ftrace_free_init_mem()
+ */
 void __init ftrace_free_init_mem(void)
 {
 	void *start = (void *)(&__init_begin);

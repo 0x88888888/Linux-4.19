@@ -46,6 +46,15 @@ void __init idle_thread_set_boot_cpu(void)
  * @cpu:	The cpu for which the idle thread should be initialized
  *
  * Creates the thread if it does not exist.
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      smp_init()
+ *       idle_threads_init()
+ *        idle_init()
  */
 static inline void idle_init(unsigned int cpu)
 {
@@ -62,6 +71,16 @@ static inline void idle_init(unsigned int cpu)
 
 /**
  * idle_threads_init - Initialize idle threads for all cpus
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      smp_init()
+ *       idle_threads_init()
+ *
+ * 为每个cpu创建一个内核态idle进程 
  */
 void __init idle_threads_init(void)
 {
