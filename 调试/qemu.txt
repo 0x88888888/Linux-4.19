@@ -21,11 +21,11 @@ qemu选项:
   
 
 这个好用
-qemu-system-x86_64 -enable-kvm -serial mon:stdio -nographic -kernel arch/x86_64/boot/bzImage -append "nokaslr console=ttyS0 earlyprintk=ttyS0 debug" 
+qemu-system-x86_64 -smp 2 -enable-kvm -serial mon:stdio -nographic -kernel arch/x86_64/boot/bzImage -append "nokaslr console=ttyS0 earlyprintk=ttyS0 debug" 
 
-qemu-system-x86_64 -s -S -enable-kvm -serial mon:stdio -nographic -kernel arch/x86_64/boot/bzImage -append "nokaslr console=ttyS0 earlyprintk=ttyS0 debug" 
+qemu-system-x86_64 -s -S -smp 2 -enable-kvm -serial mon:stdio -nographic -kernel arch/x86_64/boot/bzImage -append "nokaslr console=ttyS0 earlyprintk=ttyS0 debug" 
 
-qemu-system-x86_64 -S -s -enable-kvm -serial mon:stdio -nographic -kernel arch/x86_64/boot/bzImage -initrd ../rootfs/rootfs.img.gz  -append "root=/dev/ram console=ttyS0 rdinit=sbin/init"
+qemu-system-x86_64 -S -s -smp 2 -enable-kvm -serial mon:stdio -nographic -kernel arch/x86_64/boot/bzImage -initrd ../rootfs/rootfs.img.gz  -append "nokaslr root=/dev/ram console=ttyS0 rdinit=sbin/init"
 
 
 gdb客户端启动:
