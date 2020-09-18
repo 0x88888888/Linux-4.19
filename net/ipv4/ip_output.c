@@ -1604,6 +1604,10 @@ out:
 	ip_rt_put(rt);
 }
 
+/*
+ * inet_init()
+ *  ip_init()
+ */
 void __init ip_init(void)
 {
 	ip_rt_init();

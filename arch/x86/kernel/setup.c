@@ -274,6 +274,11 @@ static void __init cleanup_highmap(void)
 }
 #endif
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   reserve_brk()
+ */
 static void __init reserve_brk(void)
 {
 	if (_brk_end > _brk_start)
@@ -969,6 +974,7 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	x86_configure_nx();
 
+    //解析参数
 	parse_early_param();
 
 	if (efi_enabled(EFI_BOOT))
@@ -1214,6 +1220,7 @@ void __init setup_arch(char **cmdline_p)
 	if (!early_xdbc_setup_hardware())
 		early_xdbc_register_console();
 
+    //调用native_pagetable_init ，就是paging_init
 	x86_init.paging.pagetable_init();
 
 	kasan_init();

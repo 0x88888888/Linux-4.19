@@ -16,6 +16,10 @@
  *
  * Call the driver model init functions to initialize their
  * subsystems. Called early from init/main.c.
+ *
+ * start_kernel()
+ *  do_basic_setup()
+ *   driver_init()
  */
 void __init driver_init(void)
 {

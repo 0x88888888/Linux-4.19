@@ -819,6 +819,11 @@ static const struct attribute_group *memory_root_attr_groups[] = {
 
 /*
  * Initialize the sysfs support for memory devices...
+ *
+ * start_kernel()
+ *  do_basic_setup()
+ *   driver_init()
+ *    memory_dev_init()
  */
 int __init memory_dev_init(void)
 {

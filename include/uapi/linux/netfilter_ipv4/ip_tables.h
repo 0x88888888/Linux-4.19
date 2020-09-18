@@ -30,6 +30,7 @@
 #define ipt_target xt_target
 #define ipt_table xt_table
 #define ipt_get_revision xt_get_revision
+
 #define ipt_entry_match xt_entry_match
 #define ipt_entry_target xt_entry_target
 #define ipt_standard_target xt_standard_target

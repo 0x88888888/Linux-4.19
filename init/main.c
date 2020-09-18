@@ -570,7 +570,7 @@ static void __init mm_init(void)
  *    go_to_protected_mode() [arxh/x86/boot/pm.c]
  * 	   protected_mode_jump() [arch/x86/boot/pmjump.S] 实模式
  * 	    in_pm32() [arch/x86/boot/pmjump.S] 保护模式
- * 	     startup_32 [arch/x86/boot/compressed/head_64.S] 
+ * 	     startup_32 [arch/x86/boot/compressed/head_64.S]  compressed目录中的在链接的时候会与vmlinux.bin.gz一起打包成vmlinux.bin,compressed目录中的内容没有被compressed
  * 	      startup_64 [arch/x86/boot/compressed/head_64.S] 已经进入64位模式了
  * 		   relocated 这个是从startup_64()中jmp过来的,这里调用extract_kernel来解压vmlinux.bin.gz
  * 		    startup_64() [arch/x86/kernel/head_64.S]  这个是vmlinux的入口，位于0x1000000 
@@ -690,6 +690,7 @@ asmlinkage __visible void __init start_kernel(void)
 	if (WARN(!irqs_disabled(),
 		 "Interrupts were enabled *very* early, fixing it\n"))
 		local_irq_disable();
+	
 	radix_tree_init();
 
 	/*
@@ -825,7 +826,7 @@ asmlinkage __visible void __init start_kernel(void)
 	//创建uts_ns_cache对象
 	uts_ns_init();
 
-	//创建bh_cachep，用于分配buffer_head对象
+	//创建bh_cachep，用于分配buffer_head对象,挂载根文件系统rootfs_fs_type,设置当前进程的root目录
 	buffer_init();
 	key_init();
 	security_init();
@@ -1095,10 +1096,22 @@ static void __init do_initcall_level(int level)
 		do_one_initcall(initcall_from_entry(fn));
 }
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ */
 static void __init do_initcalls(void)
 {
 	int level;
 
+    /*
+     * 会调用 populate_rootfs,
+     *
+     * 1. core_initcall(sock_init)
+     * 
+     * 5. fs_initcall(inet_init)
+     */
 	for (level = 0; level < ARRAY_SIZE(initcall_levels) - 1; level++)
 		do_initcall_level(level);
 }
@@ -1109,15 +1122,20 @@ static void __init do_initcalls(void)
  * running, and memory and process management works.
  *
  * Now we can finally start doing some real work..
+ *
+ * start_kernel()
+ *  do_basic_setup()
  */
 static void __init do_basic_setup(void)
 {
 	cpuset_init_smp();
 	shmem_init();
+	
 	driver_init();
 	init_irq_proc();
 	do_ctors();
 	usermodehelper_enable();
+	
 	do_initcalls();
 }
 

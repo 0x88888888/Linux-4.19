@@ -2896,6 +2896,14 @@ EXPORT_SYMBOL(unmap_mapping_range);
  *
  * We return with the mmap_sem locked or unlocked in the same cases
  * as does filemap_fault().
+ *
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_swap_page()
  */
 vm_fault_t do_swap_page(struct vm_fault *vmf)
 {
@@ -3739,6 +3747,13 @@ static vm_fault_t do_shared_fault(struct vm_fault *vmf)
  * but allow concurrent faults).
  * The mmap_sem may have been released depending on flags and our
  * return value.  See filemap_fault() and __lock_page_or_retry().
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_fault()
  */
 static vm_fault_t do_fault(struct vm_fault *vmf)
 {
@@ -3935,6 +3950,12 @@ static vm_fault_t wp_huge_pud(struct vm_fault *vmf, pud_t orig_pud)
  *
  * The mmap_sem may have been released depending on flags and our return value.
  * See filemap_fault() and __lock_page_or_retry().
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
  */
 static vm_fault_t handle_pte_fault(struct vm_fault *vmf)
 {
@@ -3978,9 +3999,9 @@ static vm_fault_t handle_pte_fault(struct vm_fault *vmf)
 
 	if (!vmf->pte) {
 		if (vma_is_anonymous(vmf->vma))
-			return do_anonymous_page(vmf);
+			return do_anonymous_page(vmf); //anonymous mapping 的page
 		else
-			return do_fault(vmf);
+			return do_fault(vmf); //
 	}
 
 	if (!pte_present(vmf->orig_pte))
@@ -3996,7 +4017,8 @@ static vm_fault_t handle_pte_fault(struct vm_fault *vmf)
 		goto unlock;
 	if (vmf->flags & FAULT_FLAG_WRITE) {
 		if (!pte_write(entry))
-			return do_wp_page(vmf);
+			return do_wp_page(vmf); //copy on write了
+			
 		entry = pte_mkdirty(entry);
 	}
 	entry = pte_mkyoung(entry);
@@ -4023,6 +4045,11 @@ unlock:
  *
  * The mmap_sem may have been released depending on flags and our
  * return value.  See filemap_fault() and __lock_page_or_retry().
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
  */
 static vm_fault_t __handle_mm_fault(struct vm_area_struct *vma,
 		unsigned long address, unsigned int flags)
@@ -4048,6 +4075,7 @@ static vm_fault_t __handle_mm_fault(struct vm_area_struct *vma,
 	vmf.pud = pud_alloc(mm, p4d, address);
 	if (!vmf.pud)
 		return VM_FAULT_OOM;
+	
 	if (pud_none(*vmf.pud) && transparent_hugepage_enabled(vma)) {
 		ret = create_huge_pud(&vmf);
 		if (!(ret & VM_FAULT_FALLBACK))
@@ -4112,6 +4140,10 @@ static vm_fault_t __handle_mm_fault(struct vm_area_struct *vma,
  *
  * The mmap_sem may have been released depending on flags and our
  * return value.  See filemap_fault() and __lock_page_or_retry().
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
  */
 vm_fault_t handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
 		unsigned int flags)

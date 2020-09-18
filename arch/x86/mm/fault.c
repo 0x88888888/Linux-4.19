@@ -1206,6 +1206,9 @@ static inline bool smap_violation(int error_code, struct pt_regs *regs)
  * This routine handles page faults.  It determines the address,
  * and the problem, and then passes it off to one of the appropriate
  * routines.
+ *
+ * do_page_fault()
+ *  __do_page_fault()
  */
 static noinline void
 __do_page_fault(struct pt_regs *regs, unsigned long error_code,
@@ -1392,6 +1395,7 @@ good_area:
 	 * fault, so we read the pkey beforehand.
 	 */
 	pkey = vma_pkey(vma);
+	
 	fault = handle_mm_fault(vma, address, flags);
 	major |= fault & VM_FAULT_MAJOR;
 
@@ -1468,6 +1472,7 @@ do_page_fault(struct pt_regs *regs, unsigned long error_code)
 		trace_page_fault_entries(address, regs, error_code);
 
 	__do_page_fault(regs, error_code, address);
+	
 	exception_exit(prev_state);
 }
 NOKPROBE_SYMBOL(do_page_fault);

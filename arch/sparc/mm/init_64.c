@@ -2312,6 +2312,11 @@ static void __init reduce_memory(phys_addr_t limit_ram)
 	}
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   paging_init()
+ */
 void __init paging_init(void)
 {
 	unsigned long end_pfn, shift, phys_base;

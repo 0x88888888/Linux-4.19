@@ -196,6 +196,9 @@ static int fib4_rule_match(struct fib_rule *rule, struct flowi *fl, int flags)
 	return 1;
 }
 
+/*
+ * 创建新的fib_table对象
+ */
 static struct fib_table *fib_empty_table(struct net *net)
 {
 	u32 id;

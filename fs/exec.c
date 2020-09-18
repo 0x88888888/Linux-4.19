@@ -1627,6 +1627,9 @@ EXPORT_SYMBOL(remove_arg_zero);
 #define printable(c) (((c)=='\t') || ((c)=='\n') || (0x20<=(c) && (c)<=0x7e))
 /*
  * cycle the list of binary formats handler, until one recognizes the image
+ *
+ * load_script()
+ *  search_binary_handler()
  */
 int search_binary_handler(struct linux_binprm *bprm)
 {
@@ -1650,6 +1653,10 @@ int search_binary_handler(struct linux_binprm *bprm)
 			continue;
 		read_unlock(&binfmt_lock);
 		bprm->recursion_depth++;
+
+		/*
+		 * load_elf_binary()
+		 */
 		retval = fmt->load_binary(bprm);
 		read_lock(&binfmt_lock);
 		put_binfmt(fmt);

@@ -75,6 +75,9 @@
  * It can be given to a device to use as a DMA source or target.  A CPU cannot
  * reference a dma_addr_t directly because there may be translation between
  * its physical address space and the bus address space.
+ *
+ * 不同的硬件平台有不同的DMA操作的实现
+ * dma_direct_ops,
  */
 struct dma_map_ops {
 	void* (*alloc)(struct device *dev, size_t size,
@@ -232,6 +235,10 @@ static inline dma_addr_t dma_map_single_attrs(struct device *dev, void *ptr,
 	dma_addr_t addr;
 
 	BUG_ON(!valid_dma_direction(dir));
+	
+   	/*
+   	 * x86 ops == 
+  	 */
 	addr = ops->map_page(dev, virt_to_page(ptr),
 			     offset_in_page(ptr), size,
 			     dir, attrs);

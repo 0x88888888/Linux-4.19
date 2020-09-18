@@ -67,6 +67,10 @@ enum {
 	NEIGH_VAR_MAX
 };
 
+/*
+ * 每个设备为每个和它交互的邻居协议保持一个neigh]_parms对象
+ *
+ */
 struct neigh_parms {
 	possible_net_t net;
 	struct net_device *dev;

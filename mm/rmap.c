@@ -134,6 +134,17 @@ static void anon_vma_chain_free(struct anon_vma_chain *anon_vma_chain)
 	kmem_cache_free(anon_vma_chain_cachep, anon_vma_chain);
 }
 
+/*
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
+ *    copy_mm()
+ *     dup_mm()
+ *      dup_mmap() 
+ *       anon_vma_fork()
+ *        anon_vma_chain_link()
+ *
+ */
 static void anon_vma_chain_link(struct vm_area_struct *vma,
 				struct anon_vma_chain *avc,
 				struct anon_vma *anon_vma)
@@ -257,6 +268,15 @@ static inline void unlock_anon_vma_root(struct anon_vma *root)
  * child isn't reused even if there was no alive vma, thus rmap walker has a
  * good chance of avoiding scanning the whole hierarchy when it searches where
  * page is mapped.
+ *
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
+ *    copy_mm()
+ *     dup_mm()
+ *      dup_mmap() 
+ *       anon_vma_fork()
+ *        anon_vma_clone()
  */
 int anon_vma_clone(struct vm_area_struct *dst, struct vm_area_struct *src)
 {
@@ -311,6 +331,14 @@ int anon_vma_clone(struct vm_area_struct *dst, struct vm_area_struct *src)
  * Attach vma to its own anon_vma, as well as to the anon_vmas that
  * the corresponding VMA in the parent process is attached to.
  * Returns 0 on success, non-zero on failure.
+ *
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
+ *    copy_mm()
+ *     dup_mm()
+ *      dup_mmap() 
+ *       anon_vma_fork()
  */
 int anon_vma_fork(struct vm_area_struct *vma, struct vm_area_struct *pvma)
 {
@@ -337,10 +365,12 @@ int anon_vma_fork(struct vm_area_struct *vma, struct vm_area_struct *pvma)
 	if (vma->anon_vma)
 		return 0;
 
+	//分配新的anon_vma和anon_vma_chain对象
 	/* Then add our own anon_vma. */
 	anon_vma = anon_vma_alloc();
 	if (!anon_vma)
 		goto out_error;
+	
 	avc = anon_vma_chain_alloc(GFP_KERNEL);
 	if (!avc)
 		goto out_error_free_anon_vma;
@@ -348,6 +378,8 @@ int anon_vma_fork(struct vm_area_struct *vma, struct vm_area_struct *pvma)
 	/*
 	 * The root anon_vma's spinlock is the lock actually used when we
 	 * lock any of the anon_vmas in this anon_vma tree.
+	 *
+	 * 确定新的anon_vma的root 和parent
 	 */
 	anon_vma->root = pvma->anon_vma->root;
 	anon_vma->parent = pvma->anon_vma;
@@ -358,7 +390,9 @@ int anon_vma_fork(struct vm_area_struct *vma, struct vm_area_struct *pvma)
 	 */
 	get_anon_vma(anon_vma->root);
 	/* Mark this anon_vma as the one where our new (COWed) pages go. */
+	//vma所属的anon_vma
 	vma->anon_vma = anon_vma;
+	
 	anon_vma_lock_write(anon_vma);
 	anon_vma_chain_link(vma, avc, anon_vma);
 	anon_vma->parent->degree++;

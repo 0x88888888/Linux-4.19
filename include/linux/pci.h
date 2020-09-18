@@ -1280,7 +1280,15 @@ static inline pci_bus_addr_t pci_bus_address(struct pci_dev *pdev, int bar)
 int __must_check __pci_register_driver(struct pci_driver *, struct module *,
 				       const char *mod_name);
 
-/* pci_register_driver() must be a macro so KBUILD_MODNAME can be expanded */
+/* pci_register_driver() must be a macro so KBUILD_MODNAME can be expanded  
+ *
+ * e1000_init_module()
+ *  pci_register_driver(e1000_driver)
+ *
+ * vortex_init()
+ *  pci_register_driver(&vortex_driver)
+ *
+ */
 #define pci_register_driver(driver)		\
 	__pci_register_driver(driver, THIS_MODULE, KBUILD_MODNAME)
 

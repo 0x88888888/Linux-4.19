@@ -360,6 +360,13 @@ out:
 	return err;
 }
 
+/*
+ * load_script()
+ *  search_binary_handler()
+ *   load_elf_binary()
+ *	  start_thread()
+ *     start_thread_common()
+ */
 static void
 start_thread_common(struct pt_regs *regs, unsigned long new_ip,
 		    unsigned long new_sp,
@@ -383,9 +390,16 @@ start_thread_common(struct pt_regs *regs, unsigned long new_ip,
 	regs->cs		= _cs;
 	regs->ss		= _ss;
 	regs->flags		= X86_EFLAGS_IF;
+	//设置TIF_NOTIF_RESUME
 	force_iret();
 }
 
+/*
+ * load_script()
+ *  search_binary_handler()
+ *   load_elf_binary()
+ *    start_thread()
+ */
 void
 start_thread(struct pt_regs *regs, unsigned long new_ip, unsigned long new_sp)
 {

@@ -417,6 +417,11 @@ out:
 /*
  * Create devtmpfs instance, driver-core devices will add their device
  * nodes here.
+ *
+ * start_kernel()
+ *  do_basic_setup()
+ *   driver_init()
+ *    devtmpfs_init()
  */
 int __init devtmpfs_init(void)
 {

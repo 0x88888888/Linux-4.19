@@ -563,6 +563,12 @@ void class_compat_remove_link(struct class_compat *cls, struct device *dev,
 }
 EXPORT_SYMBOL_GPL(class_compat_remove_link);
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   driver_init()
+ *    classes_init()
+ */
 int __init classes_init(void)
 {
 	class_kset = kset_create_and_add("class", NULL, NULL);

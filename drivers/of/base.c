@@ -176,6 +176,12 @@ int of_free_phandle_cache(void)
 late_initcall_sync(of_free_phandle_cache);
 #endif
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   driver_init()
+ *    of_core_init()
+ */
 void __init of_core_init(void)
 {
 	struct device_node *np;

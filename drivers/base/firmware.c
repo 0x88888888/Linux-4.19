@@ -17,6 +17,12 @@
 struct kobject *firmware_kobj;
 EXPORT_SYMBOL_GPL(firmware_kobj);
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   driver_init()
+ *    firmware_init()
+ */
 int __init firmware_init(void)
 {
 	firmware_kobj = kobject_create_and_add("firmware", NULL);

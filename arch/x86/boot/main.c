@@ -25,6 +25,11 @@ char *heap_end = _end;		/* Default end of heap = no heap */
  * Copy the header into the boot parameter block.  Since this
  * screws up the old-style command line protocol, adjust by
  * filling in the new-style command line pointer instead.
+ *
+ * _start() [arch/x86/boot/header.S]
+ *  start_of_setup() [arch/x86/boot/header.S]
+ *   main()  [arxh/x86/boot/main.c]
+ *    copy_boot_params() [arxh/x86/boot/main.c]
  */
 
 static void copy_boot_params(void)

@@ -207,6 +207,13 @@ void __init free_bootmem_late(unsigned long physaddr, unsigned long size)
 	}
 }
 
+/*  
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   mem_init()
+ *    free_all_bootmem()
+ *     free_all_bootmem_core()
+ */
 static unsigned long __init free_all_bootmem_core(bootmem_data_t *bdata)
 {
 	struct page *page;
@@ -246,6 +253,7 @@ static unsigned long __init free_all_bootmem_core(bootmem_data_t *bdata)
 		 * it in one go.
 		 */
 		if (IS_ALIGNED(start, BITS_PER_LONG) && vec == ~0UL) {
+			//计算出order
 			int order = ilog2(BITS_PER_LONG);
 
 			__free_pages_bootmem(pfn_to_page(start), start, order);
@@ -303,6 +311,13 @@ void __init reset_all_zones_managed_pages(void)
 
 	reset_managed_pages_done = 1;
 }
+
+/*
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   mem_init()
+ *    free_all_bootmem()
+ */
 
 unsigned long __init free_all_bootmem(void)
 {

@@ -577,6 +577,12 @@ static void __init cpu_register_vulnerabilities(void)
 static inline void cpu_register_vulnerabilities(void) { }
 #endif
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   driver_init()
+ *    cpu_dev_init()
+ */
 void __init cpu_dev_init(void)
 {
 	if (subsys_system_register(&cpu_subsys, cpu_root_attr_groups))

@@ -171,6 +171,21 @@ void __puthex(unsigned long value)
 }
 
 #if CONFIG_X86_NEED_RELOCS
+/*
+ * _start() [arch/x86/boot/header.S]
+ *	start_of_setup() [arch/x86/boot/header.S]
+ *	 main()  [arxh/x86/boot/main.c]
+ *	  go_to_protected_mode() [arxh/x86/boot/pm.c]
+ *	   protected_mode_jump() [arch/x86/boot/pmjump.S] 实模式
+ *		in_pm32() [arch/x86/boot/pmjump.S] 保护模式
+ *		 startup_32 [arch/x86/boot/compressed/head_64.S] 这个是vmlinux的入口，位于0x1000000 
+ *		  startup_64 [arch/x86/boot/compressed/head_64.S] 已经进入64位模式了
+ *         relocated 这个是从startup_64()中jmp过来的
+ *          extract_kernel()
+ *           handle_relocations()
+ *
+ * 重定位内核
+ */
 static void handle_relocations(void *output, unsigned long output_len,
 			       unsigned long virt_addr)
 {
@@ -438,8 +453,9 @@ asmlinkage __visible void *extract_kernel(void *rmode, memptr heap,
 	/* 原地解压 kernel */
 	__decompress(input_data, input_len, NULL, NULL, output, output_len,
 			NULL, error);
-	/* 将解压后的内核 segment 放到合适位置 */
+	/* 内核被编译为elf格式了，将解压后的内核 segment 放到合适位置 */
 	parse_elf(output);
+	//重定位内核
 	handle_relocations(output, output_len, virt_addr);
 	debug_putstr("done.\nBooting the kernel.\n");
 	return output;

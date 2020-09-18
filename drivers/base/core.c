@@ -1821,6 +1821,15 @@ static int device_private_init(struct device *dev)
  * NOTE: _Never_ directly free @dev after calling this function, even
  * if it returned an error! Always use put_device() to give up your
  * reference instead.
+ *
+ *
+ * add_disk()
+ *  device_add_disk()
+ *   __device_add_disk()
+ *    register_disk()
+ *     device_add()
+ *
+ * 加载dev到sysfs中去
  */
 int device_add(struct device *dev)
 {
@@ -1924,6 +1933,7 @@ int device_add(struct device *dev)
 					     BUS_NOTIFY_ADD_DEVICE, dev);
 
 	kobject_uevent(&dev->kobj, KOBJ_ADD);
+	//在总线探测相关的驱动程序
 	bus_probe_device(dev);
 	if (parent)
 		klist_add_tail(&dev->p->knode_parent,
@@ -1991,6 +2001,8 @@ EXPORT_SYMBOL_GPL(device_add);
  * NOTE: _Never_ directly free @dev after calling this function, even
  * if it returned an error! Always use put_device() to give up the
  * reference initialized in this function instead.
+ *
+ * 将dev加载到bus的尾端，绑定到相适应的驱动上去
  */
 int device_register(struct device *dev)
 {
@@ -2281,6 +2293,12 @@ struct device *device_find_child(struct device *parent, void *data,
 }
 EXPORT_SYMBOL_GPL(device_find_child);
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   driver_init()
+ *    devices_init()
+ */
 int __init devices_init(void)
 {
 	devices_kset = kset_create_and_add("devices", &device_uevent_ops, NULL);

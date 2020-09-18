@@ -967,6 +967,7 @@ vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void 
 	if (flags & SB_KERNMOUNT)
 		mnt->mnt.mnt_flags = MNT_INTERNAL;
 
+    //返回的root为文件系统type的根目录dentry
 	root = mount_fs(type, flags, name, data);
 	if (IS_ERR(root)) {
 		mnt_free_id(mnt);
@@ -974,11 +975,14 @@ vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void 
 		return ERR_CAST(root);
 	}
 
+    //保存根节点信息
 	mnt->mnt.mnt_root = root;
 	mnt->mnt.mnt_sb = root->d_sb;
 	mnt->mnt_mountpoint = mnt->mnt.mnt_root;
 	mnt->mnt_parent = mnt;
 	lock_mount_hash();
+
+    //mount对象放到super_block->s_mounts上去
 	list_add_tail(&mnt->mnt_instance, &root->d_sb->s_mounts);
 	unlock_mount_hash();
 	return &mnt->mnt;
@@ -2940,6 +2944,15 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
 /**
  * create_mnt_ns - creates a private namespace and adds a root filesystem
  * @mnt: pointer to the new root filesystem mountpoint
+ *
+ * start_kernel()  [init/main.c]
+ *	buffer_init()
+ *	 vfs_caches_init()
+ *	  mnt_init()
+ *     init_mount_tree()
+ *      create_mnt_ns()
+ *
+ * 创建mnt_namespace对象
  */
 static struct mnt_namespace *create_mnt_ns(struct vfsmount *m)
 {
@@ -3192,6 +3205,7 @@ static void __init init_mount_tree(void)
 	if (!type)
 		panic("Can't find rootfs type");
 	
+	//挂载rootfs_fs_type
 	mnt = vfs_kern_mount(type, 0, "rootfs", NULL);
 	put_filesystem(type);
 	if (IS_ERR(mnt))
@@ -3208,6 +3222,7 @@ static void __init init_mount_tree(void)
 	root.dentry = mnt->mnt_root;
 	mnt->mnt_flags |= MNT_LOCKED;
 
+	//设置当前进程(idle进程)的文件系统信息
 	set_fs_pwd(current->fs, &root);
 	set_fs_root(current->fs, &root);
 }
@@ -3239,8 +3254,10 @@ void __init mnt_init(void)
 	if (!mount_hashtable || !mountpoint_hashtable)
 		panic("Failed to allocate mount hash table\n");
 
+    //创建kernfs_node_cache对象而已
 	kernfs_init();
 
+    //注册sysfs_fs_type到file_systems
 	err = sysfs_init();
 	if (err)
 		printk(KERN_WARNING "%s: sysfs_init error: %d\n",
@@ -3249,8 +3266,11 @@ void __init mnt_init(void)
 	fs_kobj = kobject_create_and_add("fs", NULL);
 	if (!fs_kobj)
 		printk(KERN_WARNING "%s: kobj create error\n", __func__);
-	
+
+	//注册rootfs_fs_type到file_systems
 	init_rootfs();
+
+	//挂载rootfs_fs_fs_type,设置当前进程的root目录
 	init_mount_tree();
 }
 

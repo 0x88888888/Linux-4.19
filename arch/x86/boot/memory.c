@@ -17,10 +17,18 @@
 
 #define SMAP	0x534d4150	/* ASCII "SMAP" */
 
+/*
+ * _start() [arch/x86/boot/header.S]
+ *  start_of_setup() [arch/x86/boot/header.S]
+ *   main()  [arxh/x86/boot/main.c]
+ *    detect_memory() [arxh/x86/boot/memory.c]
+ *     detect_memory_e820() [arxh/x86/boot/memory.c]
+ */
 static int detect_memory_e820(void)
 {
 	int count = 0;
 	struct biosregs ireg, oreg;
+	//存放探测到的内存信息
 	struct boot_e820_entry *desc = boot_params.e820_table;
 	static struct boot_e820_entry buf; /* static so it is zeroed */
 
@@ -119,6 +127,12 @@ static int detect_memory_88(void)
 	return -(oreg.eflags & X86_EFLAGS_CF); /* 0 or -1 */
 }
 
+/*
+ * _start() [arch/x86/boot/header.S]
+ *  start_of_setup() [arch/x86/boot/header.S]
+ *   main()  [arxh/x86/boot/main.c]
+ *    detect_memory() [arxh/x86/boot/memory.c]
+ */
 int detect_memory(void)
 {
 	int err = -1;

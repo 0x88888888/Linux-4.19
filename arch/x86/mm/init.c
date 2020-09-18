@@ -889,6 +889,12 @@ void __init memblock_find_dma_reserve(void)
 #endif
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   paging_init()
+ *    zone_sizes_init()
+ */
 void __init zone_sizes_init(void)
 {
 	unsigned long max_zone_pfns[MAX_NR_ZONES];

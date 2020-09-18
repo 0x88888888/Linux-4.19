@@ -433,6 +433,8 @@ static inline int blkdev_reset_zones_ioctl(struct block_device *bdev,
 struct request_queue {
 	/*
 	 * Together with queue_head for cacheline sharing
+	 *
+	 * 链接request对象
 	 */
 	struct list_head	queue_head;
 	struct request		*last_merge;
@@ -502,6 +504,9 @@ struct request_queue {
 
 	/*
 	 * various queue flags, see QUEUE_* below
+	 *
+	 * 当前request_queue 的状态,QUEUE_FLAG_STOPED, QUEUE_FLAG_PLUGGED
+	 * QUEUE_FLAG_QUEUED
 	 */
 	unsigned long		queue_flags;
 

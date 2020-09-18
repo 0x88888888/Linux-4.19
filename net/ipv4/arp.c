@@ -1288,6 +1288,10 @@ static struct packet_type arp_packet_type __read_mostly = {
 
 static int arp_proc_init(void);
 
+/*
+ * inet_init()
+ *  arp_init()
+ */
 void __init arp_init(void)
 {
 	neigh_table_init(NEIGH_ARP_TABLE, &arp_tbl);

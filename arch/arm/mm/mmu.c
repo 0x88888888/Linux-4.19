@@ -1618,6 +1618,7 @@ static void __init early_fixmap_shutdown(void)
 /*
  * paging_init() sets up the page tables, initialises the zone memory
  * maps, and sets up the zero page, bad page and bad page tables.
+ *
  */
 void __init paging_init(const struct machine_desc *mdesc)
 {

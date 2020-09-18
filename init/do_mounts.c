@@ -619,6 +619,11 @@ static struct dentry *rootfs_mount(struct file_system_type *fs_type,
 	return mount_nodev(fs_type, flags, data, fill);
 }
 
+
+/*
+ * 系统的根文件系统，bootloader加载initramfs到内存中，并且内核将initramfs中
+ * 的内容存放到rootfs_fs_type中
+ */
 static struct file_system_type rootfs_fs_type = {
 	.name		= "rootfs",
 	.mount		= rootfs_mount,
@@ -644,6 +649,7 @@ int __init init_rootfs(void)
 		err = shmem_init();
 		is_tmpfs = true;
 	} else {
+		
 		err = init_ramfs_fs();
 	}
 

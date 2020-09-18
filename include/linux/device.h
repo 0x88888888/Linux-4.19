@@ -110,17 +110,27 @@ extern void bus_remove_file(struct bus_type *, struct bus_attribute *);
  * A bus is represented by the bus_type structure. It contains the name, the
  * default attributes, the bus' methods, PM operations, and the driver core's
  * private data.
+ *
+ * 内核中总线对象被定义成bus_type，可以是实际的物理总线也可以是虚拟总线。
  */
 struct bus_type {
+    // 总线的名称
 	const char		*name;
+	// 设备名称
 	const char		*dev_name;
+	// Default device to use as the parent.
 	struct device		*dev_root;
+	// Default attributes of the bus.
 	const struct attribute_group **bus_groups;
+	// Default attributes of the devices on the bus.
 	const struct attribute_group **dev_groups;
+	// Default attributes of the device drivers on the bus.
 	const struct attribute_group **drv_groups;
-
+    // 总线用来试图挂载到其上的设备与驱动执行的匹配操作
 	int (*match)(struct device *dev, struct device_driver *drv);
+	// Called when a device is added, removed 或者其余的一些事情
 	int (*uevent)(struct device *dev, struct kobj_uevent_env *env);
+	// Called when a new device or driver add to this bus
 	int (*probe)(struct device *dev);
 	int (*remove)(struct device *dev);
 	void (*shutdown)(struct device *dev);
@@ -139,6 +149,7 @@ struct bus_type {
 
 	const struct iommu_ops *iommu_ops;
 
+    //用来管理bus上的device和driver的数据结构
 	struct subsys_private *p;
 	struct lock_class_key lock_key;
 

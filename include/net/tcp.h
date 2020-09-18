@@ -1001,6 +1001,25 @@ struct rate_sample {
 	bool is_ack_delayed;	/* is this (likely) a delayed ACK? */
 };
 
+
+/*
+ * tcp_reno
+ * tcp_init_congestion_ops,
+ * bictcp, 默认使用这个来进行拥塞控制
+ * cubictcp,  //4.19,这个是默认的拥塞控制
+ * tcp_highspeed,
+ * htcp,
+ * tcp_hybla,
+ * tcp_lp,
+ * tcp_scalable,
+ * tcp_vegas,
+ * tcp_veno,
+ * tcp_westwood,
+ * tcp_yeah
+ *
+ * 所有的tcp_congestion_ops对象都在tcp_cong_list链表上
+ * 用于tcp拥塞控制
+ */
 struct tcp_congestion_ops {
 	struct list_head	list;
 	u32 key;
@@ -1011,10 +1030,13 @@ struct tcp_congestion_ops {
 	/* cleanup private data  (optional) */
 	void (*release)(struct sock *sk);
 
+    //下面的两个slow start thresh和 cong_avoid函数一定要实现的
 	/* return slow start threshold (required) */
 	u32 (*ssthresh)(struct sock *sk);
 	/* do new cwnd calculation (required) */
 	void (*cong_avoid)(struct sock *sk, u32 ack, u32 acked);
+
+	
 	/* call before changing ca_state (optional) */
 	void (*set_state)(struct sock *sk, u8 new_state);
 	/* call when cwnd event occurs (optional) */

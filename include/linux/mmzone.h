@@ -356,10 +356,18 @@ enum zone_type {
 
 #ifndef __GENERATING_BOUNDS_H
 
+/*
+ * zone的初始化在bootmem_init中完成
+ *
+ */
 struct zone {
 	/* Read-mostly fields */
 
-	/* zone watermarks, access with *_wmark_pages(zone) macros */
+	/* zone watermarks, access with *_wmark_pages(zone) macros
+	 *
+	 * WMARK_MIN, WMARK_LOW, WMARK_HIGH
+	 * 在kswapd页面回收中会用到这三个值
+	 */
 	unsigned long watermark[NR_WMARK];
 
 	unsigned long nr_reserved_highatomic;
@@ -372,6 +380,8 @@ struct zone {
 	 * there being tons of freeable ram on the higher zones).  This array is
 	 * recalculated at runtime if the sysctl_lowmem_reserve_ratio sysctl
 	 * changes.
+	 *
+	 * 预留的页面，在内存不够紧急情况的时候用
 	 */
 	long lowmem_reserve[MAX_NR_ZONES];
 
@@ -433,9 +443,9 @@ struct zone {
 	 * adjust_managed_page_count() should be used instead of directly
 	 * touching zone->managed_pages and totalram_pages.
 	 */
-	unsigned long		managed_pages;
-	unsigned long		spanned_pages;
-	unsigned long		present_pages;
+	unsigned long		managed_pages; //被伙伴系统管理的页面数量
+	unsigned long		spanned_pages; //所有的page数量，包括空洞的部分
+	unsigned long		present_pages; //所有的page数量，不包括空洞的部分
 
 	const char		*name;
 
@@ -702,7 +712,10 @@ typedef struct pglist_data {
 	unsigned long split_queue_len;
 #endif
 
-	/* Fields commonly accessed by the page reclaim scanner */
+	/* Fields commonly accessed by the page reclaim scanner 
+	 *
+	 * pg_data中的lru链表，在页面回收的时候会扫描这个链表
+     */
 	struct lruvec		lruvec;
 
 	unsigned long		flags;

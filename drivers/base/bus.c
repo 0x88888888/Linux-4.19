@@ -444,6 +444,12 @@ static struct device_driver *next_driver(struct klist_iter *i)
  * driver. If the caller needs to know that info, it must set it
  * in the callback. It must also be sure to increment the refcount
  * so it doesn't disappear before returning to the caller.
+ *
+ * device_add()
+ *  bus_probe_device()
+ *   device_initial_probe()
+ *    __device_attach()
+ *     bus_for_each_drv(, fn = __device_attach_driver)
  */
 int bus_for_each_drv(struct bus_type *bus, struct device_driver *start,
 		     void *data, int (*fn)(struct device_driver *, void *))
@@ -458,7 +464,7 @@ int bus_for_each_drv(struct bus_type *bus, struct device_driver *start,
 	klist_iter_init_node(&bus->p->klist_drivers, &i,
 			     start ? &start->p->knode_bus : NULL);
 	while ((drv = next_driver(&i)) && !error)
-		error = fn(drv, data);
+		error = fn(drv, data); //调用 __device_attach_driver
 	klist_iter_exit(&i);
 	return error;
 }
@@ -508,6 +514,9 @@ out_put:
  * @dev: device to probe
  *
  * - Automatically probe for a driver if the bus allows it.
+ *
+ * device_add()
+ *  bus_probe_device()
  */
 void bus_probe_device(struct device *dev)
 {
@@ -1227,6 +1236,12 @@ int subsys_virtual_register(struct bus_type *subsys,
 }
 EXPORT_SYMBOL_GPL(subsys_virtual_register);
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   driver_init()
+ *    buses_init()
+ */
 int __init buses_init(void)
 {
 	bus_kset = kset_create_and_add("bus", &bus_uevent_ops, NULL);

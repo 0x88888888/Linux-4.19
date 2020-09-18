@@ -1408,6 +1408,12 @@ static struct pernet_operations fib_net_ops = {
 	.exit = fib_net_exit,
 };
 
+/*
+ * inet_init()
+ *  ip_init()
+ *   ip_rt_init()
+ *    ip_fib_init()
+ */
 void __init ip_fib_init(void)
 {
 	fib_trie_init();

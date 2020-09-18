@@ -25,17 +25,26 @@
  * This structure is the one that is the actual kobject allowing struct
  * bus_type/class to be statically allocated safely.  Nothing outside of the
  * driver core should ever touch these fields.
+ *
+ * 用来管理bus上的device和driver的数据结构
+ * subsys_private 为bus_type->p成员
+ *
  */
 struct subsys_private {
+    // 表示该bus所在的子系统
 	struct kset subsys;
+	// 该bus上所有的device集合
 	struct kset *devices_kset;
 	struct list_head interfaces;
 	struct mutex mutex;
-
+    // 该bus上所有的driver集合
 	struct kset *drivers_kset;
+	// bus上所有device链表
 	struct klist klist_devices;
+	// bus上所有driver链表
 	struct klist klist_drivers;
 	struct blocking_notifier_head bus_notifier;
+	//表示当向系统中注册某一设备或者驱动的时候，是否进行设备与驱动的绑定操作
 	unsigned int drivers_autoprobe:1;
 	struct bus_type *bus;
 

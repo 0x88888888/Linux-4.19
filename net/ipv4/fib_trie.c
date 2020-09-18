@@ -1184,8 +1184,10 @@ int fib_table_insert(struct net *net, struct fib_table *tb,
 			    (fa->tb_id != tb->tb_id) ||
 			    (fa->fa_tos != tos))
 				break;
+			
 			if (fa->fa_info->fib_priority != fi->fib_priority)
 				break;
+			
 			if (fa->fa_type == cfg->fc_type &&
 			    fa->fa_info == fi) {
 				fa_match = fa;

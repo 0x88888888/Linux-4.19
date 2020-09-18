@@ -8,6 +8,7 @@
 #include <linux/in6.h>
 
 /* Responses from hook functions. */
+//只有在返回NF_DROP和NF_ACCEPT时，才会接受netfilter上的函数调用
 #define NF_DROP 0
 #define NF_ACCEPT 1
 #define NF_STOLEN 2

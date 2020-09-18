@@ -567,6 +567,12 @@ static int exact_lock(dev_t devt, void *data)
 	return 0;
 }
 
+/*
+ * add_disk()
+ *  device_add_disk()
+ *   __device_add_disk()
+ *    register_disk()
+ */
 static void register_disk(struct device *parent, struct gendisk *disk)
 {
 	struct device *ddev = disk_to_dev(disk);
@@ -582,6 +588,7 @@ static void register_disk(struct device *parent, struct gendisk *disk)
 	/* delay uevents, until we scanned partition table */
 	dev_set_uevent_suppress(ddev, 1);
 
+    //加载ddev到sysfs中去
 	if (device_add(ddev))
 		return;
 	if (!sysfs_deprecated) {
@@ -635,6 +642,7 @@ exit:
 	disk_part_iter_init(&piter, disk, 0);
 	while ((part = disk_part_iter_next(&piter)))
 		kobject_uevent(&part_to_dev(part)->kobj, KOBJ_ADD);
+	
 	disk_part_iter_exit(&piter);
 
 	err = sysfs_create_link(&ddev->kobj,
@@ -653,6 +661,10 @@ exit:
  * with the kernel.
  *
  * FIXME: error handling
+ *
+ * add_disk()
+ *  device_add_disk()
+ *   __device_add_disk()
  */
 static void __device_add_disk(struct device *parent, struct gendisk *disk,
 			      bool register_queue)
@@ -669,7 +681,8 @@ static void __device_add_disk(struct device *parent, struct gendisk *disk,
 		!(disk->flags & (GENHD_FL_EXT_DEVT | GENHD_FL_HIDDEN)));
 
 	disk->flags |= GENHD_FL_UP;
-
+ 
+    //分配设备号   
 	retval = blk_alloc_devt(&disk->part0, &devt);
 	if (retval) {
 		WARN_ON(1);
@@ -698,6 +711,7 @@ static void __device_add_disk(struct device *parent, struct gendisk *disk,
 		blk_register_region(disk_devt(disk), disk->minors, NULL,
 				    exact_match, exact_lock, disk);
 	}
+	
 	register_disk(parent, disk);
 	if (register_queue)
 		blk_register_queue(disk);
@@ -712,6 +726,10 @@ static void __device_add_disk(struct device *parent, struct gendisk *disk,
 	blk_integrity_add(disk);
 }
 
+/* 
+ * add_disk()
+ *  device_add_disk()
+ */
 void device_add_disk(struct device *parent, struct gendisk *disk)
 {
 	__device_add_disk(parent, disk, true);

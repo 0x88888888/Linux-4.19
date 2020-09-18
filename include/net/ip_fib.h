@@ -268,6 +268,7 @@ static inline int fib_lookup(struct net *net, const struct flowi4 *flp,
 	rcu_read_lock();
 
 	tb = fib_get_table(net, RT_TABLE_MAIN);
+	
 	if (tb)
 		err = fib_table_lookup(tb, flp, res, flags | FIB_LOOKUP_NOREF);
 

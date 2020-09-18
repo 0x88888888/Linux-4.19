@@ -418,6 +418,15 @@ void free_task(struct task_struct *tsk)
 EXPORT_SYMBOL(free_task);
 
 #ifdef CONFIG_MMU
+
+/*
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
+ *    copy_mm()
+ *     dup_mm()
+ *      dup_mmap()
+ */
 static __latent_entropy int dup_mmap(struct mm_struct *mm,
 					struct mm_struct *oldmm)
 {
@@ -458,6 +467,7 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 		goto out;
 
 	prev = NULL;
+	//复制VMA
 	for (mpnt = oldmm->mmap; mpnt; mpnt = mpnt->vm_next) {
 		struct file *file;
 
@@ -474,23 +484,32 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 			retval = -EINTR;
 			goto out;
 		}
+		
 		if (mpnt->vm_flags & VM_ACCOUNT) {
+			//这个vma中的page的数量
 			unsigned long len = vma_pages(mpnt);
 
 			if (security_vm_enough_memory_mm(oldmm, len)) /* sic */
 				goto fail_nomem;
 			charge = len;
 		}
+
+		//创建vma，复制mpnt 这个vma中的内容
 		tmp = vm_area_dup(mpnt);
 		if (!tmp)
 			goto fail_nomem;
+		
 		retval = vma_dup_policy(mpnt, tmp);
 		if (retval)
 			goto fail_nomem_policy;
+		//新vma所属的mm_struct
 		tmp->vm_mm = mm;
+		
 		retval = dup_userfaultfd(tmp, &uf);
 		if (retval)
 			goto fail_nomem_anon_vma_fork;
+
+		//下面这个if else 操作vma所属的anon_vma和anon_vma_chain
 		if (tmp->vm_flags & VM_WIPEONFORK) {
 			/* VM_WIPEONFORK gets a clean slate in the child. */
 			tmp->anon_vma = NULL;
@@ -498,8 +517,12 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 				goto fail_nomem_anon_vma_fork;
 		} else if (anon_vma_fork(tmp, mpnt))
 			goto fail_nomem_anon_vma_fork;
+
+			
 		tmp->vm_flags &= ~(VM_LOCKED | VM_LOCKONFAULT);
 		tmp->vm_next = tmp->vm_prev = NULL;
+
+		//是不是映射大文件的vma
 		file = tmp->vm_file;
 		if (file) {
 			struct inode *inode = file_inode(file);
@@ -549,6 +572,8 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 		if (retval)
 			goto out;
 	}
+
+	
 	/* a new mm has just been created */
 	retval = arch_dup_mmap(oldmm, mm);
 out:
@@ -1264,6 +1289,12 @@ void mm_release(struct task_struct *tsk, struct mm_struct *mm)
 /*
  * Allocate a new mm structure and copy contents from the
  * mm structure of the passed in task structure.
+ *
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
+ *    copy_mm()
+ *     dup_mm()
  */
 static struct mm_struct *dup_mm(struct task_struct *tsk)
 {
@@ -1300,6 +1331,12 @@ fail_nomem:
 	return NULL;
 }
 
+/*
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
+ *    copy_mm()
+ */
 static int copy_mm(unsigned long clone_flags, struct task_struct *tsk)
 {
 	struct mm_struct *mm, *oldmm;
@@ -1632,6 +1669,10 @@ static inline void rcu_copy_process(struct task_struct *p)
  * It copies the registers, and all the appropriate
  * parts of the process environment (as per the clone
  * flags). The actual kick-off is left to the caller.
+ *
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
  */
 static __latent_entropy struct task_struct *copy_process(
 					unsigned long clone_flags,
@@ -1874,6 +1915,8 @@ static __latent_entropy struct task_struct *copy_process(
 	retval = copy_signal(clone_flags, p);
 	if (retval)
 		goto bad_fork_cleanup_sighand;
+
+	//复制虚拟地址空间
 	retval = copy_mm(clone_flags, p);
 	if (retval)
 		goto bad_fork_cleanup_signal;
@@ -2151,6 +2194,12 @@ struct task_struct *fork_idle(int cpu)
  *
  * It copies the process, and if successful kick-starts
  * it and waits for it to finish using the VM if required.
+ *
+ * do_fork()
+ *  _do_fork()
+ *
+ * kernel_thread()
+ *  _do_fork(flags|CLONE_VM|CLONE_UNTRACED, )
  */
 long _do_fork(unsigned long clone_flags,
 	      unsigned long stack_start,
@@ -2183,6 +2232,7 @@ long _do_fork(unsigned long clone_flags,
 			trace = 0;
 	}
 
+    //复制进程中的数据结构
 	p = copy_process(clone_flags, stack_start, stack_size,
 			 child_tidptr, NULL, trace, tls, NUMA_NO_NODE);
 	add_latent_entropy();

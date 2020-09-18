@@ -142,6 +142,18 @@ void driver_remove_groups(struct device_driver *drv,
  * We pass off most of the work to the bus_add_driver() call,
  * since most of the things we have to do deal with the bus
  * structures.
+ *
+ * e1000_init_module()
+ *  pci_register_driver(e1000_driver)
+ *   __pci_register_driver(e1000_driver, THIS_MODULE, KBUILD_MODNAME)
+ *    driver_register(e1000_driver->driver)
+ *
+ *
+ * vortex_init()
+ *  pci_register_driver(vortex_driver)
+ *   __pci_register_driver(vortex_driver, THIS_MODULE, KBUILD_MODNAME)
+ *    driver_register(vortex_driver->driver) 
+ *
  */
 int driver_register(struct device_driver *drv)
 {
@@ -160,21 +172,25 @@ int driver_register(struct device_driver *drv)
 		printk(KERN_WARNING "Driver '%s' needs updating - please use "
 			"bus_type methods\n", drv->name);
 
+    //在bus中查找对应的device_driver对象
 	other = driver_find(drv->name, drv->bus);
-	if (other) {
+	if (other) { //找到
 		printk(KERN_ERR "Error: Driver '%s' is already registered, "
 			"aborting...\n", drv->name);
 		return -EBUSY;
 	}
 
+    //添加device_driver到bus中
 	ret = bus_add_driver(drv);
 	if (ret)
 		return ret;
 	ret = driver_add_groups(drv, drv->groups);
+	
 	if (ret) {
 		bus_remove_driver(drv);
 		return ret;
 	}
+	//uevnet事件
 	kobject_uevent(&drv->p->kobj, KOBJ_ADD);
 
 	return ret;

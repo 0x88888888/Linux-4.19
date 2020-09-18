@@ -3831,6 +3831,10 @@ static void __init tcp_init_mem(void)
 	sysctl_tcp_mem[2] = sysctl_tcp_mem[0] * 2;	/* 9.37 % */
 }
 
+/*
+ * inet_init()
+ *  tcp_init()
+ */
 void __init tcp_init(void)
 {
 	int max_rshare, max_wshare, cnt;

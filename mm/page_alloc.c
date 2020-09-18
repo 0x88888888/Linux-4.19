@@ -766,6 +766,19 @@ static inline int page_is_buddy(struct page *page, struct page *buddy,
  * triggers coalescing into a block of larger size.
  *
  * -- nyc
+ *
+ *
+ * start_kernel()  [init/main.c]
+ *	mm_init()
+ *	 mem_init()
+ *	  free_all_bootmem()
+ *	   free_all_bootmem_core()
+ *		__free_pages_bootmem()
+ *		 __free_pages_boot_core()
+ *		  __free_pages()
+ *		   __free_pages_ok()
+ *          free_one_page()
+ *           __free_one_page()
  */
 
 static inline void __free_one_page(struct page *page,
@@ -790,7 +803,8 @@ static inline void __free_one_page(struct page *page,
 	VM_BUG_ON_PAGE(pfn & ((1 << order) - 1), page);
 	VM_BUG_ON_PAGE(bad_range(zone, page), page);
 
-continue_merging:
+//释放的时候，如果可以合并，就合并了
+continue_merging: 
 	while (order < max_order - 1) {
 		buddy_pfn = __find_buddy_pfn(pfn, order);
 		buddy = page + (buddy_pfn - pfn);
@@ -1154,6 +1168,18 @@ static void free_pcppages_bulk(struct zone *zone, int count,
 	spin_unlock(&zone->lock);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *	mm_init()
+ *	 mem_init()
+ *	  free_all_bootmem()
+ *	   free_all_bootmem_core()
+ *		__free_pages_bootmem()
+ *		 __free_pages_boot_core()
+ *		  __free_pages()
+ *		   __free_pages_ok()
+ *          free_one_page()
+ */
 static void free_one_page(struct zone *zone,
 				struct page *page, unsigned long pfn,
 				unsigned int order,
@@ -1164,6 +1190,7 @@ static void free_one_page(struct zone *zone,
 		is_migrate_isolate(migratetype))) {
 		migratetype = get_pfnblock_migratetype(page, pfn);
 	}
+		
 	__free_one_page(page, pfn, zone, order, migratetype);
 	spin_unlock(&zone->lock);
 }
@@ -1236,6 +1263,17 @@ void __meminit reserve_bootmem_region(phys_addr_t start, phys_addr_t end)
 	}
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   mem_init()
+ *    free_all_bootmem()
+ *     free_all_bootmem_core()
+ *      __free_pages_bootmem()
+ *       __free_pages_boot_core()
+ *        __free_pages()
+ *         __free_pages_ok()
+ */
 static void __free_pages_ok(struct page *page, unsigned int order)
 {
 	unsigned long flags;
@@ -1248,10 +1286,20 @@ static void __free_pages_ok(struct page *page, unsigned int order)
 	migratetype = get_pfnblock_migratetype(page, pfn);
 	local_irq_save(flags);
 	__count_vm_events(PGFREE, 1 << order);
+	
 	free_one_page(page_zone(page), page, pfn, order, migratetype);
 	local_irq_restore(flags);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   mem_init()
+ *    free_all_bootmem()
+ *     free_all_bootmem_core()
+ *      __free_pages_bootmem()
+ *       __free_pages_boot_core()
+ */
 static void __init __free_pages_boot_core(struct page *page, unsigned int order)
 {
 	unsigned int nr_pages = 1 << order;
@@ -1259,6 +1307,7 @@ static void __init __free_pages_boot_core(struct page *page, unsigned int order)
 	unsigned int loop;
 
 	prefetchw(p);
+	//循环每个page，设置标记
 	for (loop = 0; loop < (nr_pages - 1); loop++, p++) {
 		prefetchw(p + 1);
 		__ClearPageReserved(p);
@@ -1326,6 +1375,14 @@ meminit_pfn_in_nid(unsigned long pfn, int node,
 #endif
 
 
+/*
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   mem_init()
+ *    free_all_bootmem()
+ *     free_all_bootmem_core()
+ *      __free_pages_bootmem()
+ */
 void __init __free_pages_bootmem(struct page *page, unsigned long pfn,
 							unsigned int order)
 {
@@ -2979,6 +3036,12 @@ static struct page *rmqueue_pcplist(struct zone *preferred_zone,
 
 /*
  * Allocate a page from the given zone. Use pcplists for order-0 allocations.
+ *
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   __alloc_pages_nodemask()
+ *    get_page_from_freelist()
+ *     rmqueue()
  */
 static inline
 struct page *rmqueue(struct zone *preferred_zone,
@@ -3255,6 +3318,11 @@ static bool zone_allows_reclaim(struct zone *local_zone, struct zone *zone)
 /*
  * get_page_from_freelist goes through the zonelist trying to allocate
  * a page.
+ *
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   __alloc_pages_nodemask()
+ *    get_page_from_freelist()
  */
 static struct page *
 get_page_from_freelist(gfp_t gfp_mask, unsigned int order, int alloc_flags,
@@ -3267,6 +3335,8 @@ get_page_from_freelist(gfp_t gfp_mask, unsigned int order, int alloc_flags,
 	/*
 	 * Scan zonelist, looking for a zone with enough free.
 	 * See also __cpuset_node_allowed() comment in kernel/cpuset.c.
+	 *
+	 * 遍历zonglist
 	 */
 	for_next_zone_zonelist_nodemask(zone, z, ac->zonelist, ac->high_zoneidx,
 								ac->nodemask) {
@@ -4049,6 +4119,12 @@ check_retry_cpuset(int cpuset_mems_cookie, struct alloc_context *ac)
 	return false;
 }
 
+/*
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   __alloc_pages_nodemask()
+ *    __alloc_pages_slowpath()
+ */
 static inline struct page *
 __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 						struct alloc_context *ac)
@@ -4105,6 +4181,7 @@ retry_cpuset:
 	 */
 	ac->preferred_zoneref = first_zones_zonelist(ac->zonelist,
 					ac->high_zoneidx, ac->nodemask);
+	
 	if (!ac->preferred_zoneref->zone)
 		goto nopage;
 
@@ -4342,7 +4419,15 @@ static inline bool prepare_alloc_pages(gfp_t gfp_mask, unsigned int order,
 	return true;
 }
 
-/* Determine whether to spread dirty pages and what the first usable zone */
+/* Determine whether to spread dirty pages and what the first usable zone 
+ *
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   __alloc_pages_nodemask()
+ *    finalise_ac()
+ *
+ * 设置alloc_context
+ */
 static inline void finalise_ac(gfp_t gfp_mask, struct alloc_context *ac)
 {
 	/* Dirty zone balancing only done in the fast path */
@@ -4359,12 +4444,18 @@ static inline void finalise_ac(gfp_t gfp_mask, struct alloc_context *ac)
 
 /*
  * This is the 'heart' of the zoned buddy allocator.
+ *
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   __alloc_pages_nodemask()
  */
 struct page *
 __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order, int preferred_nid,
 							nodemask_t *nodemask)
 {
 	struct page *page;
+
+	//水位要求
 	unsigned int alloc_flags = ALLOC_WMARK_LOW;
 	gfp_t alloc_mask; /* The gfp_t that was actually used for allocation */
 	struct alloc_context ac = { };
@@ -4374,6 +4465,7 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order, int preferred_nid,
 	if (!prepare_alloc_pages(gfp_mask, order, preferred_nid, nodemask, &ac, &alloc_mask, &alloc_flags))
 		return NULL;
 
+    //设置alloc_context
 	finalise_ac(gfp_mask, &ac);
 
 	/* First allocation attempt */
@@ -4434,6 +4526,16 @@ unsigned long get_zeroed_page(gfp_t gfp_mask)
 }
 EXPORT_SYMBOL(get_zeroed_page);
 
+/*
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   mem_init()
+ *    free_all_bootmem()
+ *     free_all_bootmem_core()
+ *      __free_pages_bootmem()
+ *       __free_pages_boot_core()
+ *        __free_pages()
+ */
 void __free_pages(struct page *page, unsigned int order)
 {
 	if (put_page_testzero(page)) {
@@ -5472,6 +5574,16 @@ void __ref build_all_zonelists(pg_data_t *pgdat)
  * Initially all pages are reserved - free ones are freed
  * up by free_all_bootmem() once the early boot process is
  * done. Non-atomic initialization, single-pass.
+ *
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   paging_init()
+ *    zone_sizes_init()
+ *     free_area_init_nodes()
+ *      free_area_init_node()
+ *       free_area_init_core()
+ *        memmap_init()
+ *         memmap_init_zone()
  */
 void __meminit memmap_init_zone(unsigned long size, int nid, unsigned long zone,
 		unsigned long start_pfn, enum memmap_context context,
@@ -5496,6 +5608,7 @@ void __meminit memmap_init_zone(unsigned long size, int nid, unsigned long zone,
 	if (altmap && start_pfn == altmap->base_pfn)
 		start_pfn += altmap->reserve;
 
+    //每个page都是MIGRATE_MOVABLE的迁移类型
 	for (pfn = start_pfn; pfn < end_pfn; pfn++) {
 		/*
 		 * There can be holes in boot-time mem_map[]s handed to this
@@ -5555,6 +5668,7 @@ not_early:
 		 * because this is done early in sparse_add_one_section
 		 */
 		if (!(pfn & (pageblock_nr_pages - 1))) {
+			//每个page都是MIGRATE_MOVABLE的迁移类型
 			set_pageblock_migratetype(page, MIGRATE_MOVABLE);
 			cond_resched();
 		}
@@ -5571,6 +5685,16 @@ static void __meminit zone_init_free_lists(struct zone *zone)
 }
 
 #ifndef __HAVE_ARCH_MEMMAP_INIT
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   paging_init()
+ *    zone_sizes_init()
+ *     free_area_init_nodes()
+ *      free_area_init_node()
+ *       free_area_init_core()
+ *        memmap_init()
+ */
 #define memmap_init(size, nid, zone, start_pfn) \
 	memmap_init_zone((size), (nid), (zone), (start_pfn), MEMMAP_EARLY, NULL)
 #endif
@@ -6160,7 +6284,13 @@ static inline void setup_usemap(struct pglist_data *pgdat, struct zone *zone,
 
 #ifdef CONFIG_HUGETLB_PAGE_SIZE_VARIABLE
 
-/* Initialise the number of pages represented by NR_PAGEBLOCK_BITS */
+/* Initialise the number of pages represented by NR_PAGEBLOCK_BITS 
+ *
+ * free_area_init()
+ *  free_area_init_node()
+ *   free_area_init_core()
+ *    set_pageblock_order()
+ */
 void __init set_pageblock_order(void)
 {
 	unsigned int order;
@@ -6289,6 +6419,14 @@ void __ref free_area_init_core_hotplug(int nid)
  *
  * NOTE: pgdat should get zeroed by caller.
  * NOTE: this function is only called during early init.
+ *
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   paging_init()
+ *    zone_sizes_init()
+ *     free_area_init_nodes()
+ *      free_area_init_node()
+ *       free_area_init_core()
  */
 static void __init free_area_init_core(struct pglist_data *pgdat)
 {
@@ -6351,6 +6489,7 @@ static void __init free_area_init_core(struct pglist_data *pgdat)
 		set_pageblock_order();
 		setup_usemap(pgdat, zone, zone_start_pfn, size);
 		init_currently_empty_zone(zone, zone_start_pfn, size);
+		//
 		memmap_init(size, nid, j, zone_start_pfn);
 	}
 }
@@ -6418,6 +6557,14 @@ static inline void pgdat_set_deferred_range(pg_data_t *pgdat)
 static inline void pgdat_set_deferred_range(pg_data_t *pgdat) {}
 #endif
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   paging_init()
+ *    zone_sizes_init()
+ *     free_area_init_nodes()
+ *      free_area_init_node()
+ */
 void __init free_area_init_node(int nid, unsigned long *zones_size,
 				   unsigned long node_start_pfn,
 				   unsigned long *zholes_size)
@@ -6447,6 +6594,7 @@ void __init free_area_init_node(int nid, unsigned long *zones_size,
 	pgdat_set_deferred_range(pgdat);
 
 	free_area_init_core(pgdat);
+	
 }
 
 #if defined(CONFIG_HAVE_MEMBLOCK) && !defined(CONFIG_FLAT_NODE_MEM_MAP)
@@ -6852,6 +7000,13 @@ static void check_for_memory(pg_data_t *pgdat, int nid)
  * that arch_max_dma32_pfn has no pages. It is also assumed that a zone
  * starts where the previous one ended. For example, ZONE_DMA32 starts
  * at arch_max_dma_pfn.
+ *
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   paging_init()
+ *    zone_sizes_init()
+ *     free_area_init_nodes()
+ *
  */
 void __init free_area_init_nodes(unsigned long *max_zone_pfn)
 {
@@ -6919,6 +7074,7 @@ void __init free_area_init_nodes(unsigned long *max_zone_pfn)
 	zero_resv_unavail();
 	for_each_online_node(nid) {
 		pg_data_t *pgdat = NODE_DATA(nid);
+		
 		free_area_init_node(nid, NULL,
 				find_min_pfn_for_node(nid), NULL);
 

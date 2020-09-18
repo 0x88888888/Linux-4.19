@@ -746,6 +746,13 @@ void __init initmem_init(void)
 }
 #endif
 
+/*
+ * 宏定义 native_pagetable_init == paging_init 
+ *   
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   paging_init()
+ */
 void __init paging_init(void)
 {
 	sparse_memory_present_with_active_regions(MAX_NUMNODES);
@@ -1198,7 +1205,9 @@ void __init mem_init(void)
 
 	/* clear_bss() already clear the empty_zero_page */
 
-	/* this will put all memory onto the freelists */
+	/* this will put all memory onto the freelists 
+	 * 建立buddy system
+	 */
 	free_all_bootmem();
 	after_bootmem = 1;
 	x86_init.hyper.init_after_bootmem();

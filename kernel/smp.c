@@ -576,6 +576,8 @@ void __init setup_nr_cpu_ids(void)
  *    kernel_init()
  *     kernel_init_freeable()
  *      smp_init()
+ *
+ * 启动其余的secondary cpus
  */
 void __init smp_init(void)
 {

@@ -3147,6 +3147,11 @@ static __net_initdata struct pernet_operations ipv4_inetpeer_ops = {
 struct ip_rt_acct __percpu *ip_rt_acct __read_mostly;
 #endif /* CONFIG_IP_ROUTE_CLASSID */
 
+/*
+ * inet_init()
+ *  ip_init()
+ *   ip_rt_init()
+ */
 int __init ip_rt_init(void)
 {
 	int cpu;
@@ -3168,6 +3173,7 @@ int __init ip_rt_init(void)
 		INIT_LIST_HEAD(&ul->head);
 		spin_lock_init(&ul->lock);
 	}
+	
 #ifdef CONFIG_IP_ROUTE_CLASSID
 	ip_rt_acct = __alloc_percpu(256 * sizeof(struct ip_rt_acct), __alignof__(struct ip_rt_acct));
 	if (!ip_rt_acct)
@@ -3194,10 +3200,12 @@ int __init ip_rt_init(void)
 
 	if (ip_rt_proc_init())
 		pr_err("Unable to create route proc files\n");
+	
 #ifdef CONFIG_XFRM
 	xfrm_init();
 	xfrm4_init();
 #endif
+
 	rtnl_register(PF_INET, RTM_GETROUTE, inet_rtm_getroute, NULL,
 		      RTNL_FLAG_DOIT_UNLOCKED);
 

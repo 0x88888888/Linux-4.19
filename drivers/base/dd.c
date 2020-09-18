@@ -416,6 +416,12 @@ static void driver_sysfs_remove(struct device *dev)
  * from a driver's probe() method.)
  *
  * This function must be called with the device lock held.
+ *
+ * device_add()
+ *  bus_probe_device()
+ *   device_initial_probe()
+ *    __device_attach()
+ *     device_bind_driver()
  */
 int device_bind_driver(struct device *dev)
 {
@@ -719,6 +725,14 @@ struct device_attach_data {
 	bool have_async;
 };
 
+/*
+ * device_add()
+ *  bus_probe_device()
+ *   device_initial_probe()
+ *    __device_attach()
+ *     bus_for_each_drv(, fn = __device_attach_driver)
+ *      __device_attach_driver()
+ */
 static int __device_attach_driver(struct device_driver *drv, void *_data)
 {
 	struct device_attach_data *data = _data;
@@ -785,6 +799,12 @@ static void __device_attach_async_helper(void *_dev, async_cookie_t cookie)
 	put_device(dev);
 }
 
+/*
+ * device_add()
+ *  bus_probe_device()
+ *   device_initial_probe()
+ *    __device_attach()
+ */
 static int __device_attach(struct device *dev, bool allow_async)
 {
 	int ret = 0;
@@ -857,6 +877,11 @@ int device_attach(struct device *dev)
 }
 EXPORT_SYMBOL_GPL(device_attach);
 
+/*
+ * device_add()
+ *  bus_probe_device()
+ *   device_initial_probe()
+ */
 void device_initial_probe(struct device *dev)
 {
 	__device_attach(dev, true);

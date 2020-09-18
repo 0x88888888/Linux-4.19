@@ -31,6 +31,12 @@ struct bus_type container_subsys = {
 	.offline = container_offline,
 };
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   driver_init()
+ *    container_dev_init()
+ */
 void __init container_dev_init(void)
 {
 	int ret;

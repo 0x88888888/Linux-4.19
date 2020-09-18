@@ -1965,7 +1965,12 @@ out:
 }
 
 /* Allocate a page in interleaved policy.
-   Own path because it needs to do special accounting. */
+   Own path because it needs to do special accounting. 
+ *
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   alloc_page_interleave()
+ */
 static struct page *alloc_page_interleave(gfp_t gfp, unsigned order,
 					unsigned nid)
 {
@@ -2074,6 +2079,9 @@ out:
  *	Allocate a page from the kernel page pool.  When not in
  *	interrupt context and apply the current process NUMA policy.
  *	Returns NULL when no page can be allocated.
+ *
+ * alloc_pages()
+ *  alloc_pages_current()
  */
 struct page *alloc_pages_current(gfp_t gfp, unsigned order)
 {

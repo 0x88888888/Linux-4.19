@@ -1387,6 +1387,15 @@ static const struct dev_pm_ops pci_dev_pm_ops = {
  * Returns a negative value on error, otherwise 0.
  * If no error occurred, the driver remains registered even if
  * no device was claimed during registration.
+ *
+ * e1000_init_module()
+ *  pci_register_driver(e1000_driver)
+ *   __pci_register_driver(e1000_driver, THIS_MODULE, KBUILD_MODNAME)
+ *
+ * vortex_init()
+ *  pci_register_driver(vortex_driver)
+ *   __pci_register_driver(vortex_driver, THIS_MODULE, KBUILD_MODNAME)
+ *
  */
 int __pci_register_driver(struct pci_driver *drv, struct module *owner,
 			  const char *mod_name)

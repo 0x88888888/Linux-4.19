@@ -1161,6 +1161,12 @@ struct bus_type platform_bus_type = {
 };
 EXPORT_SYMBOL_GPL(platform_bus_type);
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   driver_init()
+ *    platform_bus_init()
+ */
 int __init platform_bus_init(void)
 {
 	int error;

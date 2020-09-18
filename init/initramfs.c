@@ -438,6 +438,15 @@ static unsigned long my_inptr; /* index of next byte to be processed in inbuf */
 
 #include <linux/decompress/generic.h>
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    populate_rootfs()
+ *     unpack_to_rootfs()
+ *
+ * 将bootloader装载到内存的initramfs 解压到rootfs中
+ */
 static char * __init unpack_to_rootfs(char *buf, unsigned long len)
 {
 	long written;
@@ -597,13 +606,23 @@ static void __init clean_rootfs(void)
 }
 #endif
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    populate_rootfs()
+ */
 static int __init populate_rootfs(void)
 {
-	/* Load the built in initramfs */
+	/* Load the built in initramfs 
+	 * 将bootloader装载到内存的initramfs 解压到rootfs中
+	 * __initramfs_start是被bootloader加载到内存中的起始位置
+     */
 	char *err = unpack_to_rootfs(__initramfs_start, __initramfs_size);
 	if (err)
 		panic("%s", err); /* Failed to decompress INTERNAL initramfs */
 	/* If available load the bootloader supplied initrd */
+	
 	if (initrd_start && !IS_ENABLED(CONFIG_INITRAMFS_FORCE)) {
 #ifdef CONFIG_BLK_DEV_RAM
 		int fd;
@@ -652,4 +671,9 @@ static int __init populate_rootfs(void)
 
 	return 0;
 }
+
+/*
+ * 函数populate_rootfs将被连接器链接在.initcall段，
+ * 在 do_initcall中调用populate_rootfs
+ */
 rootfs_initcall(populate_rootfs);

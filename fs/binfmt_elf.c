@@ -687,6 +687,11 @@ static unsigned long randomize_stack_top(unsigned long stack_top)
 #endif
 }
 
+/*
+ * load_script()
+ *  search_binary_handler()
+ *   load_elf_binary()
+ */
 static int load_elf_binary(struct linux_binprm *bprm)
 {
 	struct file *interpreter = NULL; /* to shut gcc up */
