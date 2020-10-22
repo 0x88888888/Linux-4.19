@@ -207,7 +207,10 @@ void main(void)
 	init_heap();
 
 	/* Make sure we have all the proper CPU support */
-	/* 检查当前特权级是否能够运行 kernel，kernel 需要的 feature 是否都满足。通过 cpuid 或 rdmsr 获取 */
+	/* 检查当前特权级是否够运行 kernel，kernel 需要的 feature 是否都满足。通过 cpuid 或 rdmsr 获取 
+	 *
+	 * checking if the CPU supports long mode and SSE.
+	 */
 	if (validate_cpu()) {
 		puts("Unable to boot - please use a kernel appropriate "
 		     "for your CPU.\n");
@@ -232,10 +235,17 @@ void main(void)
 	/* 键盘初始化，通过 BIOS 0x16 例程获取键盘状态，然后设置 repeat rate (按住不放产生字符的速率) */
 	keyboard_init();
 
-	/* Query Intel SpeedStep (IST) information */
+	/* Query Intel SpeedStep (IST) information 
+	 *
+	 * SpeedStep:
+	 * https://en.wikipedia.org/wiki/SpeedStep
+	 */
 	query_ist();
 
-	/* Query APM information */
+	/* Query APM information 
+	 *
+	 * Advanced Power Management information 
+	 */
 	/* 通过 BIOS 0x15 例程获取 Advanced Power Management 信息，然后再次调用以连接 32 位接口(做两次，第二次是检查) */
 #if defined(CONFIG_APM) || defined(CONFIG_APM_MODULE)
 	query_apm_bios();

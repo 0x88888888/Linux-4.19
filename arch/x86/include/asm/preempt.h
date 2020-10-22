@@ -6,6 +6,11 @@
 #include <asm/percpu.h>
 #include <linux/thread_info.h>
 
+/*
+ * 抢占看下面两篇文章
+ * http://oliveryang.net/2016/03/linux-scheduler-1/
+ * http://oliveryang.net/2016/03/linux-scheduler-2/
+ */
 DECLARE_PER_CPU(int, __preempt_count);
 
 /*
@@ -50,6 +55,8 @@ static __always_inline void preempt_count_set(int pc)
  *
  * We invert the actual bit, so that when the decrement hits 0 we know we both
  * need to resched (the bit is cleared) and can resched (no preempt count).
+ *
+ *
  */
 
 static __always_inline void set_preempt_need_resched(void)
@@ -73,6 +80,11 @@ static __always_inline bool test_preempt_need_resched(void)
 
 static __always_inline void __preempt_count_add(int val)
 {
+/*
+ * 抢占看下面两篇文章
+ * http://oliveryang.net/2016/03/linux-scheduler-1/
+ * http://oliveryang.net/2016/03/linux-scheduler-2/
+ */ 
 	raw_cpu_add_4(__preempt_count, val);
 }
 

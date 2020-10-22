@@ -67,6 +67,11 @@ struct hmm;
 #define _struct_page_alignment
 #endif
 
+/*
+ * page的反向映射看rmap_walk_anon(),
+ *
+ * 可以看出从struct page、到struct anon_vma、到struct anon_vma_chain、到struct vm_area_struct的关系。
+ */
 struct page {
 
     // 在enum pageflags中

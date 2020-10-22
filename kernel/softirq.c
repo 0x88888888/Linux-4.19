@@ -383,9 +383,12 @@ void irq_enter(void)
          * 否则有实现
 		 */
 		tick_irq_enter();
+
+		
 		_local_bh_enable();
 	}
-
+	
+    //增加preempt_count的 HARDIRQ_OFFSET的部分
 	__irq_enter();
 }
 

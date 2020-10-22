@@ -73,6 +73,8 @@ static inline void __list_add_rcu(struct list_head *new,
  * However, it is perfectly legal to run concurrently with
  * the _rcu list-traversal primitives, such as
  * list_for_each_entry_rcu().
+ *
+ * 主要作用是 write barrier
  */
 static inline void list_add_rcu(struct list_head *new, struct list_head *head)
 {
@@ -347,6 +349,8 @@ static inline void list_splice_tail_init_rcu(struct list_head *list,
  * This list-traversal primitive may safely run concurrently with
  * the _rcu list-mutation primitives such as list_add_rcu()
  * as long as the traversal is guarded by rcu_read_lock().
+ *
+ * 主要是read barrier
  */
 #define list_for_each_entry_rcu(pos, head, member) \
 	for (pos = list_entry_rcu((head)->next, typeof(*pos), member); \

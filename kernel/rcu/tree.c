@@ -463,14 +463,15 @@ static void rcu_momentary_dyntick_idle(void)
  * The caller must have disabled interrupts.
  *
  * schedule()
- *  __schedule()
- *   rcu_note_context_switch()
+ *  __schedule( false)
+ *   rcu_note_context_switch( false)
  */
 void rcu_note_context_switch(bool preempt)
 {
 	barrier(); /* Avoid RCU read-side critical sections leaking down. */
 	trace_rcu_utilization(TPS("Start context switch"));
 	rcu_sched_qs();
+	
 	rcu_preempt_note_context_switch(preempt);
 	/* Load rcu_urgent_qs before other flags. */
 	if (!smp_load_acquire(this_cpu_ptr(&rcu_dynticks.rcu_urgent_qs)))
@@ -479,6 +480,7 @@ void rcu_note_context_switch(bool preempt)
 	this_cpu_write(rcu_dynticks.rcu_urgent_qs, false);
 	if (unlikely(raw_cpu_read(rcu_dynticks.rcu_need_heavy_qs)))
 		rcu_momentary_dyntick_idle();
+	
 	this_cpu_inc(rcu_dynticks.rcu_qs_ctr);
 	if (!preempt)
 		rcu_tasks_qs(current);
@@ -3519,6 +3521,9 @@ static int rcu_blocking_is_gp(void)
  * to have executed a full memory barrier during the execution of
  * synchronize_sched() -- even if CPU A and CPU B are the same CPU (but
  * again only if the system has more than one CPU).
+ *
+ * synchronize_rcu()
+ *  synchronize_sched()
  */
 void synchronize_sched(void)
 {
@@ -3526,8 +3531,10 @@ void synchronize_sched(void)
 			 lock_is_held(&rcu_lock_map) ||
 			 lock_is_held(&rcu_sched_lock_map),
 			 "Illegal synchronize_sched() in RCU-sched read-side critical section");
+	
 	if (rcu_blocking_is_gp())
 		return;
+	
 	if (rcu_gp_is_expedited())
 		synchronize_sched_expedited();
 	else

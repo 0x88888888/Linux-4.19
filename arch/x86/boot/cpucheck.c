@@ -108,6 +108,12 @@ static int check_cpuflags(void)
  * level.  x86-64 is considered level 64 for this purpose.
  *
  * *err_flags_ptr is set to the flags error array if there are flags missing.
+ *
+ * _start() [arch/x86/boot/header.S]
+ *  start_of_setup() [arch/x86/boot/header.S]
+ *   main()  [arxh/x86/boot/main.c]
+ *    validate_cpu()
+ *     check_cpu()
  */
 int check_cpu(int *cpu_level_ptr, int *req_level_ptr, u32 **err_flags_ptr)
 {
@@ -122,6 +128,7 @@ int check_cpu(int *cpu_level_ptr, int *req_level_ptr, u32 **err_flags_ptr)
 	get_cpuflags();
 	err = check_cpuflags();
 
+    //是否支持64位的long mode
 	if (test_bit(X86_FEATURE_LM, cpu.flags))
 		cpu.level = 64;
 
@@ -190,8 +197,10 @@ int check_cpu(int *cpu_level_ptr, int *req_level_ptr, u32 **err_flags_ptr)
 
 	if (err_flags_ptr)
 		*err_flags_ptr = err ? err_flags : NULL;
+	
 	if (cpu_level_ptr)
 		*cpu_level_ptr = cpu.level;
+	
 	if (req_level_ptr)
 		*req_level_ptr = req_level;
 

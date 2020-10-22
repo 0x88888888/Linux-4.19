@@ -72,6 +72,12 @@ static void show_cap_strs(u32 *err_flags)
 #endif
 }
 
+/*
+ * _start() [arch/x86/boot/header.S]
+ *  start_of_setup() [arch/x86/boot/header.S]
+ *   main()  [arxh/x86/boot/main.c]
+ *    validate_cpu()
+ */
 int validate_cpu(void)
 {
 	u32 *err_flags;

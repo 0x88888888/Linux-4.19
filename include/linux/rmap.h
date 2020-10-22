@@ -73,10 +73,14 @@ struct anon_vma {
  * all the anon_vmas associated with this VMA.
  * The "rb" field indexes on an interval tree the anon_vma_chains
  * which link all the VMAs associated with this anon_vma.
+ *
+ * 只在匿名映射page是有用这个数据结构
  */
 struct anon_vma_chain {
 	struct vm_area_struct *vma;
 	struct anon_vma *anon_vma;
+
+	//在anon_vma_chain_link中操作same_vam，链接到anon_vma_chain对象
 	struct list_head same_vma;   /* locked by mmap_sem & page_table_lock */
 	struct rb_node rb;			/* locked by anon_vma->rwsem */
 	unsigned long rb_subtree_last;
@@ -145,6 +149,15 @@ void unlink_anon_vmas(struct vm_area_struct *);
 int anon_vma_clone(struct vm_area_struct *, struct vm_area_struct *);
 int anon_vma_fork(struct vm_area_struct *, struct vm_area_struct *);
 
+/*
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_anonymous_page()
+ *       anon_vma_prepare()
+ */
 static inline int anon_vma_prepare(struct vm_area_struct *vma)
 {
 	if (likely(vma->anon_vma))

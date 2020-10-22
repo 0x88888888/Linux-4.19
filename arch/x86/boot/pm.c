@@ -134,8 +134,11 @@ void go_to_protected_mode(void)
 	//setup_idt后，就不能使用puts函数了
 	setup_idt();  
 	setup_gdt(); //加载gdt, boot_gdt
-	// 切换到保护模式 ,这个函数定义在pmjump.S中
-	// boot_params.hdr.code32_start 指向startup_64 [arch/x86/kernel/head_64.S]]
+	/* 切换到保护模式 ,这个函数定义在arch/x86/boot/pmjump.S中
+	 * boot_params.hdr.code32_start 指向startup_32 [arch/x86/kernel/head_64.S]
+	 *
+	 * boot_params.hdr.code32_start == 0x100000	 
+	 */
 	protected_mode_jump(boot_params.hdr.code32_start,
 			    (u32)&boot_params + (ds() << 4));
 }

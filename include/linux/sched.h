@@ -443,6 +443,9 @@ struct sched_statistics {
 #endif
 };
 
+/*
+ * Cgroup使用,调度实体
+ */
 struct sched_entity {
 	/* For load-balancing: */
 	struct load_weight		load;
@@ -462,6 +465,7 @@ struct sched_entity {
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	int				depth;
+    //for_each_sched_entity 遍历
 	struct sched_entity		*parent;
 	/* rq on which this entity is (to be) queued: */
 	struct cfs_rq			*cfs_rq;

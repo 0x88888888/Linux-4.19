@@ -3124,6 +3124,13 @@ out_release:
  * We enter with non-exclusive mmap_sem (to exclude vma changes,
  * but allow concurrent faults), and pte mapped but not yet locked.
  * We return with mmap_sem still held, but pte unmapped and unlocked.
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_anonymous_page()
  */
 static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 {
@@ -3998,9 +4005,9 @@ static vm_fault_t handle_pte_fault(struct vm_fault *vmf)
 	}
 
 	if (!vmf->pte) {
-		if (vma_is_anonymous(vmf->vma))
+		if (vma_is_anonymous(vmf->vma)) //匿名映射
 			return do_anonymous_page(vmf); //anonymous mapping 的page
-		else
+		else//映射到文件?
 			return do_fault(vmf); //
 	}
 

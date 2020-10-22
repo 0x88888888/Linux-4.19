@@ -3397,7 +3397,7 @@ again:
  * WARNING: must be called with preemption disabled!
  *
  * schedule()
- *  __schedule()
+ *  __schedule(false)
  */
 static void __sched notrace __schedule(bool preempt)
 {

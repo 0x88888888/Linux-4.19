@@ -402,6 +402,8 @@ static inline void rcu_preempt_sleep_check(void) { }
  * other macros that it invokes.
  *
  * 主要作用是 write barrier
+ *
+ * 先barrier，后赋值,确保happens before
  */
 #define rcu_assign_pointer(p, v)					      \
 ({									      \
@@ -628,7 +630,7 @@ static inline void rcu_preempt_sleep_check(void) { }
  */
 static inline void rcu_read_lock(void)
 {
-    //关闭内核抢占
+    //关闭内核抢占(preempt_disable)
 	__rcu_read_lock();
 	//空
 	__acquire(RCU);

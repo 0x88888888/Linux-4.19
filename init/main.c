@@ -573,6 +573,7 @@ static void __init mm_init(void)
  * 	     startup_32 [arch/x86/boot/compressed/head_64.S]  compressed目录中的在链接的时候会与vmlinux.bin.gz一起打包成vmlinux.bin,compressed目录中的内容没有被compressed
  * 	      startup_64 [arch/x86/boot/compressed/head_64.S] 已经进入64位模式了
  * 		   relocated 这个是从startup_64()中jmp过来的,这里调用extract_kernel来解压vmlinux.bin.gz
+ *
  * 		    startup_64() [arch/x86/kernel/head_64.S]  这个是vmlinux的入口，位于0x1000000 
  *           secondary_startup_64() [arch/x86/kernel/head_64.S] 从startup_64中jump过来的
  * 		      Ljump_to_C_code() [arch/x86/kernel/head_64.S]

@@ -682,7 +682,9 @@ static void _synchronize_rcu_expedited(struct rcu_state *rsp,
 	struct rcu_node *rnp;
 	unsigned long s;
 
-	/* If expedited grace periods are prohibited, fall back to normal. */
+	/*
+	 * If expedited grace periods are prohibited, fall back to normal. 
+	 */
 	if (rcu_gp_is_normal()) {
 		wait_rcu_gp(rsp->call);
 		return;

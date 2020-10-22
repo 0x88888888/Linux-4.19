@@ -23,6 +23,8 @@
  * there are a few palaeontologic drivers which reenable interrupts in
  * the handler, so we need more than one bit here.
  *
+ * __preempt_count各个位的划分
+ *
  *         PREEMPT_MASK:	0x000000ff
  *         SOFTIRQ_MASK:	0x0000ff00
  *         HARDIRQ_MASK:	0x000f0000
@@ -169,6 +171,7 @@ extern void preempt_count_sub(int val);
 
 #ifdef CONFIG_PREEMPT_COUNT
 
+//__preempt_count + 1
 #define preempt_disable() \
 do { \
 	preempt_count_inc(); \
@@ -183,6 +186,7 @@ do { \
 
 #define preempt_enable_no_resched() sched_preempt_enable_no_resched()
 
+//__preempt_count == 0 并且  !(!(eflags & X86_EFLAGS_IF))  ，即X86_EFLAGS_IF被设置的(开中断)
 #define preemptible()	(preempt_count() == 0 && !irqs_disabled())
 
 #ifdef CONFIG_PREEMPT

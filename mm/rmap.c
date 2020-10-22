@@ -144,6 +144,26 @@ static void anon_vma_chain_free(struct anon_vma_chain *anon_vma_chain)
  *       anon_vma_fork()
  *        anon_vma_chain_link()
  *
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
+ *    copy_mm()
+ *     dup_mm()
+ *      dup_mmap() 
+ *       anon_vma_fork()
+ *        anon_vma_clone()
+ *         anon_vma_chain_link()
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_anonymous_page()
+ *       anon_vma_prepare()
+ *        __anon_vma_prepare()
+ *         anon_vma_chain_link()
+ *
  */
 static void anon_vma_chain_link(struct vm_area_struct *vma,
 				struct anon_vma_chain *avc,
@@ -182,6 +202,15 @@ static void anon_vma_chain_link(struct vm_area_struct *vma,
  * an anon_vma.
  *
  * This must be called with the mmap_sem held for reading.
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_anonymous_page()
+ *       anon_vma_prepare()
+ *        __anon_vma_prepare()
  */
 int __anon_vma_prepare(struct vm_area_struct *vma)
 {
@@ -283,10 +312,15 @@ int anon_vma_clone(struct vm_area_struct *dst, struct vm_area_struct *src)
 	struct anon_vma_chain *avc, *pavc;
 	struct anon_vma *root = NULL;
 
+    //遍历src->anon_vma_chain上的anon_vma_chain
 	list_for_each_entry_reverse(pavc, &src->anon_vma_chain, same_vma) {
+	
 		struct anon_vma *anon_vma;
 
+        //分配一个anon_vma_chain对象
 		avc = anon_vma_chain_alloc(GFP_NOWAIT | __GFP_NOWARN);
+
+		//分配失败，重新分配
 		if (unlikely(!avc)) {
 			unlock_anon_vma_root(root);
 			root = NULL;
@@ -294,8 +328,10 @@ int anon_vma_clone(struct vm_area_struct *dst, struct vm_area_struct *src)
 			if (!avc)
 				goto enomem_failure;
 		}
+		
 		anon_vma = pavc->anon_vma;
 		root = lock_anon_vma_root(root, anon_vma);
+		
 		anon_vma_chain_link(dst, avc, anon_vma);
 
 		/*
@@ -310,6 +346,7 @@ int anon_vma_clone(struct vm_area_struct *dst, struct vm_area_struct *src)
 				anon_vma->degree < 2)
 			dst->anon_vma = anon_vma;
 	}
+	
 	if (dst->anon_vma)
 		dst->anon_vma->degree++;
 	unlock_anon_vma_root(root);
@@ -1370,6 +1407,9 @@ void page_remove_rmap(struct page *page, bool compound)
 
 /*
  * @arg: enum ttu_flags will be passed to this argument
+ *
+ * rmap_walk_anon()
+ *  try_to_unmap_one()
  */
 static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 		     unsigned long address, void *arg)
@@ -1837,6 +1877,9 @@ static struct anon_vma *rmap_walk_anon_lock(struct page *page,
  * where the page was found will be held for write.  So, we won't recheck
  * vm_flags for that VMA.  That should be OK, because that vma shouldn't be
  * LOCKED.
+ *
+ * try_to_unmap()
+ *  rmap_walk_anon()
  */
 static void rmap_walk_anon(struct page *page, struct rmap_walk_control *rwc,
 		bool locked)
@@ -1845,6 +1888,7 @@ static void rmap_walk_anon(struct page *page, struct rmap_walk_control *rwc,
 	pgoff_t pgoff_start, pgoff_end;
 	struct anon_vma_chain *avc;
 
+    //得到page的anon_vma对象,就是page->mapping
 	if (locked) {
 		anon_vma = page_anon_vma(page);
 		/* anon_vma disappear under us? */
@@ -1852,14 +1896,19 @@ static void rmap_walk_anon(struct page *page, struct rmap_walk_control *rwc,
 	} else {
 		anon_vma = rmap_walk_anon_lock(page, rwc);
 	}
+	
 	if (!anon_vma)
 		return;
 
 	pgoff_start = page_to_pgoff(page);
 	pgoff_end = pgoff_start + hpage_nr_pages(page) - 1;
+
+	//遍历anon_vma->rb_root红黑树中的AVC，从AVC得到相应的VMA
 	anon_vma_interval_tree_foreach(avc, &anon_vma->rb_root,
 			pgoff_start, pgoff_end) {
 		struct vm_area_struct *vma = avc->vma;
+
+		//page所对应的进程中的虚拟的值
 		unsigned long address = vma_address(page, vma);
 
 		cond_resched();
@@ -1867,6 +1916,7 @@ static void rmap_walk_anon(struct page *page, struct rmap_walk_control *rwc,
 		if (rwc->invalid_vma && rwc->invalid_vma(vma, rwc->arg))
 			continue;
 
+        //就是try_to_unmap_one函数
 		if (!rwc->rmap_one(page, vma, address, rwc->arg))
 			break;
 		if (rwc->done && rwc->done(page))
@@ -1889,6 +1939,9 @@ static void rmap_walk_anon(struct page *page, struct rmap_walk_control *rwc,
  * where the page was found will be held for write.  So, we won't recheck
  * vm_flags for that VMA.  That should be OK, because that vma shouldn't be
  * LOCKED.
+ *
+ * rmap_walk()
+ *  rmap_walk_file()
  */
 static void rmap_walk_file(struct page *page, struct rmap_walk_control *rwc,
 		bool locked)
@@ -1912,6 +1965,7 @@ static void rmap_walk_file(struct page *page, struct rmap_walk_control *rwc,
 	pgoff_end = pgoff_start + hpage_nr_pages(page) - 1;
 	if (!locked)
 		i_mmap_lock_read(mapping);
+	
 	vma_interval_tree_foreach(vma, &mapping->i_mmap,
 			pgoff_start, pgoff_end) {
 		unsigned long address = vma_address(page, vma);
@@ -1921,6 +1975,7 @@ static void rmap_walk_file(struct page *page, struct rmap_walk_control *rwc,
 		if (rwc->invalid_vma && rwc->invalid_vma(vma, rwc->arg))
 			continue;
 
+		// 就是try_to_unmap_one
 		if (!rwc->rmap_one(page, vma, address, rwc->arg))
 			goto done;
 		if (rwc->done && rwc->done(page))
@@ -1932,6 +1987,9 @@ done:
 		i_mmap_unlock_read(mapping);
 }
 
+/*
+ * try_to_unmap()
+ */
 void rmap_walk(struct page *page, struct rmap_walk_control *rwc)
 {
 	if (unlikely(PageKsm(page)))
