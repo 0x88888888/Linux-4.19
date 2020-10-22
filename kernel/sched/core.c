@@ -459,6 +459,18 @@ void wake_up_q(struct wake_q_head *head)
  *  __call_rcu()
  *   resched_cpu()
  *    resched_curr()
+ *
+ * apic_timer_interrupt()  [arch/x86/entry/entry_64.S]
+ *  smp_apic_timer_interrupt()
+ *   local_apic_timer_interrupt()
+ *    tick_handle_periodic( dev==lapic_events )
+ *     tick_periodic()
+ *      update_process_times()
+ *       scheduler_tick()
+ *        task_tick_fair(queued ==0)
+ *         entity_tick( queued==0)
+ *          check_preempt_tick()
+ *           resched_curr()
  */
 void resched_curr(struct rq *rq)
 {

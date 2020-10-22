@@ -4007,6 +4007,17 @@ dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 
 /*
  * Preempt the current task with a newly woken task if needed:
+ *
+ * apic_timer_interrupt()  [arch/x86/entry/entry_64.S]
+ *  smp_apic_timer_interrupt()
+ *   local_apic_timer_interrupt()
+ *    tick_handle_periodic( dev==lapic_events )
+ *     tick_periodic()
+ *      update_process_times()
+ *       scheduler_tick()
+ *        task_tick_fair(queued ==0)
+ *         entity_tick( queued==0)
+ *          check_preempt_tick()
  */
 static void
 check_preempt_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr)
