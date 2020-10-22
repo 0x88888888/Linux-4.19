@@ -72,15 +72,15 @@ static const __initconst struct idt_data early_idts[] = {
  * set up TSS.
  */
 static const __initconst struct idt_data def_idts[] = {
-	INTG(X86_TRAP_DE,		divide_error),
-	INTG(X86_TRAP_NMI,		nmi),
-	INTG(X86_TRAP_BR,		bounds),
-	INTG(X86_TRAP_UD,		invalid_op),
-	INTG(X86_TRAP_NM,		device_not_available),
+	INTG(X86_TRAP_DE  /*0*/,		divide_error),
+	INTG(X86_TRAP_NMI /*2*/,		nmi),
+	INTG(X86_TRAP_BR  /*5*/,		bounds),
+	INTG(X86_TRAP_UD  /*6*/,		invalid_op),
+	INTG(X86_TRAP_NM  /*7*/,		device_not_available),
 	INTG(X86_TRAP_OLD_MF,		coprocessor_segment_overrun),
 	INTG(X86_TRAP_TS,		invalid_TSS),
 	INTG(X86_TRAP_NP,		segment_not_present),
-	INTG(X86_TRAP_SS,		stack_segment),
+	INTG(X86_TRAP_SS /*12*/,		stack_segment),
 	INTG(X86_TRAP_GP,		general_protection),
 	INTG(X86_TRAP_SPURIOUS,		spurious_interrupt_bug),
 	INTG(X86_TRAP_MF,		coprocessor_error),
@@ -92,17 +92,17 @@ static const __initconst struct idt_data def_idts[] = {
 #else
 	INTG(X86_TRAP_DF,		double_fault),
 #endif
-	INTG(X86_TRAP_DB,		debug),
+	INTG(X86_TRAP_DB /*1*/,		debug),
 
 #ifdef CONFIG_X86_MCE
 	INTG(X86_TRAP_MC,		&machine_check),
 #endif
 
-	SYSG(X86_TRAP_OF,		overflow),
+	SYSG(X86_TRAP_OF /*4*/,		overflow),
 #if defined(CONFIG_IA32_EMULATION)
 	SYSG(IA32_SYSCALL_VECTOR,	entry_INT80_compat),
 #elif defined(CONFIG_X86_32)
-	SYSG(IA32_SYSCALL_VECTOR,	entry_INT80_32),
+	SYSG(IA32_SYSCALL_VECTOR /*0x80*/,	entry_INT80_32),
 #endif
 };
 
@@ -111,41 +111,41 @@ static const __initconst struct idt_data def_idts[] = {
  */
 static const __initconst struct idt_data apic_idts[] = {
 #ifdef CONFIG_SMP
-	INTG(RESCHEDULE_VECTOR,		reschedule_interrupt),
-	INTG(CALL_FUNCTION_VECTOR,	call_function_interrupt),
-	INTG(CALL_FUNCTION_SINGLE_VECTOR, call_function_single_interrupt),
-	INTG(IRQ_MOVE_CLEANUP_VECTOR,	irq_move_cleanup_interrupt),
-	INTG(REBOOT_VECTOR,		reboot_interrupt),
+	INTG(RESCHEDULE_VECTOR /*0xfd*/,		reschedule_interrupt),
+	INTG(CALL_FUNCTION_VECTOR /*0xfc*/,	call_function_interrupt),
+	INTG(CALL_FUNCTION_SINGLE_VECTOR /*0xfb*/, call_function_single_interrupt),
+	INTG(IRQ_MOVE_CLEANUP_VECTOR /*0x20*/,	irq_move_cleanup_interrupt),
+	INTG(REBOOT_VECTOR /*0xf8*/,		reboot_interrupt),
 #endif
 
 #ifdef CONFIG_X86_THERMAL_VECTOR
-	INTG(THERMAL_APIC_VECTOR,	thermal_interrupt),
+	INTG(THERMAL_APIC_VECTOR /*0xfa*/,	thermal_interrupt),
 #endif
 
 #ifdef CONFIG_X86_MCE_THRESHOLD
-	INTG(THRESHOLD_APIC_VECTOR,	threshold_interrupt),
+	INTG(THRESHOLD_APIC_VECTOR/*0xf9*/,	threshold_interrupt),
 #endif
 
 #ifdef CONFIG_X86_MCE_AMD
-	INTG(DEFERRED_ERROR_VECTOR,	deferred_error_interrupt),
+	INTG(DEFERRED_ERROR_VECTOR/*0xf4*/,	deferred_error_interrupt),
 #endif
 
 #ifdef CONFIG_X86_LOCAL_APIC
-	INTG(LOCAL_TIMER_VECTOR,	apic_timer_interrupt),
-	INTG(X86_PLATFORM_IPI_VECTOR,	x86_platform_ipi),
+	INTG(LOCAL_TIMER_VECTOR/*0xec*/,	apic_timer_interrupt),
+	INTG(X86_PLATFORM_IPI_VECTOR/*0xf7*/,	x86_platform_ipi),
 # ifdef CONFIG_HAVE_KVM
-	INTG(POSTED_INTR_VECTOR,	kvm_posted_intr_ipi),
-	INTG(POSTED_INTR_WAKEUP_VECTOR, kvm_posted_intr_wakeup_ipi),
-	INTG(POSTED_INTR_NESTED_VECTOR, kvm_posted_intr_nested_ipi),
+	INTG(POSTED_INTR_VECTOR/*0xf2*/,	kvm_posted_intr_ipi),
+	INTG(POSTED_INTR_WAKEUP_VECTOR/*0xf1*/, kvm_posted_intr_wakeup_ipi),
+	INTG(POSTED_INTR_NESTED_VECTOR/*0xf0*/, kvm_posted_intr_nested_ipi),
 # endif
 # ifdef CONFIG_IRQ_WORK
-	INTG(IRQ_WORK_VECTOR,		irq_work_interrupt),
+	INTG(IRQ_WORK_VECTOR/*0xf6*/,		irq_work_interrupt),
 # endif
 #ifdef CONFIG_X86_UV
 	INTG(UV_BAU_MESSAGE,		uv_bau_message_intr1),
 #endif
-	INTG(SPURIOUS_APIC_VECTOR,	spurious_interrupt),
-	INTG(ERROR_APIC_VECTOR,		error_interrupt),
+	INTG(SPURIOUS_APIC_VECTOR/*0xff*/,	spurious_interrupt),
+	INTG(ERROR_APIC_VECTOR/*0xfe*/,		error_interrupt),
 #endif
 };
 
@@ -155,7 +155,7 @@ static const __initconst struct idt_data apic_idts[] = {
  * stacks work only after cpu_init().
  */
 static const __initconst struct idt_data early_pf_idts[] = {
-	INTG(X86_TRAP_PF,		page_fault),
+	INTG(X86_TRAP_PF /*14*/,		page_fault),
 };
 
 /*
@@ -163,7 +163,7 @@ static const __initconst struct idt_data early_pf_idts[] = {
  * stack set to DEFAULT_STACK (0). Required for NMI trap handling.
  */
 static const __initconst struct idt_data dbg_idts[] = {
-	INTG(X86_TRAP_DB,	debug),
+	INTG(X86_TRAP_DB/*1*/,	debug),
 };
 #endif
 
@@ -221,6 +221,12 @@ static inline void idt_init_desc(gate_desc *gate, const struct idt_data *d)
  *  trap_init()
  *   idt_setup_traps()
  *    idt_setup_from_table(idt_table, def_idts, ARRAY_SIZE(def_idts), true)
+ *
+ * start_kernel()  [init/main.c]
+ *  init_IRQ()
+ *   native_init_IRQ()
+ *    idt_setup_apic_and_irq_gates()
+ *     idt_setup_from_table(idt_table, apic_idts, ARRAY_SIZE(apic_idts), true)
  *
  * 初始化中断向量
  */
@@ -328,6 +334,10 @@ void __init idt_setup_apic_and_irq_gates(void)
 	int i = FIRST_EXTERNAL_VECTOR;
 	void *entry;
 
+    /*
+     * RESCHEDULE_VECTOR  -->  reschedule_interrupt
+     * LOCAL_TIMER_VECTOR -->  apic_timer_interrupt
+     */
 	idt_setup_from_table(idt_table, apic_idts, ARRAY_SIZE(apic_idts), true);
 
 	for_each_clear_bit_from(i, system_vectors, FIRST_SYSTEM_VECTOR) {

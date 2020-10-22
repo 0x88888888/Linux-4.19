@@ -719,6 +719,11 @@ asmlinkage __visible void __init start_kernel(void)
 	context_tracking_init();
 	/* init some links before init_ISA_irqs() */
 	early_irq_init();
+
+	/* idt_setup_apic_and_irq_gates()中 设置中断处理函数，比如
+	 * RESCHEDULE_VECTOR  -->  reschedule_interrupt
+     * LOCAL_TIMER_VECTOR -->  apic_timer_interrupt
+	 */
 	init_IRQ();
 	
 	tick_init();

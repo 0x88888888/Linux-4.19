@@ -256,6 +256,10 @@ finish:
 /*
  * Reschedule call back. KVM uses this interrupt to force a cpu out of
  * guest mode
+ *
+ * BUILD_INTERRUPT(reschedule_interrupt,RESCHEDULE_VECTOR)
+ *  smp_reschedule_interrupt()
+ *
  */
 __visible void __irq_entry smp_reschedule_interrupt(struct pt_regs *regs)
 {

@@ -1758,6 +1758,10 @@ void sched_ttwu_pending(void)
 	rq_unlock_irqrestore(rq, &rf);
 }
 
+/*
+ * smp_reschedule_interrupt()
+ *  scheduler_ipi()
+ */
 void scheduler_ipi(void)
 {
 	/*
@@ -2796,6 +2800,10 @@ asmlinkage __visible void schedule_tail(struct task_struct *prev)
 
 /*
  * context_switch - switch to the new MM and the new thread's register state.
+ *
+ * schedule()
+ *  __schedule(preempt=false)
+ *   context_switch()
  */
 static __always_inline struct rq *
 context_switch(struct rq *rq, struct task_struct *prev,
@@ -3397,7 +3405,7 @@ again:
  * WARNING: must be called with preemption disabled!
  *
  * schedule()
- *  __schedule(false)
+ *  __schedule(preempt=false)
  */
 static void __sched notrace __schedule(bool preempt)
 {

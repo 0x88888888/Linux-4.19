@@ -67,6 +67,14 @@ struct fork_frame {
 	struct pt_regs regs;
 };
 
+/*
+ * schedule()
+ *  __schedule(preempt=false)
+ *   context_switch()
+ *    switch_to()
+ *
+ * __switch_to_asm在 arch/x86/entry/entry_64.S 中
+ */
 #define switch_to(prev, next, last)					\
 do {									\
 	prepare_switch_to(next);					\

@@ -452,6 +452,7 @@ typedef struct {
 	unsigned long		seg;
 } mm_segment_t;
 
+
 struct thread_struct {
 	/* Cached TLS descriptors: */
 	struct desc_struct	tls_array[GDT_ENTRY_TLS_ENTRIES];
