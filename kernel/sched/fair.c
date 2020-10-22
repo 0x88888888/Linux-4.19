@@ -4164,6 +4164,17 @@ static void put_prev_entity(struct cfs_rq *cfs_rq, struct sched_entity *prev)
 	cfs_rq->curr = NULL;
 }
 
+/*
+ * apic_timer_interrupt()  [arch/x86/entry/entry_64.S]
+ *  smp_apic_timer_interrupt()
+ *   local_apic_timer_interrupt()
+ *    tick_handle_periodic( dev==lapic_events )
+ *     tick_periodic()
+ *      update_process_times()
+ *       scheduler_tick()
+ *        task_tick_fair(queued ==0)
+ *         entity_tick( queued==0)
+ */
 static void
 entity_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr, int queued)
 {
@@ -9645,6 +9656,15 @@ static void rq_offline_fair(struct rq *rq)
  * goes along full dynticks. Therefore no local assumption can be made
  * and everything must be accessed through the @rq and @curr passed in
  * parameters.
+ *
+ * apic_timer_interrupt()  [arch/x86/entry/entry_64.S]
+ *  smp_apic_timer_interrupt()
+ *   local_apic_timer_interrupt()
+ *    tick_handle_periodic( dev==lapic_events )
+ *     tick_periodic()
+ *      update_process_times()
+ *       scheduler_tick()
+ *        task_tick_fair( queued==0)
  */
 static void task_tick_fair(struct rq *rq, struct task_struct *curr, int queued)
 {

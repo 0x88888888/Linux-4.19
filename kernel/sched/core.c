@@ -3058,6 +3058,14 @@ unsigned long long task_sched_runtime(struct task_struct *p)
 /*
  * This function gets called by the timer code, with HZ frequency.
  * We call it with interrupts disabled.
+ *
+ * apic_timer_interrupt()  [arch/x86/entry/entry_64.S]
+ *  smp_apic_timer_interrupt()
+ *   local_apic_timer_interrupt()
+ *    tick_handle_periodic( dev==lapic_events )
+ *     tick_periodic()
+ *      update_process_times()
+ *       scheduler_tick()
  */
 void scheduler_tick(void)
 {
@@ -3071,6 +3079,7 @@ void scheduler_tick(void)
 	rq_lock(rq, &rf);
 
 	update_rq_clock(rq);
+	//task_tick_fair
 	curr->sched_class->task_tick(rq, curr, 0);
 	cpu_load_update_active(rq);
 	calc_global_load_tick(rq);

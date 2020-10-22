@@ -78,6 +78,12 @@ int tick_is_oneshot_available(void)
  *
  * tick_handle_periodic()
  *  tick_periodic()
+ *
+ * apic_timer_interrupt()  [arch/x86/entry/entry_64.S]
+ *  smp_apic_timer_interrupt()
+ *   local_apic_timer_interrupt()
+ *    tick_handle_periodic( dev==lapic_events )
+ *     tick_periodic()
  */
 static void tick_periodic(int cpu)
 {
@@ -98,6 +104,11 @@ static void tick_periodic(int cpu)
 
 /*
  * Event handler for periodic ticks
+ *
+ * apic_timer_interrupt()  [arch/x86/entry/entry_64.S]
+ *  smp_apic_timer_interrupt()
+ *   local_apic_timer_interrupt()
+ *    tick_handle_periodic( dev==lapic_events )
  */
 void tick_handle_periodic(struct clock_event_device *dev)
 {

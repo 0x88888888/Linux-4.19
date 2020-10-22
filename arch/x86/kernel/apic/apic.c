@@ -997,6 +997,10 @@ void setup_secondary_APIC_clock(void)
 
 /*
  * The guts of the apic timer interrupt
+ *
+ * apic_timer_interrupt()  [arch/x86/entry/entry_64.S]
+ *  smp_apic_timer_interrupt()
+ *   local_apic_timer_interrupt()
  */
 static void local_apic_timer_interrupt(void)
 {
@@ -1026,6 +1030,7 @@ static void local_apic_timer_interrupt(void)
 	 */
 	inc_irq_stat(apic_timer_irqs);
 
+    //是tick_handle_periodic
 	evt->event_handler(evt);
 }
 
@@ -1036,6 +1041,9 @@ static void local_apic_timer_interrupt(void)
  *
  * [ if a single-CPU system runs an SMP kernel then we call the local
  *   interrupt as well. Thus we cannot inline the local irq ... ]
+ *
+ * apic_timer_interrupt()  [arch/x86/entry/entry_64.S]
+ *  smp_apic_timer_interrupt()
  */
 __visible void __irq_entry smp_apic_timer_interrupt(struct pt_regs *regs)
 {

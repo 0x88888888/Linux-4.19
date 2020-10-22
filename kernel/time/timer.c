@@ -1635,6 +1635,13 @@ static inline int collect_expired_timers(struct timer_base *base,
  *
  * timer_tick()    [arch\arm\kernel\time.c]
  *  update_process_times()
+ *
+ * apic_timer_interrupt()  [arch/x86/entry/entry_64.S]
+ *  smp_apic_timer_interrupt()
+ *   local_apic_timer_interrupt()
+ *    tick_handle_periodic( dev==lapic_events )
+ *     tick_periodic()
+ *      update_process_times()
  */
 void update_process_times(int user_tick)
 {
