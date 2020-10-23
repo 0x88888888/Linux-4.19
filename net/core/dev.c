@@ -5129,6 +5129,10 @@ static int generic_xdp_install(struct net_device *dev, struct netdev_bpf *xdp)
 	return ret;
 }
 
+/*
+ * netif_receive_skb()
+ *  netif_receive_skb_internal()
+ */
 static int netif_receive_skb_internal(struct sk_buff *skb)
 {
 	int ret;
@@ -5143,6 +5147,7 @@ static int netif_receive_skb_internal(struct sk_buff *skb)
 
 		preempt_disable();
 		rcu_read_lock();
+		//已经分配了sk_buff，属于generic         eBPF的XDP程序
 		ret = do_xdp_generic(rcu_dereference(skb->dev->xdp_prog), skb);
 		rcu_read_unlock();
 		preempt_enable();

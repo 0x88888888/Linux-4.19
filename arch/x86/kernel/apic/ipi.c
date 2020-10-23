@@ -74,6 +74,8 @@ void __default_send_IPI_dest_field(unsigned int mask, int vector, unsigned int d
 
 	/*
 	 * Send the IPI. The write to APIC_ICR fires this off.
+	 *
+	 * 设置APIC_ICR 寄存器编程来触发 IPI
 	 */
 	native_apic_mem_write(APIC_ICR, cfg);
 }

@@ -128,6 +128,8 @@ static void native_smp_send_reschedule(int cpu)
 		WARN(1, "sched: Unexpected reschedule of offline CPU#%d!\n", cpu);
 		return;
 	}
+
+	//有很多apic对象
 	apic->send_IPI(cpu, RESCHEDULE_VECTOR);
 }
 

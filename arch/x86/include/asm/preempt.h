@@ -113,6 +113,7 @@ static __always_inline bool should_resched(int preempt_offset)
 
 #ifdef CONFIG_PREEMPT
   extern asmlinkage void ___preempt_schedule(void);
+  //___preempt_schedule 定义在arch/x86/entry/thunk_64.S中
 # define __preempt_schedule() \
 	asm volatile ("call ___preempt_schedule" : ASM_CALL_CONSTRAINT)
 

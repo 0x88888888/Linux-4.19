@@ -479,13 +479,17 @@ void resched_curr(struct rq *rq)
 
 	lockdep_assert_held(&rq->lock);
 
+	//thread_info->flags已经有TIF_NEED_RESCHED标记了
 	if (test_tsk_need_resched(curr))
 		return;
 
 	cpu = cpu_of(rq);
 
+    
 	if (cpu == smp_processor_id()) {
+		//设置thread_info->flags 上的TIF_NEED_RESCHED
 		set_tsk_need_resched(curr);
+		//设置__preempt_count PREEMPT_NEED_RESCHED标记
 		set_preempt_need_resched();
 		return;
 	}
@@ -865,6 +869,7 @@ void check_preempt_curr(struct rq *rq, struct task_struct *p, int flags)
 {
 	const struct sched_class *class;
 
+    //目标task和curr 是同一个调度class
 	if (p->sched_class == rq->curr->sched_class) {
 		rq->curr->sched_class->check_preempt_curr(rq, p, flags);
 	} else {
@@ -1661,6 +1666,13 @@ ttwu_stat(struct task_struct *p, int cpu, int wake_flags)
 		__schedstat_inc(p->se.statistics.nr_wakeups_sync);
 }
 
+/*
+ * smp_reschedule_interrupt()
+ *  scheduler_ipi()
+ *   sched_ttwu_pending()
+ *    ttwu_do_activate()
+ *     ttwu_activate()
+ */
 static inline void ttwu_activate(struct rq *rq, struct task_struct *p, int en_flags)
 {
 	activate_task(rq, p, en_flags);
@@ -1673,6 +1685,16 @@ static inline void ttwu_activate(struct rq *rq, struct task_struct *p, int en_fl
 
 /*
  * Mark the task runnable and perform wakeup-preemption.
+ *
+ * smp_reschedule_interrupt()
+ *  scheduler_ipi()
+ *   sched_ttwu_pending()
+ *    ttwu_do_activate()
+ *     ttwu_do_wakeup()
+ *
+ * try_to_wake_up()
+ *  ttwu_remote()
+ *   ttwu_do_wakeup()
  */
 static void ttwu_do_wakeup(struct rq *rq, struct task_struct *p, int wake_flags,
 			   struct rq_flags *rf)
@@ -1682,6 +1704,7 @@ static void ttwu_do_wakeup(struct rq *rq, struct task_struct *p, int wake_flags,
 	trace_sched_wakeup(p);
 
 #ifdef CONFIG_SMP
+    //CFS 调度器似乎没有这个函数
 	if (p->sched_class->task_woken) {
 		/*
 		 * Our task @p is fully woken up and running; so its safe to
@@ -1706,6 +1729,12 @@ static void ttwu_do_wakeup(struct rq *rq, struct task_struct *p, int wake_flags,
 #endif
 }
 
+/*
+ * smp_reschedule_interrupt()
+ *  scheduler_ipi()
+ *   sched_ttwu_pending()
+ *    ttwu_do_activate()
+ */
 static void
 ttwu_do_activate(struct rq *rq, struct task_struct *p, int wake_flags,
 		 struct rq_flags *rf)
@@ -1731,6 +1760,9 @@ ttwu_do_activate(struct rq *rq, struct task_struct *p, int wake_flags,
  * in this case we must do a remote wakeup. Its a 'light' wakeup though,
  * since all we need to do is flip p->state to TASK_RUNNING, since
  * the task is still ->on_rq.
+ *
+ * try_to_wake_up()
+ *  ttwu_remote()
  */
 static int ttwu_remote(struct task_struct *p, int wake_flags)
 {
@@ -1751,6 +1783,12 @@ static int ttwu_remote(struct task_struct *p, int wake_flags)
 }
 
 #ifdef CONFIG_SMP
+
+/*
+ * smp_reschedule_interrupt()
+ *  scheduler_ipi()
+ *   sched_ttwu_pending()
+ */
 void sched_ttwu_pending(void)
 {
 	struct rq *rq = this_rq();
@@ -1800,6 +1838,8 @@ void scheduler_ipi(void)
 	 * somewhat pessimize the simple resched case.
 	 */
 	irq_enter();
+
+	// 调用 sched_ttwu_pending 来实现异步唤醒的下半部操作，并触发 Wakeup Preemption
 	sched_ttwu_pending();
 
 	/*
@@ -1976,6 +2016,9 @@ static void ttwu_queue(struct task_struct *p, int cpu, int wake_flags)
  *
  * Return: %true if @p->state changes (an actual wakeup was done),
  *	   %false otherwise.
+ *
+ * wake_up_process()
+ *  try_to_wake_up( state == TASK_NORMAL)
  */
 static int
 try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
@@ -2021,6 +2064,7 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 	 * __schedule().  See the comment for smp_mb__after_spinlock().
 	 */
 	smp_rmb();
+	//当被wakeup的task还在rq上没有被删除时
 	if (p->on_rq && ttwu_remote(p, wake_flags))
 		goto stat;
 
@@ -3427,6 +3471,16 @@ again:
  *
  * schedule()
  *  __schedule(preempt=false)
+ *
+ * preempt_enable()
+ *  ___preempt_schedule() 
+ *   preempt_schedule()
+ *    preempt_schedule_common()
+ *     __schedule(preempt == true)
+ *
+ * retint_kernel []arch/x86/entry/entry_64.S]
+ *  preempt_schedule_irq()
+ *   __schedule(preempt == true)
  */
 static void __sched notrace __schedule(bool preempt)
 {
@@ -3633,6 +3687,12 @@ void __sched schedule_preempt_disabled(void)
 	preempt_disable();
 }
 
+/*
+ * preempt_enable()
+ *  ___preempt_schedule() 
+ *   preempt_schedule()
+ *    preempt_schedule_common()
+ */
 static void __sched notrace preempt_schedule_common(void)
 {
 	do {
@@ -3667,6 +3727,10 @@ static void __sched notrace preempt_schedule_common(void)
  * this is the entry point to schedule() from in-kernel preemption
  * off of preempt_enable. Kernel preemptions off return from interrupt
  * occur there and call schedule directly.
+ *
+ * preempt_enable()
+ *  ___preempt_schedule() 
+ *   preempt_schedule()
  */
 asmlinkage __visible void __sched notrace preempt_schedule(void)
 {
@@ -3741,6 +3805,9 @@ EXPORT_SYMBOL_GPL(preempt_schedule_notrace);
  * off of irq context.
  * Note, that this is called and return with irqs disabled. This will
  * protect us against recursive calling from irq.
+ *
+ * retint_kernel []arch/x86/entry/entry_64.S]
+ *  preempt_schedule_irq()
  */
 asmlinkage __visible void __sched preempt_schedule_irq(void)
 {
@@ -3752,10 +3819,14 @@ asmlinkage __visible void __sched preempt_schedule_irq(void)
 	prev_state = exception_enter();
 
 	do {
+		//关掉preempt
 		preempt_disable();
+		//打开 irq,就是sti指令
 		local_irq_enable();
 		__schedule(true);
+		//关闭 irq,就是cli指令
 		local_irq_disable();
+		//打开preempt
 		sched_preempt_enable_no_resched();
 	} while (need_resched());
 

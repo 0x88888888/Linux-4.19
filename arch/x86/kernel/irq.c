@@ -228,6 +228,13 @@ u64 arch_irq_stat(void)
  * do_IRQ handles all normal device IRQ's (the special
  * SMP cross-CPU interrupts have their own specific
  * handlers).
+ *
+ *
+ * common_interrupt() [arch\x86\entry\entry_64.S] 这个是normal interrupt的入口
+ * 与APIC中断的入口不一样
+ *
+ * common_interrupt() [arch\x86\entry\entry_64.S]
+ *  do_IRQ()
  */
 __visible unsigned int __irq_entry do_IRQ(struct pt_regs *regs)
 {
@@ -238,12 +245,16 @@ __visible unsigned int __irq_entry do_IRQ(struct pt_regs *regs)
 	 */
 	unsigned vector = ~regs->orig_ax;
 
-    // 中断的上半部，在关中断的情况下处理
+    /* 中断的上半部，在关中断的情况下处理
+     *
+     * 进行必要的context保存和栈切换
+     */
 	entering_irq();
 
 	/* entering_irq() tells RCU that we're not quiescent.  Check it. */
 	RCU_LOCKDEP_WARN(!rcu_is_watching(), "IRQ failed to wake up RCU");
 
+    //根据中断号，得到对应的irq_desc对象
 	desc = __this_cpu_read(vector_irq[vector]);
 
 	if (!handle_irq(desc, regs)) {

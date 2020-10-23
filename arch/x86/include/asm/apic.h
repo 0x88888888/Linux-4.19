@@ -280,6 +280,19 @@ struct irq_data;
  * Hacked for x86-64 by James Cleverdon from i386 architecture code by
  * Martin Bligh, Andi Kleen, James Bottomley, John Stultz, and
  * James Cleverdon.
+ *
+ * xen_pv_apic,
+ * apic_physflat,
+ * apic_flat,
+ * apic_numachip1,
+ * apic_numachip2,
+ * apic_bigsmp,
+ * orig_apic,
+ * apic_default, 32位时
+ * apic_x2apic_phys,
+ * apic_x2apic_uv_x,
+ * 
+ *
  */
 struct apic {
 	/* Hotpath functions first */

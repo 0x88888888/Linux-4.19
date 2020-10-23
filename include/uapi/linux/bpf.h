@@ -2403,10 +2403,15 @@ struct bpf_sock {
  * result in packet drops and a warning via bpf_warn_invalid_xdp_action().
  */
 enum xdp_action {
+    //eBPF程序出错了
 	XDP_ABORTED = 0,
+	//丢弃这个packet
 	XDP_DROP,
+	//往协议栈上传
 	XDP_PASS,
+	//从同样的网卡转发出去
 	XDP_TX,
+	//转发到别的NIC或者cpu去处理
 	XDP_REDIRECT,
 };
 
