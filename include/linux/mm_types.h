@@ -316,7 +316,10 @@ struct vm_area_struct {
 					  * page_table_lock */
 	struct anon_vma *anon_vma;	/* Serialized by page_table_lock */
 
-	/* Function pointers to deal with this struct. */
+	/* Function pointers to deal with this struct.
+     *
+	 * 为NULL，则说明为anonymous映射了
+	 */
 	const struct vm_operations_struct *vm_ops;
 
 	/* Information about our backing store: */

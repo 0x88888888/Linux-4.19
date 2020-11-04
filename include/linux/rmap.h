@@ -77,11 +77,21 @@ struct anon_vma {
  * 只在匿名映射page是有用这个数据结构
  */
 struct anon_vma_chain {
+    //指向该AVC对应的VMA
 	struct vm_area_struct *vma;
+	//指向该AVC对应的AV
 	struct anon_vma *anon_vma;
 
-	//在anon_vma_chain_link中操作same_vam，链接到anon_vma_chain对象
+	/* 
+	 * 在anon_vma_chain_link()中操作same_vam，链接到anon_vma_chain对象
+	 * 
+	 * 链接入VMA链表的节点
+	 */
 	struct list_head same_vma;   /* locked by mmap_sem & page_table_lock */
+	/*
+	 * 链接入AV红黑树的节点
+	 * 构建所属进程 AVC的父子关系
+	 */
 	struct rb_node rb;			/* locked by anon_vma->rwsem */
 	unsigned long rb_subtree_last;
 #ifdef CONFIG_DEBUG_VM_RB
