@@ -3000,6 +3000,14 @@ static struct pernet_operations ipmr_net_ops = {
 	.exit = ipmr_net_exit,
 };
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    inet_init()
+ *     ip_mr_init()
+ */
+
 int __init ip_mr_init(void)
 {
 	int err;

@@ -224,6 +224,7 @@ static const struct pci_error_handlers igb_err_handler = {
 
 static void igb_init_dmac(struct igb_adapter *adapter, u32 pba);
 
+
 static struct pci_driver igb_driver = {
 	.name     = igb_driver_name,
 	.id_table = igb_pci_tbl,
@@ -673,6 +674,11 @@ static int __init igb_init_module(void)
 #ifdef CONFIG_IGB_DCA
 	dca_register_notify(&dca_notifier);
 #endif
+
+    /*
+     * 把igb_driver注册到PCI子系统，
+     * 由PCI子系统初始化的时候统一初始化
+     */
 	ret = pci_register_driver(&igb_driver);
 	return ret;
 }
@@ -941,6 +947,7 @@ static int igb_request_msix(struct igb_adapter *adapter)
 	struct net_device *netdev = adapter->netdev;
 	int i, err = 0, vector = 0, free_vector = 0;
 
+    //设置中断处理函数
 	err = request_irq(adapter->msix_entries[vector].vector,
 			  igb_msix_other, 0, netdev->name, adapter);
 	if (err)
@@ -1091,6 +1098,11 @@ static void igb_clear_interrupt_scheme(struct igb_adapter *adapter)
  *
  *  Attempt to configure interrupts using the best available
  *  capabilities of the hardware and kernel.
+ *
+ * igb_probe()
+ *  igb_sw_init()
+ *   igb_init_interrupt_scheme()
+ *    igb_set_interrupt_capability()
  **/
 static void igb_set_interrupt_capability(struct igb_adapter *adapter, bool msix)
 {
@@ -1181,6 +1193,12 @@ static void igb_add_ring(struct igb_ring *ring,
  *  @rxr_idx: index of first Rx ring to allocate
  *
  *  We allocate one q_vector.  If allocation fails we return -ENOMEM.
+ *
+ * igb_probe()
+ *  igb_sw_init()
+ *   igb_init_interrupt_scheme()
+ *    igb_alloc_q_vectors()
+ *     igb_alloc_q_vector()
  **/
 static int igb_alloc_q_vector(struct igb_adapter *adapter,
 			      int v_count, int v_idx,
@@ -1317,6 +1335,11 @@ static int igb_alloc_q_vector(struct igb_adapter *adapter,
  *
  *  We allocate one q_vector per queue interrupt.  If allocation fails we
  *  return -ENOMEM.
+ *
+ * igb_probe()
+ *  igb_sw_init()
+ *   igb_init_interrupt_scheme()
+ *    igb_alloc_q_vectors()
  **/
 static int igb_alloc_q_vectors(struct igb_adapter *adapter)
 {
@@ -1376,6 +1399,10 @@ err_out:
  *  @msix: boolean value of MSIX capability
  *
  *  This function initializes the interrupts and allocates all of the queues.
+ *
+ * igb_probe()
+ *  igb_sw_init()
+ *   igb_init_interrupt_scheme()
  **/
 static int igb_init_interrupt_scheme(struct igb_adapter *adapter, bool msix)
 {
@@ -1405,6 +1432,9 @@ err_alloc_q_vectors:
  *
  *  Attempts to configure interrupts using the best available
  *  capabilities of the hardware and kernel.
+ *
+ * __igb_open()
+ *  igb_request_irq()
  **/
 static int igb_request_irq(struct igb_adapter *adapter)
 {
@@ -1412,9 +1442,11 @@ static int igb_request_irq(struct igb_adapter *adapter)
 	struct pci_dev *pdev = adapter->pdev;
 	int err = 0;
 
+    
 	if (adapter->flags & IGB_FLAG_HAS_MSIX) {
+		//设置中断处理函数,MSI-方式
 		err = igb_request_msix(adapter);
-		if (!err)
+		if (!err) //没问题了
 			goto request_done;
 		/* fall back to MSI */
 		igb_free_all_tx_resources(adapter);
@@ -1432,6 +1464,7 @@ static int igb_request_irq(struct igb_adapter *adapter)
 
 	igb_assign_vector(adapter->q_vector[0], 0);
 
+    //igb_intr_msi为中断处理函数，MSI方式
 	if (adapter->flags & IGB_FLAG_HAS_MSI) {
 		err = request_irq(pdev->irq, igb_intr_msi, 0,
 				  netdev->name, adapter);
@@ -1443,6 +1476,7 @@ static int igb_request_irq(struct igb_adapter *adapter)
 		adapter->flags &= ~IGB_FLAG_HAS_MSI;
 	}
 
+    //legacy方式
 	err = request_irq(pdev->irq, igb_intr, IRQF_SHARED,
 			  netdev->name, adapter);
 
@@ -3020,6 +3054,8 @@ static s32 igb_init_i2c(struct igb_adapter *adapter)
  *  igb_probe initializes an adapter identified by a pci_dev structure.
  *  The OS initialization, configuring of the adapter private structure,
  *  and a hardware reset occur.
+ *
+ * pci系统发现设备的时候,调用这个函数
  **/
 static int igb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
@@ -3042,11 +3078,13 @@ static int igb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		return -EINVAL;
 	}
 
+    //使能device使用的内存空间
 	err = pci_enable_device_mem(pdev);
 	if (err)
 		return err;
 
 	pci_using_dac = 0;
+	//设置dma相关信息
 	err = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
 	if (!err) {
 		pci_using_dac = 1;
@@ -3069,11 +3107,13 @@ static int igb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	pci_save_state(pdev);
 
 	err = -ENOMEM;
+	//创建net_device
 	netdev = alloc_etherdev_mq(sizeof(struct igb_adapter),
 				   IGB_MAX_TX_QUEUES);
 	if (!netdev)
 		goto err_alloc_etherdev;
 
+    // 绑定net_device  igb_adapter e1000_hw之间的关系
 	SET_NETDEV_DEV(netdev, &pdev->dev);
 
 	pci_set_drvdata(pdev, netdev);
@@ -3085,13 +3125,16 @@ static int igb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	adapter->msg_enable = netif_msg_init(debug, DEFAULT_MSG_ENABLE);
 
 	err = -EIO;
+	//io地址映射
 	adapter->io_addr = pci_iomap(pdev, 0, 0);
 	if (!adapter->io_addr)
 		goto err_ioremap;
 	/* hw->hw_addr can be altered, we'll use adapter->io_addr for unmap */
 	hw->hw_addr = adapter->io_addr;
 
+    //设置 net_device_ops
 	netdev->netdev_ops = &igb_netdev_ops;
+	//ethtool命令的操作方法
 	igb_set_ethtool_ops(netdev);
 	netdev->watchdog_timeo = 5 * HZ;
 
@@ -3115,6 +3158,7 @@ static int igb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	err = ei->get_invariants(hw);
 	if (err)
 		goto err_sw_init;
+
 
 	/* setup the private structure */
 	err = igb_sw_init(adapter);
@@ -3816,6 +3860,9 @@ void igb_set_flag_queue_pairs(struct igb_adapter *adapter,
  *  igb_sw_init initializes the Adapter private data structure.
  *  Fields are initialized based on PCI device information and
  *  OS network device settings (MTU size).
+ *
+ * igb_probe()
+ *  igb_sw_init()
  **/
 static int igb_sw_init(struct igb_adapter *adapter)
 {
@@ -3825,6 +3872,7 @@ static int igb_sw_init(struct igb_adapter *adapter)
 
 	pci_read_config_word(pdev, PCI_COMMAND, &hw->bus.pci_cmd_word);
 
+    //设置接收/发送ring个数，默认为8
 	/* set default ring sizes */
 	adapter->tx_ring_count = IGB_DEFAULT_TXD;
 	adapter->rx_ring_count = IGB_DEFAULT_RXD;
@@ -3836,6 +3884,7 @@ static int igb_sw_init(struct igb_adapter *adapter)
 	/* set default work limits */
 	adapter->tx_work_limit = IGB_DEFAULT_TX_WORK;
 
+    //最大最小帧大小
 	adapter->max_frame_size = netdev->mtu + ETH_HLEN + ETH_FCS_LEN +
 				  VLAN_HLEN;
 	adapter->min_frame_size = ETH_ZLEN + ETH_FCS_LEN;
@@ -3871,7 +3920,8 @@ static int igb_sw_init(struct igb_adapter *adapter)
 		return -ENOMEM;
 
 	igb_probe_vfs(adapter);
-
+    
+	//队列配置，这里主要是初始化
 	igb_init_queue_configuration(adapter);
 
 	/* Setup and initialize a copy of the hw vlan table array */
@@ -3879,7 +3929,8 @@ static int igb_sw_init(struct igb_adapter *adapter)
 				       GFP_KERNEL);
 	if (!adapter->shadow_vfta)
 		return -ENOMEM;
-
+    
+	//分配中断向量
 	/* This call may decrease the number of queues */
 	if (igb_init_interrupt_scheme(adapter, true)) {
 		dev_err(&pdev->dev, "Unable to allocate memory for queues\n");
@@ -6472,6 +6523,10 @@ void igb_update_stats(struct igb_adapter *adapter)
 	}
 }
 
+/*
+ * igb_intr_msi()
+ *  igb_tsync_interrupt()
+ */ 
 static void igb_tsync_interrupt(struct igb_adapter *adapter)
 {
 	struct e1000_hw *hw = &adapter->hw;
@@ -7621,6 +7676,8 @@ static void igb_set_uta(struct igb_adapter *adapter, bool set)
  *  igb_intr_msi - Interrupt Handler
  *  @irq: interrupt number
  *  @data: pointer to a network interface device structure
+ *
+ * igb网卡中断处理函数
  **/
 static irqreturn_t igb_intr_msi(int irq, void *data)
 {
@@ -7725,6 +7782,11 @@ static void igb_ring_irq_enable(struct igb_q_vector *q_vector)
  *  igb_poll - NAPI Rx polling callback
  *  @napi: napi polling structure
  *  @budget: count of how many packets we should handle
+ *
+ * netpoll_poll_dev()
+ *  poll_napi()
+ *   poll_one_napi()
+ *    igb_poll()
  **/
 static int igb_poll(struct napi_struct *napi, int budget)
 {
@@ -7738,6 +7800,8 @@ static int igb_poll(struct napi_struct *napi, int budget)
 	if (q_vector->adapter->flags & IGB_FLAG_DCA_ENABLED)
 		igb_update_dca(q_vector);
 #endif
+
+    //数据已经发送出去了，需要回收空闲空间
 	if (q_vector->tx.ring)
 		clean_complete = igb_clean_tx_irq(q_vector, budget);
 
@@ -7766,6 +7830,13 @@ static int igb_poll(struct napi_struct *napi, int budget)
  *  @napi_budget: Used to determine if we are in netpoll
  *
  *  returns true if ring is completely cleaned
+ *
+ * netpoll_poll_dev()
+ *  poll_napi()
+ *   poll_one_napi()
+ *    igb_poll()
+ *     igb_clean_tx_irq()
+ *
  **/
 static bool igb_clean_tx_irq(struct igb_q_vector *q_vector, int napi_budget)
 {
@@ -8325,6 +8396,13 @@ static void igb_put_rx_buffer(struct igb_ring *rx_ring,
 	rx_buffer->page = NULL;
 }
 
+/*
+ * netpoll_poll_dev()
+ *  poll_napi()
+ *   poll_one_napi()
+ *    igb_poll()
+ *     igb_clean_rx_irq()
+ **/
 static int igb_clean_rx_irq(struct igb_q_vector *q_vector, const int budget)
 {
 	struct igb_ring *rx_ring = q_vector->rx.ring;

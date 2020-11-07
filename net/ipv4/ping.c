@@ -1177,6 +1177,13 @@ void ping_proc_exit(void)
 
 #endif
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    inet_init()
+ *     ping_init()
+ */
 void __init ping_init(void)
 {
 	int i;

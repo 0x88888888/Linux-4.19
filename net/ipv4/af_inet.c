@@ -1794,6 +1794,14 @@ static __net_initdata struct pernet_operations ipv4_mib_ops = {
 	.exit = ipv4_mib_exit_net,
 };
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    inet_init()
+ *     init_ipv4_mibs()
+ */
+
 static int __init init_ipv4_mibs(void)
 {
 	return register_pernet_subsys(&ipv4_mib_ops);
@@ -1905,6 +1913,12 @@ static struct packet_type ip_packet_type __read_mostly = {
 	.list_func = ip_list_rcv,
 };
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    inet_init()
+ */
 static int __init inet_init(void)
 {
 	struct inet_protosw *q;
@@ -2036,6 +2050,14 @@ fs_initcall(inet_init);
 /* ------------------------------------------------------------------------ */
 
 #ifdef CONFIG_PROC_FS
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    inet_init()
+ *     ipv4_proc_init()
+ */
+
 static int __init ipv4_proc_init(void)
 {
 	int rc = 0;

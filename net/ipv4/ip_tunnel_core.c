@@ -411,6 +411,14 @@ static const struct lwtunnel_encap_ops ip6_tun_lwt_ops = {
 	.owner = THIS_MODULE,
 };
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    inet_init()
+ *     ip_tunnel_core_init()
+ */
+
 void __init ip_tunnel_core_init(void)
 {
 	/* If you land here, make sure whether increasing ip_tunnel_info's

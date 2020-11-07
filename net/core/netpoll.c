@@ -135,6 +135,11 @@ static void queue_process(struct work_struct *work)
 	}
 }
 
+/*
+ * netpoll_poll_dev()
+ *  poll_napi()
+ *   poll_one_napi()
+ */ 
 static void poll_one_napi(struct napi_struct *napi)
 {
 	int work;
@@ -148,6 +153,9 @@ static void poll_one_napi(struct napi_struct *napi)
 
 	/* We explicilty pass the polling call a budget of 0 to
 	 * indicate that we are clearing the Tx path only.
+	 *
+	 * process_backlog
+	 * igb_poll
 	 */
 	work = napi->poll(napi, 0);
 	WARN_ONCE(work, "%pF exceeded budget in poll\n", napi->poll);
@@ -156,11 +164,16 @@ static void poll_one_napi(struct napi_struct *napi)
 	clear_bit(NAPI_STATE_NPSVC, &napi->state);
 }
 
+/*
+ * netpoll_poll_dev()
+ *  poll_napi()
+ */ 
 static void poll_napi(struct net_device *dev)
 {
 	struct napi_struct *napi;
 	int cpu = smp_processor_id();
 
+    //循环调用napi_struct->poll
 	list_for_each_entry(napi, &dev->napi_list, dev_list) {
 		if (cmpxchg(&napi->poll_owner, -1, cpu) == -1) {
 			poll_one_napi(napi);
@@ -169,6 +182,16 @@ static void poll_napi(struct net_device *dev)
 	}
 }
 
+/*
+ * bond_poll_controller()
+ *  netpoll_poll_dev()
+ *
+ * find_skb()
+ *  netpoll_poll_dev()
+ *
+ * netpoll_send_skb_on_dev()
+ *  netpoll_poll_dev()
+ */
 void netpoll_poll_dev(struct net_device *dev)
 {
 	struct netpoll_info *ni = rcu_dereference_bh(dev->npinfo);
@@ -190,6 +213,7 @@ void netpoll_poll_dev(struct net_device *dev)
 	if (ops->ndo_poll_controller)
 		ops->ndo_poll_controller(dev);
 
+    //
 	poll_napi(dev);
 
 	up(&ni->dev_lock);

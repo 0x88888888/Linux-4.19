@@ -3253,11 +3253,14 @@ static int req_prot_init(const struct proto *prot)
 }
 
 /*
- * inet_init()
- *  proto_register(prot== tcp_prot)
- *  proto_register(prot== udp_prot)
- *  proto_register(prot== raw_prot)
- *  proto_register(prot== ping_prot)
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    inet_init()
+ *     proto_register(prot== tcp_prot)
+ *     proto_register(prot== udp_prot)
+ *     proto_register(prot== raw_prot)
+ *     proto_register(prot== ping_prot)
  *
  * rawsock_init()
  *  nfc_proto_register(nfc_protocol == rawsock_nfc_proto)

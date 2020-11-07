@@ -2920,6 +2920,13 @@ static struct pernet_operations __net_initdata udp_sysctl_ops = {
 	.init	= udp_sysctl_init,
 };
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    inet_init()
+ *     udp_init()
+ */
 void __init udp_init(void)
 {
 	unsigned long limit;

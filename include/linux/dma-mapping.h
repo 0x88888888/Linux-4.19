@@ -248,6 +248,10 @@ static inline dma_addr_t dma_map_single_attrs(struct device *dev, void *ptr,
 	return addr;
 }
 
+/*
+ * igb_clean_tx_irq()
+ *  dma_unmap_single_attrs()
+ */
 static inline void dma_unmap_single_attrs(struct device *dev, dma_addr_t addr,
 					  size_t size,
 					  enum dma_data_direction dir,

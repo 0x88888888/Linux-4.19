@@ -735,6 +735,15 @@ static void msix_program_entries(struct pci_dev *dev,
  * Setup the MSI-X capability structure of device function with a
  * single MSI-X irq. A return of zero indicates the successful setup of
  * requested MSI-X entries with allocated irqs or non-zero for otherwise.
+ *
+ * igb_probe()
+ *  igb_sw_init()
+ *   igb_init_interrupt_scheme()
+ *    igb_set_interrupt_capability()
+ *     pci_enable_msix_range()
+ *      __pci_enable_msix_range()
+ *       __pci_enable_msix()
+ *        msix_capability_init()
  **/
 static int msix_capability_init(struct pci_dev *dev, struct msix_entry *entries,
 				int nvec, const struct irq_affinity *affd)
@@ -932,6 +941,15 @@ int pci_msix_vec_count(struct pci_dev *dev)
 }
 EXPORT_SYMBOL(pci_msix_vec_count);
 
+/*
+ * igb_probe()
+ *  igb_sw_init()
+ *   igb_init_interrupt_scheme()
+ *    igb_set_interrupt_capability()
+ *     pci_enable_msix_range()
+ *      __pci_enable_msix_range()
+ *       __pci_enable_msix()
+ */
 static int __pci_enable_msix(struct pci_dev *dev, struct msix_entry *entries,
 			     int nvec, const struct irq_affinity *affd)
 {
@@ -1078,6 +1096,14 @@ int pci_enable_msi(struct pci_dev *dev)
 }
 EXPORT_SYMBOL(pci_enable_msi);
 
+/*
+ * igb_probe()
+ *  igb_sw_init()
+ *   igb_init_interrupt_scheme()
+ *    igb_set_interrupt_capability()
+ *     pci_enable_msix_range()
+ *      __pci_enable_msix_range()
+ */
 static int __pci_enable_msix_range(struct pci_dev *dev,
 				   struct msix_entry *entries, int minvec,
 				   int maxvec, const struct irq_affinity *affd)
@@ -1121,6 +1147,12 @@ static int __pci_enable_msix_range(struct pci_dev *dev,
  * If it succeeds, it returns the actual number of interrupts allocated and
  * indicates the successful configuration of MSI-X capability structure
  * with new allocated MSI-X interrupts.
+ *
+ * igb_probe()
+ *  igb_sw_init()
+ *   igb_init_interrupt_scheme()
+ *    igb_set_interrupt_capability()
+ *     pci_enable_msix_range()
  **/
 int pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries,
 		int minvec, int maxvec)

@@ -32,6 +32,16 @@ struct net_protocol __rcu *inet_protos[MAX_INET_PROTOS] __read_mostly;
 const struct net_offload __rcu *inet_offloads[MAX_INET_PROTOS] __read_mostly;
 EXPORT_SYMBOL(inet_offloads);
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    inet_init()
+ *     inet_add_protocol(prot==icmp_protocol)
+ *     inet_add_protocol(prot==udp_protocol)
+ *     inet_add_protocol(prot==tcp_protocol)
+ *     inet_add_protocol(prot==igmp_protocol)
+ */
 int inet_add_protocol(const struct net_protocol *prot, unsigned char protocol)
 {
 	if (!prot->netns_ok) {

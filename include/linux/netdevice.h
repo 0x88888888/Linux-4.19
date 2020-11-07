@@ -315,6 +315,8 @@ struct gro_list {
 
 /*
  * Structure for NAPI scheduling similar to tasklet but with weighting
+ *
+ * 在函数netif_napi_add()中添加napi_struct对象到napi_hash[]
  */
 struct napi_struct {
 	/* The poll_list must only be managed by the entity which
@@ -2080,6 +2082,11 @@ static inline struct netdev_queue *skb_get_tx_queue(const struct net_device *dev
 	return netdev_get_tx_queue(dev, skb_get_queue_mapping(skb));
 }
 
+/*
+ * alloc_netdev_mqs()
+ *	netif_alloc_netdev_queues()
+ *   netdev_for_each_tx_queue(..., f == netdev_init_one_queue)
+ */
 static inline void netdev_for_each_tx_queue(struct net_device *dev,
 					    void (*f)(struct net_device *,
 						      struct netdev_queue *,
@@ -3166,6 +3173,14 @@ static inline void netdev_sent_queue(struct net_device *dev, unsigned int bytes)
 	netdev_tx_sent_queue(netdev_get_tx_queue(dev, 0), bytes);
 }
 
+/*
+ * netpoll_poll_dev()
+ *  poll_napi()
+ *   poll_one_napi()
+ *    igb_poll()
+ *     igb_clean_tx_irq()
+ *      netdev_tx_completed_queue()
+ */
 static inline void netdev_tx_completed_queue(struct netdev_queue *dev_queue,
 					     unsigned int pkts, unsigned int bytes)
 {

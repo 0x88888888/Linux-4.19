@@ -1254,6 +1254,14 @@ static struct pernet_operations __net_initdata icmp_sk_ops = {
        .exit = icmp_sk_exit,
 };
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    inet_init()
+ *     icmp_init()
+ */
+
 int __init icmp_init(void)
 {
 	return register_pernet_subsys(&icmp_sk_ops);

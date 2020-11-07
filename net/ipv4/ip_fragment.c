@@ -952,6 +952,14 @@ static const struct rhashtable_params ip4_rhash_params = {
 	.automatic_shrinking	= true,
 };
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    inet_init()
+ *     ipfrag_init()
+ */
+
 void __init ipfrag_init(void)
 {
 	ip4_frags.constructor = ip4_frag_init;

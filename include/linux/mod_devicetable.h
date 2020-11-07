@@ -18,8 +18,13 @@ typedef unsigned long kernel_ulong_t;
 
 //pci上的设备的id
 struct pci_device_id {
+    /*
+     * 标识硬件厂商ID和标识哪类设备的ID
+     */ 
 	__u32 vendor, device;		/* Vendor and device ID or PCI_ANY_ID*/
+	//标识PCI子系统中的厂商ID和设备ID
 	__u32 subvendor, subdevice;	/* Subsystem ID's or PCI_ANY_ID */
+	//设备类型
 	__u32 class, class_mask;	/* (class,subclass,prog-if) triplet */
 	kernel_ulong_t driver_data;	/* Data private to the driver */
 };

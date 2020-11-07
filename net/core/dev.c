@@ -6207,6 +6207,14 @@ static void init_gro_hash(struct napi_struct *napi)
 	napi->gro_bitmask = 0;
 }
 
+/*
+ * igb_probe()
+ *  igb_sw_init()
+ *   igb_init_interrupt_scheme()
+ *    igb_alloc_q_vectors()
+ *     igb_alloc_q_vector()
+ *      netif_napi_add(..., poll== igb_poll)
+ */
 void netif_napi_add(struct net_device *dev, struct napi_struct *napi,
 		    int (*poll)(struct napi_struct *, int), int weight)
 {
@@ -8382,6 +8390,12 @@ static void netif_free_rx_queues(struct net_device *dev)
 	kvfree(dev->_rx);
 }
 
+/*
+ * alloc_netdev_mqs()
+ *	netif_alloc_netdev_queues()
+ *   netdev_for_each_tx_queue(..., f == netdev_init_one_queue)
+ *    netdev_init_one_queue()
+ */
 static void netdev_init_one_queue(struct net_device *dev,
 				  struct netdev_queue *queue, void *_unused)
 {
@@ -8401,6 +8415,10 @@ static void netif_free_tx_queues(struct net_device *dev)
 	kvfree(dev->_tx);
 }
 
+/*
+ * alloc_netdev_mqs()
+ *  netif_alloc_netdev_queues()
+ */
 static int netif_alloc_netdev_queues(struct net_device *dev)
 {
 	unsigned int count = dev->num_tx_queues;
@@ -8923,6 +8941,8 @@ void netdev_freemem(struct net_device *dev)
  * Allocates a struct net_device with private data area for driver use
  * and performs basic initialization.  Also allocates subqueue structs
  * for each queue on the device.
+ *
+ *
  */
 struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 		unsigned char name_assign_type,
@@ -8971,6 +8991,7 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 	dev_mc_init(dev);
 	dev_uc_init(dev);
 
+    //设置设备的namespace
 	dev_net_set(dev, &init_net);
 
 	dev->gso_max_size = GSO_MAX_SIZE;
@@ -8997,11 +9018,14 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 
 	dev->num_tx_queues = txqs;
 	dev->real_num_tx_queues = txqs;
+
+	//创建发送队列
 	if (netif_alloc_netdev_queues(dev))
 		goto free_all;
 
 	dev->num_rx_queues = rxqs;
 	dev->real_num_rx_queues = rxqs;
+	//接收队列
 	if (netif_alloc_rx_queues(dev))
 		goto free_all;
 
