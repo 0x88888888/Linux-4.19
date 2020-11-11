@@ -1459,6 +1459,7 @@ static int igb_request_irq(struct igb_adapter *adapter)
 
 		igb_setup_all_tx_resources(adapter);
 		igb_setup_all_rx_resources(adapter);
+		
 		igb_configure(adapter);
 	}
 

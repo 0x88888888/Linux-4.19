@@ -273,6 +273,10 @@ static void flush_smp_call_function_queue(bool warn_cpu_offline)
  * @wait: If true, wait until function has completed on other CPUs.
  *
  * Returns 0 on success, else a negative status code.
+ *
+ * smp_call_function()
+ *  smp_call_function_many()
+ *   smp_call_function_single()
  */
 int smp_call_function_single(int cpu, smp_call_func_t func, void *info,
 			     int wait)
@@ -408,6 +412,9 @@ EXPORT_SYMBOL_GPL(smp_call_function_any);
  * You must not call this function with disabled interrupts or from a
  * hardware interrupt handler or from a bottom half handler. Preemption
  * must be disabled when calling this function.
+ *
+ * smp_call_function()
+ *  smp_call_function_many()
  */
 void smp_call_function_many(const struct cpumask *mask,
 			    smp_call_func_t func, void *info, bool wait)
@@ -460,6 +467,7 @@ void smp_call_function_many(const struct cpumask *mask,
 		csd_lock(csd);
 		if (wait)
 			csd->flags |= CSD_FLAG_SYNCHRONOUS;
+		
 		csd->func = func;
 		csd->info = info;
 		if (llist_add(&csd->llist, &per_cpu(call_single_queue, cpu)))
