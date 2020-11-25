@@ -367,6 +367,19 @@ struct apic {
  * Pointer to the local APIC driver in use on this system (there's
  * always just one such driver in use - the kernel decides via an
  * early probing process which one it picks - and then sticks to it):
+ *
+ * 在xen_apic_check(), xen_init_apic()
+ * 在apic/apic_flat64.c中，定义静态变量赋值 struct apic *apic __ro_after_init = &apic_flat;
+ * 在generic_bigsmp_probe()
+ * 在probe_32.c中的parse_apic(),遍历[__apicdrivers,__apicdrivers_end] 赋值apic变量
+ * 在probe_32.c中的generic_apic_probe(),遍历[__apicdrivers,__apicdrivers_end] 赋值apic变量
+ * 在probe_32.c中的default_acpi_madt_oem_check(),遍历[__apicdrivers,__apicdrivers_end] 赋值apic变量
+ * 在probe_64.c中的default_setup_apic_routing(),遍历[__apicdrivers,__apicdrivers_end] 赋值apic变量
+ * 在probe_64.c中的default_acpi_madt_oem_check(),遍历[__apicdrivers,__apicdrivers_end] 赋值apic变量
+ * 在x2apic_phys_probe()中赋值apic == &apic_x2apic_phys;
+ * 在uv_probe()中赋值apic == &apic_x2apic_uv_x
+ * 
+ *
  */
 extern struct apic *apic;
 
@@ -388,6 +401,21 @@ extern struct apic *apic;
 	__aligned(sizeof(struct apic *))				\
 	__section(.apicdrivers) = { &sym1, &sym2 }
 
+/*
+ * 这两个值之间的对象，通过宏apic_driver, apic_drivers来设置
+ * 看链接脚本中的 .apicdrivers
+ *
+ * apic_driver(apic_numachip1)
+ * apic_driver(apic_numachip2)
+ * apic_driver(apic_bigsmp)
+ * apic_driver(apic_default)
+ * apic_driver(apic_x2apic_cluster)
+ * apic_driver(apic_x2apic_uv_x)
+ * 4.19默认配置是这个?
+ * apic_driver(apic_x2apic_phys)
+ *
+ * apic_drivers(apic_physflat, apic_flat)
+ */
 extern struct apic *__apicdrivers[], *__apicdrivers_end[];
 
 /*

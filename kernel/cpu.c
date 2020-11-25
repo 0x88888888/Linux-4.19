@@ -145,7 +145,7 @@ static struct cpuhp_step *cpuhp_get_step(enum cpuhp_state state)
  *    kernel_init()
  *     kernel_init_freeable()
  *      smp_init()
- *       cpu_up()
+ *       cpu_up() 启动cpuid为cpu的CPU
  *        do_cpu_up()
  *         _cpu_up()
  *          cpuhp_up_callbacks()
@@ -542,7 +542,7 @@ static int bringup_wait_for_ap(unsigned int cpu)
  *    kernel_init()
  *     kernel_init_freeable()
  *      smp_init()
- *       cpu_up()
+ *       cpu_up() 启动cpuid为cpu的CPU
  *        do_cpu_up()
  *         _cpu_up()
  *          cpuhp_up_callbacks()
@@ -586,7 +586,7 @@ static void undo_cpu_up(unsigned int cpu, struct cpuhp_cpu_state *st)
  *    kernel_init()
  *     kernel_init_freeable()
  *      smp_init()
- *       cpu_up()
+ *       cpu_up() 启动cpuid为cpu的CPU
  *        do_cpu_up()
  *         _cpu_up()
  *          cpuhp_up_callbacks()
@@ -1102,7 +1102,7 @@ void cpuhp_online_idle(enum cpuhp_state state)
  *    kernel_init()
  *     kernel_init_freeable()
  *      smp_init()
- *       cpu_up()
+ *       cpu_up() 启动cpuid为cpu的CPU
  *        do_cpu_up()
  *         _cpu_up()
  */
@@ -1172,8 +1172,8 @@ out:
  *   ......
  *    kernel_init()
  *     kernel_init_freeable()
- *      smp_init()
- *       cpu_up()
+ *      smp_init() 
+ *       cpu_up() 启动cpuid为cpu的CPU
  *        do_cpu_up()
  */
 static int do_cpu_up(unsigned int cpu, enum cpuhp_state target)
@@ -1218,6 +1218,7 @@ out:
  *     kernel_init_freeable()
  *      smp_init()
  *       cpu_up()
+ * 启动cpuid为cpu的CPU
  */
 int cpu_up(unsigned int cpu)
 {

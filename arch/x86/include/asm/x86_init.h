@@ -296,6 +296,7 @@ struct x86_apic_ops {
 extern struct x86_init_ops x86_init;
 
 extern struct x86_cpuinit_ops x86_cpuinit;
+//在arch/x86/kernel/x86_init.c 中定义
 extern struct x86_platform_ops x86_platform;
 extern struct x86_msi_ops x86_msi;
 extern struct x86_apic_ops x86_apic_ops;

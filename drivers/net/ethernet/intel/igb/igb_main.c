@@ -941,6 +941,10 @@ static void igb_configure_msix(struct igb_adapter *adapter)
  *
  *  igb_request_msix allocates MSI-X vectors and requests interrupts from the
  *  kernel.
+ *
+ * __igb_open()
+ *  igb_request_irq()
+ *   igb_request_msix()
  **/
 static int igb_request_msix(struct igb_adapter *adapter)
 {
@@ -975,6 +979,7 @@ static int igb_request_msix(struct igb_adapter *adapter)
 		err = request_irq(adapter->msix_entries[vector].vector,
 				  igb_msix_ring, 0, q_vector->name,
 				  q_vector);
+		
 		if (err)
 			goto err_free;
 	}

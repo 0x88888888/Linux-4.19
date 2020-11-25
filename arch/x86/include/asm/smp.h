@@ -86,8 +86,17 @@ static inline void smp_prepare_boot_cpu(void)
 	smp_ops.smp_prepare_boot_cpu();
 }
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      smp_prepare_cpus()
+ */
 static inline void smp_prepare_cpus(unsigned int max_cpus)
 {
+    //native_smp_prepare_cpus
 	smp_ops.smp_prepare_cpus(max_cpus);
 }
 
@@ -103,7 +112,7 @@ static inline void smp_cpus_done(unsigned int max_cpus)
  *    kernel_init()
  *     kernel_init_freeable()
  *      smp_init()
- *       cpu_up()
+ *       cpu_up() 启动cpuid为cpu的CPU
  *        do_cpu_up()
  *         _cpu_up()
  *          cpuhp_up_callbacks()
@@ -149,6 +158,7 @@ static inline void arch_send_call_function_single_ipi(int cpu)
  */
 static inline void arch_send_call_function_ipi_mask(const struct cpumask *mask)
 {
+    //native_send_call_func_ipi
 	smp_ops.send_call_func_ipi(mask);
 }
 

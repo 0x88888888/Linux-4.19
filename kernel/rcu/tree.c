@@ -112,7 +112,7 @@ RCU_STATE_INITIALIZER(rcu_bh, 'b', call_rcu_bh);
 
 static struct rcu_state *const rcu_state_p;
 /*
- * 链表中有三个rcu_bh_state,rcu_sched_state,rcu_state_p对象
+ * 链表中有三个rcu_bh_state,rcu_sched_state,rcu_state_p全局对象
  */
 LIST_HEAD(rcu_struct_flavors);
 
@@ -552,6 +552,7 @@ static int param_set_first_fqs_jiffies(const char *val, const struct kernel_para
 
 	if (!ret)
 		WRITE_ONCE(*(ulong *)kp->arg, (j > HZ) ? HZ : j);
+	
 	return ret;
 }
 
@@ -1111,6 +1112,7 @@ void rcu_request_urgent_qs_task(struct task_struct *t)
 
 	barrier();
 	cpu = task_cpu(t);
+	
 	if (!task_curr(t))
 		return; /* This task is not running on that CPU. */
 	smp_store_release(per_cpu_ptr(&rcu_dynticks.rcu_urgent_qs, cpu), true);
@@ -1143,6 +1145,7 @@ bool rcu_lockdep_current_cpu_online(void)
 
 	if (in_nmi() || !rcu_scheduler_fully_active)
 		return true;
+	
 	preempt_disable();
 
 	//rcu_bh_state,rcu_sched_state,rcu_state_p三个对象
@@ -1412,10 +1415,12 @@ static void rcu_dump_cpu_stacks(struct rcu_state *rsp)
 
 	rcu_for_each_leaf_node(rsp, rnp) {
 		raw_spin_lock_irqsave_rcu_node(rnp, flags);
+		
 		for_each_leaf_node_possible_cpu(rnp, cpu)
 			if (rnp->qsmask & leaf_node_cpu_bit(rnp, cpu))
 				if (!trigger_single_cpu_backtrace(cpu))
 					dump_cpu_task(cpu);
+				
 		raw_spin_unlock_irqrestore_rcu_node(rnp, flags);
 	}
 }

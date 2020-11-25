@@ -20,7 +20,10 @@
 
 #include "tick-internal.h"
 
-/* The registered clock event devices */
+/* The registered clock event devices 
+ *
+ * lapic_clockevent,
+ */
 static LIST_HEAD(clockevent_devices);
 static LIST_HEAD(clockevents_released);
 /* Protection for the above */
@@ -450,6 +453,17 @@ EXPORT_SYMBOL_GPL(clockevents_unbind_device);
 /**
  * clockevents_register_device - register a clock event device
  * @dev:	device to register
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      smp_prepare_cpus()
+ *       native_smp_prepare_cpus()
+ *        setup_boot_APIC_clock()
+ *         setup_APIC_timer()
+ *          clockevents_register_device(dev == lapic_clockevent)
  */
 void clockevents_register_device(struct clock_event_device *dev)
 {

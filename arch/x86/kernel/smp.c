@@ -138,6 +138,12 @@ void native_send_call_func_single_ipi(int cpu)
 	apic->send_IPI(cpu, CALL_FUNCTION_SINGLE_VECTOR);
 }
 
+/*
+ * smp_call_function()
+ *  smp_call_function_many()
+ *   arch_send_call_function_ipi_mask()
+ *    native_send_call_func_ipi()
+ */
 void native_send_call_func_ipi(const struct cpumask *mask)
 {
 	cpumask_var_t allbutself;

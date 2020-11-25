@@ -413,8 +413,14 @@ EXPORT_SYMBOL_GPL(smp_call_function_any);
  * hardware interrupt handler or from a bottom half handler. Preemption
  * must be disabled when calling this function.
  *
- * smp_call_function()
- *  smp_call_function_many()
+ * update_ftrace_function()
+ *  smp_call_function( func==ftrace_sync_ipi, NULL, 1); 
+ *   smp_call_function_many(,  func==ftrace_sync_ipi, NULL, 1)
+ *
+ * ftrace_modify_all_code()
+ *  smp_call_function( func=ftrace_sync_ipi, NULL, 1);
+ *   smp_call_function_many(,  func==ftrace_sync_ipi, NULL, 1)
+ * 
  */
 void smp_call_function_many(const struct cpumask *mask,
 			    smp_call_func_t func, void *info, bool wait)
@@ -462,6 +468,7 @@ void smp_call_function_many(const struct cpumask *mask,
 
 	cpumask_clear(cfd->cpumask_ipi);
 	for_each_cpu(cpu, cfd->cpumask) {
+		//注意:per cpu变量哦
 		call_single_data_t *csd = per_cpu_ptr(cfd->csd, cpu);
 
 		csd_lock(csd);
@@ -502,6 +509,24 @@ EXPORT_SYMBOL(smp_call_function_many);
  *
  * You must not call this function with disabled interrupts or from a
  * hardware interrupt handler or from a bottom half handler.
+ *
+ * update_ftrace_function()
+ *   smp_call_function( func==ftrace_sync_ipi, NULL, 1); 
+ *
+ * ftrace_modify_all_code()
+ *  smp_call_function( func=ftrace_sync_ipi, NULL, 1);
+ *
+ * tlb_remove_table_one()
+ *  smp_call_function( func=tlb_remove_table_smp_sync, NULL, 1);
+ *
+ * rb_hammer_test()
+ *  smp_call_function( func=rb_ipi, NULL, 1);
+ *
+ * on_each_cpu(func==..)
+ *  smp_call_function(func==..)
+ *
+ * kick_all_cpus_sync()
+ *  smp_call_function(do_nothing, NULL, 1)
  */
 int smp_call_function(smp_call_func_t func, void *info, int wait)
 {

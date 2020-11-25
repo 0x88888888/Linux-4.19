@@ -169,6 +169,8 @@ static void smp_callin(void)
 	 * on callin_map until we finish. We are free to set up this
 	 * CPU, first the APIC. (this is probably redundant on most
 	 * boards)
+	 *
+	 * 设置local apic
 	 */
 	apic_ap_setup();
 
@@ -208,6 +210,8 @@ static int cpu0_logical_apicid;
 static int enable_start_cpu0;
 /*
  * Activate a secondary processor.
+ *
+ * 启动bsp之外的cpu
  */
 static void notrace start_secondary(void *unused)
 {
@@ -233,6 +237,9 @@ static void notrace start_secondary(void *unused)
 	cpu_init();
 	x86_cpuinit.early_percpu_clock_init();
 	preempt_disable();
+	/*
+	 * 启动local apic 之类的工作
+	 */
 	smp_callin();
 
 	enable_start_cpu0 = 0;
@@ -1005,7 +1012,7 @@ void common_cpu_up(unsigned int cpu, struct task_struct *idle)
  *    kernel_init()
  * 	   kernel_init_freeable()
  * 	    smp_init()
- * 	     cpu_up()
+ * 	     cpu_up()  启动cpuid为cpu的CPU
  * 	      do_cpu_up()
  * 		   _cpu_up()
  * 		    cpuhp_up_callbacks()
@@ -1014,6 +1021,8 @@ void common_cpu_up(unsigned int cpu, struct task_struct *idle)
  * 			   __cpu_up()
  * 			    native_cpu_up()
  *               do_boot_cpu()
+ *
+ * 启动cpu id为cpu的cpu
  */
 static int do_boot_cpu(int apicid, int cpu, struct task_struct *idle,
 		       int *cpu0_nmi_registered)
@@ -1028,6 +1037,8 @@ static int do_boot_cpu(int apicid, int cpu, struct task_struct *idle,
 
 	idle->thread.sp = (unsigned long)task_pt_regs(idle);
 	early_gdt_descr.address = (unsigned long)get_cpu_gdt_rw(cpu);
+
+	//启动 ap cpu
 	initial_code = (unsigned long)start_secondary;
 	initial_stack  = idle->thread.sp;
 
@@ -1135,7 +1146,7 @@ static int do_boot_cpu(int apicid, int cpu, struct task_struct *idle,
  *    kernel_init()
  *     kernel_init_freeable()
  *      smp_init()
- *       cpu_up()
+ *       cpu_up()  启动cpuid为cpu的CPU
  *        do_cpu_up()
  *         _cpu_up()
  *          cpuhp_up_callbacks()
@@ -1146,6 +1157,7 @@ static int do_boot_cpu(int apicid, int cpu, struct task_struct *idle,
  */
 int native_cpu_up(unsigned int cpu, struct task_struct *tidle)
 {
+    //cpu对应的apic id
 	int apicid = apic->cpu_present_to_apicid(cpu);
 	int cpu0_nmi_registered = 0;
 	unsigned long flags;
@@ -1323,6 +1335,17 @@ static void __init smp_get_logical_apicid(void)
  * Prepare for SMP bootup.
  * @max_cpus: configured maximum number of CPUs, It is a legacy parameter
  *            for common interface support.
+ *
+ * kvm_smp_prepare_cpus()
+ *  native_smp_prepare_cpus()
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      smp_prepare_cpus()
+ *       native_smp_prepare_cpus()
  */
 void __init native_smp_prepare_cpus(unsigned int max_cpus)
 {
@@ -1356,6 +1379,7 @@ void __init native_smp_prepare_cpus(unsigned int max_cpus)
 
 	smp_sanity_check();
 
+    //开始设置apic了
 	switch (apic_intr_mode) {
 	case APIC_PIC:
 	case APIC_VIRTUAL_WIRE_NO_CONFIG:
@@ -1371,9 +1395,13 @@ void __init native_smp_prepare_cpus(unsigned int max_cpus)
 		break;
 	}
 
-	/* Setup local timer */
+	/* Setup local timer 
+	 * 
+	 * setup_boot_APIC_clock()
+	 */
 	x86_init.timers.setup_percpu_clockev();
 
+    //cpu0的apic id
 	smp_get_logical_apicid();
 
 	pr_info("CPU0: ");

@@ -26,6 +26,7 @@
  * sg element.
  */
 struct virtqueue {
+    //链接virtqueue
 	struct list_head list;
 	void (*callback)(struct virtqueue *vq);
 	const char *name;

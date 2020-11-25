@@ -1041,6 +1041,16 @@ static int alloc_isa_irq_from_domain(struct irq_domain *domain,
 	return irq;
 }
 
+/*
+ * start_kernel()	[init/main.c]
+ *  x86_late_time_init()
+ *   apic_intr_mode_init()
+ *    apic_bsp_setup()
+ * 	   setup_IO_APIC()
+ *      setup_IO_APIC_irqs()
+ * 	     pin_2_irq( ,flags==ioapic ? 0 : IOAPIC_MAP_ALLOC)
+ *        mp_map_pin_to_irq(...... , flags==ioapic ? 0 : IOAPIC_MAP_ALLOC)
+ */
 static int mp_map_pin_to_irq(u32 gsi, int idx, int ioapic, int pin,
 			     unsigned int flags, struct irq_alloc_info *info)
 {
@@ -1059,6 +1069,7 @@ static int mp_map_pin_to_irq(u32 gsi, int idx, int ioapic, int pin,
 	}
 
 	mutex_lock(&ioapic_mutex);
+	
 	if (!(flags & IOAPIC_MAP_ALLOC)) {
 		if (!legacy) {
 			irq = irq_find_mapping(domain, pin);
@@ -1084,6 +1095,15 @@ static int mp_map_pin_to_irq(u32 gsi, int idx, int ioapic, int pin,
 	return irq;
 }
 
+ /*
+  * start_kernel()	[init/main.c]
+  *  x86_late_time_init()
+  *   apic_intr_mode_init()
+  *    apic_bsp_setup()
+  * 	setup_IO_APIC()
+  * 	 setup_IO_APIC_irqs()
+  *       pin_2_irq( ,flags==ioapic ? 0 : IOAPIC_MAP_ALLOC)
+  */
 static int pin_2_irq(int idx, int ioapic, int pin, unsigned int flags)
 {
 	u32 gsi = mp_pin_to_gsi(ioapic, pin);
@@ -1216,6 +1236,14 @@ EXPORT_SYMBOL(IO_APIC_get_PCI_irq_vector);
 
 static struct irq_chip ioapic_chip, ioapic_ir_chip;
 
+/*
+ * start_kernel()  [init/main.c]
+ *  x86_late_time_init()
+ *   apic_intr_mode_init()
+ *    apic_bsp_setup()
+ *     setup_IO_APIC()
+ *      setup_IO_APIC_irqs()
+ */
 static void __init setup_IO_APIC_irqs(void)
 {
 	unsigned int ioapic, pin;
@@ -1223,8 +1251,14 @@ static void __init setup_IO_APIC_irqs(void)
 
 	apic_printk(APIC_VERBOSE, KERN_DEBUG "init IO_APIC IRQs\n");
 
+    /*
+     * ioapic 表示io_apic 的id
+     *
+     * pin表示ioapics[idx].nr_registers 的数值遍历
+     */
 	for_each_ioapic_pin(ioapic, pin) {
 		idx = find_irq_entry(ioapic, pin, mp_INT);
+		// 小于0，说明错误了
 		if (idx < 0)
 			apic_printk(APIC_VERBOSE,
 				    KERN_DEBUG " apic %d pin %d not connected\n",
@@ -1233,6 +1267,7 @@ static void __init setup_IO_APIC_irqs(void)
 			pin_2_irq(idx, ioapic, pin,
 				  ioapic ? 0 : IOAPIC_MAP_ALLOC);
 	}
+	
 }
 
 void ioapic_zap_locks(void)
@@ -1373,6 +1408,13 @@ void __init print_IO_APICs(void)
 /* Where if anywhere is the i8259 connect in external int mode */
 static struct { int pin, apic; } ioapic_i8259 = { -1, -1 };
 
+/*
+ * start_kernel()  [init/main.c]
+ *  x86_late_time_init()
+ *   apic_intr_mode_init()
+ *    apic_bsp_setup()
+ *     enable_IO_APIC()
+ */
 void __init enable_IO_APIC(void)
 {
 	int i8259_apic, i8259_pin;
@@ -1928,6 +1970,14 @@ static struct irq_chip ioapic_ir_chip __read_mostly = {
 	.flags			= IRQCHIP_SKIP_SET_WAKE,
 };
 
+/*
+ * start_kernel()  [init/main.c]
+ *  x86_late_time_init()
+ *   apic_intr_mode_init()
+ *    apic_bsp_setup()
+ *     setup_IO_APIC()
+ *      init_IO_APIC_traps()
+ */
 static inline void init_IO_APIC_traps(void)
 {
 	struct irq_cfg *cfg;
@@ -2312,6 +2362,13 @@ static void ioapic_destroy_irqdomain(int idx)
 	}
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  x86_late_time_init()
+ *   apic_intr_mode_init()
+ *    apic_bsp_setup()
+ *     setup_IO_APIC()
+ */
 void __init setup_IO_APIC(void)
 {
 	int ioapic;
@@ -2326,8 +2383,8 @@ void __init setup_IO_APIC(void)
 		BUG_ON(mp_irqdomain_create(ioapic));
 
 	/*
-         * Set up IO-APIC IRQ routing.
-         */
+     * Set up IO-APIC IRQ routing.
+     */
 	x86_init.mpparse.setup_ioapic_ids();
 
 	sync_Arb_IDs();

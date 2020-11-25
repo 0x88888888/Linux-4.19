@@ -24,6 +24,11 @@
 
 /*
  * Check the APIC IDs in bios_cpu_apicid and choose the APIC mode.
+ *
+ * start_kernel()  [init/main.c]
+ *  x86_late_time_init()
+ *   apic_intr_mode_init()
+ *    default_setup_apic_routing()
  */
 void __init default_setup_apic_routing(void)
 {
@@ -31,6 +36,9 @@ void __init default_setup_apic_routing(void)
 
 	enable_IR_x2apic();
 
+    /*
+     * 
+     */
 	for (drv = __apicdrivers; drv < __apicdrivers_end; drv++) {
 		if ((*drv)->probe && (*drv)->probe()) {
 			if (apic != *drv) {
@@ -42,6 +50,7 @@ void __init default_setup_apic_routing(void)
 		}
 	}
 
+    //空
 	if (x86_platform.apic_post_init)
 		x86_platform.apic_post_init();
 }

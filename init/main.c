@@ -802,7 +802,10 @@ asmlinkage __visible void __init start_kernel(void)
 	numa_policy_init();
 	acpi_early_init();
 
-	//late_time_init == x86_late_time_init
+	/*
+	 * late_time_init == x86_late_time_init
+	 * 会调用setup_local_APIC,setup_IO_APIC
+	*/
 	if (late_time_init)
 		late_time_init();
 	
@@ -1326,6 +1329,10 @@ static noinline void __init kernel_init_freeable(void)
 
 	cad_pid = task_pid(current);
 
+    /*
+     * 重要
+     * x86/include/asm/smp.h中
+     */
 	smp_prepare_cpus(setup_max_cpus);
 
 	workqueue_init();

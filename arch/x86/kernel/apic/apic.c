@@ -161,6 +161,7 @@ early_param("lapic", parse_lapic);
 
 #ifdef CONFIG_X86_64
 static int apic_calibrate_pmtmr __initdata;
+//内核引导参数apicpmtimer解析
 static __init int setup_apicpmtimer(char *s)
 {
 	apic_calibrate_pmtmr = 1;
@@ -635,6 +636,16 @@ static void apic_check_deadline_errata(void)
 /*
  * Setup the local APIC timer for this CPU. Copy the initialized values
  * of the boot CPU and register the clock event in the framework.
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      smp_prepare_cpus()
+ *       native_smp_prepare_cpus()
+ *        setup_boot_APIC_clock()
+ *         setup_APIC_timer()
  */
 static void setup_APIC_timer(void)
 {
@@ -951,6 +962,15 @@ static int __init calibrate_APIC_clock(void)
  * Setup the boot APIC
  *
  * Calibrate and verify the result.
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      smp_prepare_cpus()
+ *       native_smp_prepare_cpus()
+ *        setup_boot_APIC_clock()
  */
 void __init setup_boot_APIC_clock(void)
 {
@@ -1214,6 +1234,13 @@ void lapic_shutdown(void)
 
 /**
  * sync_Arb_IDs - synchronize APIC bus arbitration IDs
+ *
+ * start_kernel()  [init/main.c]
+ *  x86_late_time_init()
+ *   apic_intr_mode_init()
+ *    apic_bsp_setup()
+ *     setup_IO_APIC()
+ *      sync_Arb_IDs()
  */
 void __init sync_Arb_IDs(void)
 {
@@ -1358,6 +1385,9 @@ void __init apic_intr_mode_init(void)
 {
 	bool upmode = IS_ENABLED(CONFIG_UP_LATE_INIT);
 
+    /*
+     *  APIC处理中断的模式 PIC, MSI,MSI-X几种
+     */
 	apic_intr_mode = apic_intr_mode_select();
 
 	switch (apic_intr_mode) {
@@ -1480,6 +1510,12 @@ static void apic_pending_intr_clear(void)
  *
  * Used to setup local APIC while initializing BSP or bringing up APs.
  * Always called with preemption disabled.
+ *
+ * start_kernel()  [init/main.c]
+ *  x86_late_time_init()
+ *   apic_intr_mode_init()
+ *    apic_bsp_setup()
+ *     setup_local_APIC()
  */
 static void setup_local_APIC(void)
 {
@@ -1490,6 +1526,7 @@ static void setup_local_APIC(void)
 #endif
 
 
+    //不是用APIC，不太可能了
 	if (disable_apic) {
 		disable_ioapic_support();
 		return;
@@ -1504,6 +1541,7 @@ static void setup_local_APIC(void)
 		apic_write(APIC_ESR, 0);
 	}
 #endif
+
 	perf_events_lapic_init();
 
 	/*
@@ -1516,6 +1554,8 @@ static void setup_local_APIC(void)
 	 * Intel recommends to set DFR, LDR and TPR before enabling
 	 * an APIC.  See e.g. "AP-388 82489DX User's Manual" (Intel
 	 * document number 292116).  So here it goes...
+	 *
+	 * 
 	 */
 	apic->init_apic_ldr();
 
@@ -1535,6 +1575,8 @@ static void setup_local_APIC(void)
 	/*
 	 * Set Task Priority to 'accept all'. We never change this
 	 * later on.
+	 *
+	 * 在APIC设置cpu的优先级为0，要能够接收所有的中断
 	 */
 	value = apic_read(APIC_TASKPRI);
 	value &= ~APIC_TPRI_MASK;
@@ -1628,6 +1670,13 @@ static void setup_local_APIC(void)
 #endif
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  x86_late_time_init()
+ *   apic_intr_mode_init()
+ *    apic_bsp_setup()
+ *     end_local_APIC_setup()
+ */
 static void end_local_APIC_setup(void)
 {
 	lapic_setup_esr();
@@ -2105,16 +2154,24 @@ __visible void __irq_entry smp_error_interrupt(struct pt_regs *regs)
 
 /**
  * connect_bsp_APIC - attach the APIC to the interrupt system
+ *
+ * start_kernel()  [init/main.c]
+ *  x86_late_time_init()
+ *   apic_intr_mode_init()
+ *    apic_bsp_setup()
+ *     connect_bsp_APIC()
  */
 static void __init connect_bsp_APIC(void)
 {
 #ifdef CONFIG_X86_32
 	if (pic_mode) {
 		/*
+		 *
 		 * Do not trust the local APIC being empty at bootup.
 		 */
 		clear_local_APIC();
 		/*
+         * 通过IMCR 切换入 APIC 模式
 		 * PIC mode, enable APIC mode in the IMCR, i.e.  connect BSP's
 		 * local APIC to INT and NMI lines.
 		 */
@@ -2395,6 +2452,13 @@ void __init apic_set_eoi_write(void (*eoi_write)(u32 reg, u32 v))
 	}
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  x86_late_time_init()
+ *   apic_intr_mode_init()
+ *    apic_bsp_setup()
+ *     apic_bsp_up_setup()
+ */
 static void __init apic_bsp_up_setup(void)
 {
 #ifdef CONFIG_X86_64
@@ -2418,17 +2482,25 @@ static void __init apic_bsp_up_setup(void)
  *
  * Returns:
  * apic_id of BSP APIC
+ *
+ * start_kernel()  [init/main.c]
+ *  x86_late_time_init()
+ *   apic_intr_mode_init()
+ *    apic_bsp_setup()
  */
 void __init apic_bsp_setup(bool upmode)
 {
 	connect_bsp_APIC();
 	if (upmode)
 		apic_bsp_up_setup();
+	
 	setup_local_APIC();
 
 	enable_IO_APIC();
 	end_local_APIC_setup();
 	irq_remap_enable_fault_handling();
+
+	//
 	setup_IO_APIC();
 }
 
