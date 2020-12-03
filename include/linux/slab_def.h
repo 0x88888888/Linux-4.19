@@ -24,7 +24,11 @@ struct kmem_cache {
 	unsigned int num;		/* # of objs per slab */
 
 /* 3) cache_grow/shrink */
-	/* order of pgs per slab (2^n) */
+	/* order of pgs per slab (2^n) 
+	 *
+	 * slab需要的page的order
+	 * 在calculate_slab_order()中计算
+	*/
 	unsigned int gfporder;
 
 	/* force GFP flags, e.g. GFP_DMA */

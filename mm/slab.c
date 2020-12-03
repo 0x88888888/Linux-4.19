@@ -1757,6 +1757,9 @@ static void slabs_destroy(struct kmem_cache *cachep, struct list_head *list)
  * This could be made much more intelligent.  For now, try to avoid using
  * high order pages for slabs.  When the gfp() functions are more friendly
  * towards high-order requests, this should be changed.
+ *
+ * 这个函数计算kmem_cache中slab对象需要的page的order，
+ * 也计算slab中所有page可以分配obj的个数
  */
 static size_t calculate_slab_order(struct kmem_cache *cachep,
 				size_t size, slab_flags_t flags)
@@ -1799,6 +1802,7 @@ static size_t calculate_slab_order(struct kmem_cache *cachep,
 
 		/* Found something acceptable - save it away */
 		cachep->num = num;
+		//slab需要的page的order
 		cachep->gfporder = gfporder;
 		left_over = remainder;
 
@@ -1893,6 +1897,11 @@ slab_flags_t kmem_cache_flags(unsigned int object_size,
 	return flags;
 }
 
+/*
+ * kmem_cache_create()
+ *  kmem_cache_create_usercopy()
+ *   __kmem_cache_alias()
+ */
 struct kmem_cache *
 __kmem_cache_alias(const char *name, unsigned int size, unsigned int align,
 		   slab_flags_t flags, void (*ctor)(void *))
@@ -1900,7 +1909,7 @@ __kmem_cache_alias(const char *name, unsigned int size, unsigned int align,
 	struct kmem_cache *cachep;
 
 	cachep = find_mergeable(size, align, flags, name, ctor);
-	if (cachep) {
+	if (cachep) { //调整cachep->object_size
 		cachep->refcount++;
 
 		/*
@@ -2005,6 +2014,11 @@ static bool set_on_slab_cache(struct kmem_cache *cachep,
  * %SLAB_HWCACHE_ALIGN - Align the objects in this cache to a hardware
  * cacheline.  This can be beneficial if you're counting cycles as closely
  * as davem.
+ *
+ * kmem_cache_create()
+ *  kmem_cache_create_usercopy()
+ *   create_cache()
+ *    __kmem_cache_create()
  */
 int __kmem_cache_create(struct kmem_cache *cachep, slab_flags_t flags)
 {
@@ -2141,8 +2155,10 @@ done:
 	cachep->allocflags = __GFP_COMP;
 	if (flags & SLAB_CACHE_DMA)
 		cachep->allocflags |= GFP_DMA;
+	
 	if (flags & SLAB_RECLAIM_ACCOUNT)
 		cachep->allocflags |= __GFP_RECLAIMABLE;
+	
 	cachep->size = size;
 	cachep->reciprocal_buffer_size = reciprocal_value(size);
 
@@ -3415,6 +3431,12 @@ slab_alloc(struct kmem_cache *cachep, gfp_t flags, unsigned long caller)
 /*
  * Caller needs to acquire correct kmem_cache_node's list_lock
  * @list: List of detached free slabs should be freed by caller
+ *
+ * kmem_cache_free()
+ *	___cache_free()
+ *	 ___cache_free()
+ *    cache_flusharray()
+ *     free_block()
  */
 static void free_block(struct kmem_cache *cachep, void **objpp,
 			int nr_objects, int node, struct list_head *list)
@@ -3460,6 +3482,12 @@ static void free_block(struct kmem_cache *cachep, void **objpp,
 	}
 }
 
+/*
+ * kmem_cache_free()
+ *	___cache_free()
+ *	 ___cache_free()
+ *    cache_flusharray()
+ */
 static void cache_flusharray(struct kmem_cache *cachep, struct array_cache *ac)
 {
 	int batchcount;
@@ -3509,6 +3537,9 @@ free_done:
 /*
  * Release an obj back to its cache. If the obj has a constructed state, it must
  * be in this state _before_ it is released.  Called with disabled ints.
+ *
+ * kmem_cache_free()
+ *  ___cache_free()
  */
 static __always_inline void __cache_free(struct kmem_cache *cachep, void *objp,
 					 unsigned long caller)
@@ -3520,6 +3551,11 @@ static __always_inline void __cache_free(struct kmem_cache *cachep, void *objp,
 	___cache_free(cachep, objp, caller);
 }
 
+/*
+ * kmem_cache_free()
+ *  ___cache_free()
+ *   ___cache_free()
+ */
 void ___cache_free(struct kmem_cache *cachep, void *objp,
 		unsigned long caller)
 {
@@ -3565,11 +3601,18 @@ void ___cache_free(struct kmem_cache *cachep, void *objp,
  *
  * Allocate an object from this cache.  The flags are only relevant
  * if the cache has no available objects.
+ *
+ * kmem_cache_create()
+ *  kmem_cache_create_usercopy()
+ *   create_cache()
+ *    kmem_cache_zalloc()
+ *     kmem_cache_alloc()
  */
 void *kmem_cache_alloc(struct kmem_cache *cachep, gfp_t flags)
 {
 	void *ret = slab_alloc(cachep, flags, _RET_IP_);
 
+    // 创建kmem_cache上的slab对象
 	kasan_slab_alloc(cachep, ret, flags);
 	trace_kmem_cache_alloc(_RET_IP_, ret,
 			       cachep->object_size, cachep->size, flags);
@@ -3772,6 +3815,7 @@ void kmem_cache_free(struct kmem_cache *cachep, void *objp)
 	debug_check_no_locks_freed(objp, cachep->object_size);
 	if (!(cachep->flags & SLAB_DEBUG_OBJECTS))
 		debug_check_no_obj_freed(objp, cachep->object_size);
+	
 	__cache_free(cachep, objp, _RET_IP_);
 	local_irq_restore(flags);
 

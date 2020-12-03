@@ -1951,6 +1951,13 @@ static const struct tcp_sock_af_ops tcp_sock_ipv4_specific = {
 
 /* NOTE: A lot of things set to zero explicitly by call to
  *       sk_alloc() so need not be done here.
+ *
+ * SYSCALL_DEFINE3(socket)
+ *  __sys_socket()
+ *   sock_create()
+ *    __sock_create()
+ *     inet_create()
+ *      tcp_v4_init_sock()
  */
 static int tcp_v4_init_sock(struct sock *sk)
 {

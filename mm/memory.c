@@ -2075,6 +2075,8 @@ static inline int remap_p4d_range(struct mm_struct *mm, pgd_t *pgd,
  * @prot: page protection flags for this mapping
  *
  *  Note: this is only safe if the mm semaphore is held when called.
+ *
+ * 映射内核的page到用户空间
  */
 int remap_pfn_range(struct vm_area_struct *vma, unsigned long addr,
 		    unsigned long pfn, unsigned long size, pgprot_t prot)

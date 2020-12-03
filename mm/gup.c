@@ -70,6 +70,17 @@ static inline bool can_follow_write_pte(pte_t pte, unsigned int flags)
 		((flags & FOLL_FORCE) && (flags & FOLL_COW) && pte_dirty(pte));
 }
 
+/*
+ * mm_populate()
+ *  __mm_populate()
+ *   populate_vma_page_range()
+ *    __get_user_pages()
+ *     follow_page_mask()
+ *      follow_p4d_mask()
+ *       follow_pud_mask()
+ *        follow_pmd_mask()
+ *         follow_page_pte()
+ */
 static struct page *follow_page_pte(struct vm_area_struct *vma,
 		unsigned long address, pmd_t *pmd, unsigned int flags)
 {
@@ -85,6 +96,7 @@ retry:
 
 	ptep = pte_offset_map_lock(mm, pmd, address, &ptl);
 	pte = *ptep;
+	//已经换出了
 	if (!pte_present(pte)) {
 		swp_entry_t entry;
 		/*
@@ -208,6 +220,16 @@ no_page:
 	return no_page_table(vma, flags);
 }
 
+/*
+ * mm_populate()
+ *  __mm_populate()
+ *   populate_vma_page_range()
+ *    __get_user_pages()
+ *     follow_page_mask()
+ *      follow_p4d_mask()
+ *       follow_pud_mask()
+ *        follow_pmd_mask()
+ */
 static struct page *follow_pmd_mask(struct vm_area_struct *vma,
 				    unsigned long address, pud_t *pudp,
 				    unsigned int flags, unsigned int *page_mask)
@@ -315,7 +337,15 @@ retry_locked:
 	return page;
 }
 
-
+/*
+ * mm_populate()
+ *  __mm_populate()
+ *   populate_vma_page_range()
+ *    __get_user_pages()
+ *     follow_page_mask()
+ *      follow_p4d_mask()
+ *       follow_pud_mask()
+ */
 static struct page *follow_pud_mask(struct vm_area_struct *vma,
 				    unsigned long address, p4d_t *p4dp,
 				    unsigned int flags, unsigned int *page_mask)
@@ -355,7 +385,14 @@ static struct page *follow_pud_mask(struct vm_area_struct *vma,
 	return follow_pmd_mask(vma, address, pud, flags, page_mask);
 }
 
-
+/*
+ * mm_populate()
+ *  __mm_populate()
+ *   populate_vma_page_range()
+ *    __get_user_pages()
+ *     follow_page_mask()
+ *      follow_p4d_mask()
+ */
 static struct page *follow_p4d_mask(struct vm_area_struct *vma,
 				    unsigned long address, pgd_t *pgdp,
 				    unsigned int flags, unsigned int *page_mask)
@@ -393,6 +430,12 @@ static struct page *follow_p4d_mask(struct vm_area_struct *vma,
  * Returns the mapped (struct page *), %NULL if no mapping exists, or
  * an error pointer if there is a mapping to something not represented
  * by a page descriptor (see also vm_normal_page()).
+ *
+ * mm_populate()
+ *  __mm_populate()
+ *   populate_vma_page_range()
+ *    __get_user_pages()
+ *     follow_page_mask()
  */
 struct page *follow_page_mask(struct vm_area_struct *vma,
 			      unsigned long address, unsigned int flags,
@@ -431,6 +474,7 @@ struct page *follow_page_mask(struct vm_area_struct *vma,
 		return no_page_table(vma, flags);
 	}
 
+    //这里
 	return follow_p4d_mask(vma, address, pgd, flags, page_mask);
 }
 
@@ -653,6 +697,11 @@ static int check_vma_flags(struct vm_area_struct *vma, unsigned long gup_flags)
  * In most cases, get_user_pages or get_user_pages_fast should be used
  * instead of __get_user_pages. __get_user_pages should be used only if
  * you need some special @gup_flags.
+ *
+ * mm_populate()
+ *  __mm_populate()
+ *   populate_vma_page_range()
+ *    __get_user_pages()
  */
 static long __get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 		unsigned long start, unsigned long nr_pages,
@@ -712,6 +761,7 @@ retry:
 		if (unlikely(fatal_signal_pending(current)))
 			return i ? i : -ERESTARTSYS;
 		cond_resched();
+		//获取一个page
 		page = follow_page_mask(vma, start, foll_flags, &page_mask);
 		if (!page) {
 			int ret;
@@ -1183,6 +1233,10 @@ EXPORT_SYMBOL(get_user_pages_longterm);
  *
  * If @nonblocking is non-NULL, it must held for read only and may be
  * released.  If it's released, *@nonblocking will be set to 0.
+ *
+ * mm_populate()
+ *  __mm_populate()
+ *   populate_vma_page_range()
  */
 long populate_vma_page_range(struct vm_area_struct *vma,
 		unsigned long start, unsigned long end, int *nonblocking)
@@ -1229,6 +1283,9 @@ long populate_vma_page_range(struct vm_area_struct *vma,
  * This is used to implement mlock() and the MAP_POPULATE / MAP_LOCKED mmap
  * flags. VMAs must be already marked with the desired vm_flags, and
  * mmap_sem must not be held.
+ *
+ * mm_populate()
+ *  __mm_populate()
  */
 int __mm_populate(unsigned long start, unsigned long len, int ignore_errors)
 {

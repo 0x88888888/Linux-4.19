@@ -250,7 +250,7 @@ EXPORT_SYMBOL(inet_listen);
  *  __sys_socket()
  *   sock_create()
  *    __sock_create()
- *     inet_create()
+ *     inet_create(net==init_net)
  */
 static int inet_create(struct net *net, struct socket *sock, int protocol,
 		       int kern)
@@ -272,6 +272,7 @@ static int inet_create(struct net *net, struct socket *sock, int protocol,
 lookup_protocol:
 	err = -ESOCKTNOSUPPORT;
 	rcu_read_lock();
+	//查找对应的inet_protosw
 	list_for_each_entry_rcu(answer, &inetsw[sock->type], list) {
 
 		err = 0;
@@ -334,6 +335,7 @@ lookup_protocol:
 	if (INET_PROTOSW_REUSE & answer_flags)
 		sk->sk_reuse = SK_CAN_REUSE;
 
+    //转成inet_sock
 	inet = inet_sk(sk);
 	inet->is_icsk = (INET_PROTOSW_ICSK & answer_flags) != 0;
 
@@ -352,6 +354,7 @@ lookup_protocol:
 
 	inet->inet_id = 0;
 
+    //设置sock的函数和成员变量
 	sock_init_data(sock, sk);
 
 	sk->sk_destruct	   = inet_sock_destruct;
@@ -384,6 +387,7 @@ lookup_protocol:
 	}
 
 	if (sk->sk_prot->init) {
+		//tcp_v4_init_sock,udp_init_sock
 		err = sk->sk_prot->init(sk);
 		if (err) {
 			sk_common_release(sk);

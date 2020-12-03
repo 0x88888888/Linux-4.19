@@ -319,6 +319,12 @@ int slab_unmergeable(struct kmem_cache *s)
 	return 0;
 }
 
+/*
+ * kmem_cache_create()
+ *  kmem_cache_create_usercopy()
+ *   __kmem_cache_alias()
+ *    find_mergeable()
+ */
 struct kmem_cache *find_mergeable(unsigned int size, unsigned int align,
 		slab_flags_t flags, const char *name, void (*ctor)(void *))
 {
@@ -366,6 +372,11 @@ struct kmem_cache *find_mergeable(unsigned int size, unsigned int align,
 	return NULL;
 }
 
+/*
+ * kmem_cache_create()
+ *  kmem_cache_create_usercopy()
+ *   create_cache()
+ */
 static struct kmem_cache *create_cache(const char *name,
 		unsigned int object_size, unsigned int align,
 		slab_flags_t flags, unsigned int useroffset,
@@ -394,6 +405,7 @@ static struct kmem_cache *create_cache(const char *name,
 	if (err)
 		goto out_free_cache;
 
+    //创建kmem_cache上的slab对象
 	err = __kmem_cache_create(s, flags);
 	if (err)
 		goto out_free_cache;
@@ -441,6 +453,9 @@ out_free_cache:
  * start_kernel()  [init/main.c]
  *  uts_ns_init()
  *   kmem_cache_create_usercopy()
+ *
+ * kmem_cache_create()
+ *  kmem_cache_create_usercopy()
  */
 struct kmem_cache *
 kmem_cache_create_usercopy(const char *name,
@@ -483,8 +498,10 @@ kmem_cache_create_usercopy(const char *name,
 	    WARN_ON(size < usersize || size - usersize < useroffset))
 		usersize = useroffset = 0;
 
+    //先查找是否有合适的kmem_cache_t对象
 	if (!usersize)
 		s = __kmem_cache_alias(name, size, align, flags, ctor);
+	
 	if (s)
 		goto out_unlock;
 

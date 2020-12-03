@@ -2313,6 +2313,10 @@ do_mmap_pgoff(struct file *file, unsigned long addr,
 #ifdef CONFIG_MMU
 extern int __mm_populate(unsigned long addr, unsigned long len,
 			 int ignore_errors);
+
+/*
+ * 给虚拟地址addr分配物理内存page
+ */
 static inline void mm_populate(unsigned long addr, unsigned long len)
 {
 	/* Ignore errors */

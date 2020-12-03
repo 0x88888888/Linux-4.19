@@ -691,6 +691,11 @@ extern void *__kmalloc_node_track_caller(size_t, gfp_t, int, unsigned long);
 
 /*
  * Shortcuts
+ *
+ * kmem_cache_create()
+ *  kmem_cache_create_usercopy()
+ *   create_cache()
+ *    kmem_cache_zalloc()
  */
 static inline void *kmem_cache_zalloc(struct kmem_cache *k, gfp_t flags)
 {

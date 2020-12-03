@@ -485,6 +485,14 @@ void kasan_init_slab_obj(struct kmem_cache *cache, const void *object)
 	__memset(alloc_info, 0, sizeof(*alloc_info));
 }
 
+/*
+ * kmem_cache_create()
+ *  kmem_cache_create_usercopy()
+ *   create_cache()
+ *    kmem_cache_zalloc()
+ *     kmem_cache_alloc()
+ *      kasan_slab_alloc()
+ */
 void kasan_slab_alloc(struct kmem_cache *cache, void *object, gfp_t flags)
 {
 	kasan_kmalloc(cache, object, cache->object_size, flags);
@@ -528,6 +536,15 @@ bool kasan_slab_free(struct kmem_cache *cache, void *object, unsigned long ip)
 	return __kasan_slab_free(cache, object, ip, true);
 }
 
+/*
+ * kmem_cache_create()
+ *  kmem_cache_create_usercopy()
+ *   create_cache()
+ *    kmem_cache_zalloc()
+ *     kmem_cache_alloc()
+ *      kasan_slab_alloc()
+ *       kasan_kmalloc()
+ */
 void kasan_kmalloc(struct kmem_cache *cache, const void *object, size_t size,
 		   gfp_t flags)
 {
