@@ -860,6 +860,16 @@ static void enqueue_huge_page(struct hstate *h, struct page *page)
 	h->free_huge_pages_node[nid]++;
 }
 
+/*
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    hugetlb_no_page()
+ *     alloc_huge_page()
+ *      dequeue_huge_page_vma()
+ *       dequeue_huge_page_nodemask()
+ *        dequeue_huge_page_node_exact()
+ */
 static struct page *dequeue_huge_page_node_exact(struct hstate *h, int nid)
 {
 	struct page *page;
@@ -880,6 +890,15 @@ static struct page *dequeue_huge_page_node_exact(struct hstate *h, int nid)
 	return page;
 }
 
+/*
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    hugetlb_no_page()
+ *     alloc_huge_page()
+ *      dequeue_huge_page_vma()
+ *       dequeue_huge_page_nodemask()
+ */
 static struct page *dequeue_huge_page_nodemask(struct hstate *h, gfp_t gfp_mask, int nid,
 		nodemask_t *nmask)
 {
@@ -925,6 +944,14 @@ static inline gfp_t htlb_alloc_mask(struct hstate *h)
 		return GFP_HIGHUSER;
 }
 
+/*
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    hugetlb_no_page()
+ *     alloc_huge_page()
+ *      dequeue_huge_page_vma()
+ */
 static struct page *dequeue_huge_page_vma(struct hstate *h,
 				struct vm_area_struct *vma,
 				unsigned long address, int avoid_reserve,
@@ -1987,6 +2014,13 @@ static void restore_reserve_on_error(struct hstate *h,
 	}
 }
 
+/*
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    hugetlb_no_page()
+ *     alloc_huge_page()
+ */
 struct page *alloc_huge_page(struct vm_area_struct *vma,
 				    unsigned long addr, int avoid_reserve)
 {
@@ -2759,6 +2793,7 @@ static int __init hugetlb_init(void)
 {
 	int i;
 
+    //是否支持X86_FEATURE_PSE
 	if (!hugepages_supported())
 		return 0;
 
@@ -3696,6 +3731,12 @@ int huge_add_to_page_cache(struct page *page, struct address_space *mapping,
 	return 0;
 }
 
+/*
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    hugetlb_no_page()
+ */
 static vm_fault_t hugetlb_no_page(struct mm_struct *mm,
 			struct vm_area_struct *vma,
 			struct address_space *mapping, pgoff_t idx,

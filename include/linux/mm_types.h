@@ -74,7 +74,10 @@ struct hmm;
  */
 struct page {
 
-    // 在enum pageflags中
+    /*
+     * 在enum pageflags中
+     * 同时也存放section编号,node节点编号,zone编号,LAST_CPUID等等
+    */
 	unsigned long flags;		/* Atomic flags, some possibly
 					 * updated asynchronously */
 	/*

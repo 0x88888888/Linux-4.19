@@ -68,28 +68,28 @@
  * SPARSEMEM_EXTREME with !SPARSEMEM_VMEMMAP).
  */
 enum pageflags {
-	PG_locked,		/* Page is locked. Don't touch. */
-	PG_error,
-	PG_referenced,
-	PG_uptodate,
-	PG_dirty,
-	PG_lru,
-	PG_active,
-	PG_waiters,		/* Page has waiters, check its waitqueue. Must be bit #7 and in the same byte as "PG_locked" */
-	PG_slab,
-	PG_owner_priv_1,	/* Owner use. If pagecache, fs may use*/
+	PG_locked,		/* page已经上锁, Page is locked. Don't touch. */
+	PG_error,       /* 表示page发生了IO错误 */
+	PG_referenced,  /* 该标志位用来实现LRU算法中的第二次机会 */
+	PG_uptodate,    /* 表示页面的内容是有效的,当该页面上的读操作完成后,设置该标志 */
+	PG_dirty,       /* 表示页面内容被修改过，为脏页 */
+	PG_lru,         /* 表示该page在LRU链表中 */
+	PG_active,      /* 表示该page在活跃LRU链表中 */
+	PG_waiters,		/* page有waiter在等待, Page has waiters, check its waitqueue. Must be bit #7 and in the same byte as "PG_locked" */
+	PG_slab,        /* 表示该page属于由slab分配器创建的slab */
+	PG_owner_priv_1,	/* 页面的所有者使用,如果是pagecache页面,文件系统可能使用。Owner use. If pagecache, fs may use*/
 	PG_arch_1,
-	PG_reserved,
-	PG_private,		/* If pagecache, has fs-private data */
+	PG_reserved,    /* 表示page不会被swap out */
+	PG_private,		/* 标记page->private是有效的数据信息， If pagecache, has fs-private data */
 	PG_private_2,		/* If pagecache, has fs aux data */
-	PG_writeback,		/* Page is under writeback */
+	PG_writeback,		/*page正在writeback. Page is under writeback */
 	PG_head,		/* A head page */
-	PG_mappedtodisk,	/* Has blocks allocated on-disk */
-	PG_reclaim,		/* To be reclaimed asap */
-	PG_swapbacked,		/* Page is backed by RAM/swap */
-	PG_unevictable,		/* Page is "unevictable"  */
+	PG_mappedtodisk,	/*在磁盘中分配了blocks, Has blocks allocated on-disk */
+	PG_reclaim,		/* 马上要回收.To be reclaimed asap */
+	PG_swapbacked,		/* 页面支持RAM/swap. Page is backed by RAM/swap */
+	PG_unevictable,		/* 页面是不可回收的.Page is "unevictable"  */
 #ifdef CONFIG_MMU
-	PG_mlocked,		/* Page is vma mlocked */
+	PG_mlocked,		/* vma处于locked状态. Page is vma mlocked */
 #endif
 #ifdef CONFIG_ARCH_USES_PG_UNCACHED
 	PG_uncached,		/* Page has been mapped as uncached */

@@ -339,6 +339,12 @@ out:
  * set, VM_FAULT_RETRY can still be returned if and only if there are
  * fatal_signal_pending()s, and the mmap_sem must be released before
  * returning it.
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    hugetlb_no_page()
+ *     handle_userfault()
  */
 vm_fault_t handle_userfault(struct vm_fault *vmf, unsigned long reason)
 {

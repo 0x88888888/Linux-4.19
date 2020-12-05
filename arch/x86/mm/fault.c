@@ -42,6 +42,11 @@ kmmio_fault(struct pt_regs *regs, unsigned long addr)
 	return 0;
 }
 
+/*
+ * do_page_fault()
+ *  __do_page_fault()
+ *   kprobes_fault()
+ */
 static nokprobe_inline int kprobes_fault(struct pt_regs *regs)
 {
 	int ret = 0;
@@ -414,6 +419,10 @@ void vmalloc_sync_all(void)
  * 64-bit:
  *
  *   Handle a fault on the vmalloc area
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   vmalloc_fault()
  */
 static noinline int vmalloc_fault(unsigned long address)
 {
