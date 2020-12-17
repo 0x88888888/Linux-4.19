@@ -289,6 +289,11 @@ void __init kasan_early_init(void)
 	kasan_map_early_shadow(init_top_pgt);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   kasan_init()
+ */
 void __init kasan_init(void)
 {
 	int i;

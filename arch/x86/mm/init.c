@@ -786,6 +786,13 @@ void free_init_pages(char *what, unsigned long begin, unsigned long end)
  * begin/end can be in the direct map or the "high kernel mapping"
  * used for the kernel image only.  free_init_pages() will do the
  * right thing for either kind of address.
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     free_initmem()
+ *      free_kernel_image_pages()
  */
 void free_kernel_image_pages(void *begin, void *end)
 {
@@ -817,6 +824,13 @@ void free_kernel_image_pages(void *begin, void *end)
 
 void __weak mem_encrypt_free_decrypted_mem(void) { }
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     free_initmem()
+ */
 void __ref free_initmem(void)
 {
 	e820__reallocate_tables();
@@ -849,6 +863,10 @@ void __init free_initrd_mem(unsigned long start, unsigned long end)
  *
  * Done on 64-bit systems only for the time being, although 32-bit systems
  * might benefit from this as well.
+ *
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   memblock_find_dma_reserve()
  */
 void __init memblock_find_dma_reserve(void)
 {

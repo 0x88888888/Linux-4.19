@@ -174,6 +174,13 @@ EXPORT_SYMBOL_GPL(rcu_expedite_gp);
  * and if the rcu_expedited sysfs/boot parameter is not set, then all
  * subsequent calls to synchronize_rcu() and friends will return to
  * their normal non-expedited behavior.
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     rcu_end_inkernel_boot()
+ *      rcu_unexpedite_gp()
  */
 void rcu_unexpedite_gp(void)
 {
@@ -183,6 +190,12 @@ EXPORT_SYMBOL_GPL(rcu_unexpedite_gp);
 
 /*
  * Inform RCU of the end of the in-kernel boot sequence.
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     rcu_end_inkernel_boot()
  */
 void rcu_end_inkernel_boot(void)
 {

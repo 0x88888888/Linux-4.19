@@ -452,6 +452,10 @@ struct vm_operations_struct {
 					  unsigned long addr);
 };
 
+/*
+ * vm_area_alloc()
+ *  vma_init()
+ */
 static inline void vma_init(struct vm_area_struct *vma, struct mm_struct *mm)
 {
 	static const struct vm_operations_struct dummy_vm_ops = {};

@@ -842,6 +842,7 @@ perf_cgroup_from_task(struct task_struct *task, struct perf_event_context *ctx)
 }
 #endif /* CONFIG_CGROUP_PERF */
 
+//有定义
 #ifdef CONFIG_PERF_EVENTS
 
 extern void *perf_aux_output_begin(struct perf_output_handle *handle,

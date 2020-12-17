@@ -955,7 +955,9 @@ struct task_struct {
 	struct blk_plug			*plug;
 #endif
 
-	/* VM state: */
+	/* VM state: 
+	 * kswapd中使用
+     */
 	struct reclaim_state		*reclaim_state;
 
 	struct backing_dev_info		*backing_dev_info;

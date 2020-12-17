@@ -44,6 +44,17 @@ static __always_inline void update_lru_size(struct lruvec *lruvec,
 #endif
 }
 
+/*
+ * add_ra_bio_pages()
+ * ext4_mpage_readpages()
+ *  add_to_page_cache_lru()
+ *   lru_cache_add()
+ *    __lru_cache_add()
+ *     __pagevec_lru_add()
+ *      pagevec_lru_move_fn( move_fn == __pagevec_lru_add_fn)
+ *       __pagevec_lru_add_fn()
+ *        add_page_to_lru_list()
+ */
 static __always_inline void add_page_to_lru_list(struct page *page,
 				struct lruvec *lruvec, enum lru_list lru)
 {
@@ -110,6 +121,8 @@ static __always_inline enum lru_list page_off_lru(struct page *page)
  *
  * Returns the LRU list a page should be on, as an index
  * into the array of LRU lists.
+ *
+ * 根据page的状态，得到待插入的LRU链表类型
  */
 static __always_inline enum lru_list page_lru(struct page *page)
 {

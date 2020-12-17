@@ -59,6 +59,11 @@ enum migratetype {
 	MIGRATE_CMA,
 #endif
 #ifdef CONFIG_MEMORY_ISOLATION
+	/* 
+	 * 不能从这个链表分配页框，
+     * 因为这个链表专门用于NUMA结点移动物理内存页，
+     * 将物理内存页移动到使用这个页最频繁的CPU 
+     */
 	MIGRATE_ISOLATE,	/* can't allocate from here */
 #endif
 	MIGRATE_TYPES
@@ -455,6 +460,7 @@ struct zone {
 	 * freepage counting problem due to racy retrieving migratetype
 	 * of pageblock. Protected by zone->lock.
 	 */
+	 /* 在内存隔离中表示隔离的页框块数量 */
 	unsigned long		nr_isolate_pageblock;
 #endif
 
@@ -468,7 +474,8 @@ struct zone {
 	/* Write-intensive fields used from the page allocator */
 	ZONE_PADDING(_pad1_)
 
-	/* free areas of different sizes */
+	/* free areas of different sizes */	
+    /* MAX_ORDER为11，分别代表包含大小为1,2,4,8,16,32,64,128,256,512,1024个连续页框的链表 */
 	struct free_area	free_area[MAX_ORDER];
 
 	/* zone flags, see below */
@@ -658,15 +665,21 @@ typedef struct pglist_data {
 	 */
 	spinlock_t node_size_lock;
 #endif
+
 	unsigned long node_start_pfn;
 	unsigned long node_present_pages; /* total number of physical pages */
 	unsigned long node_spanned_pages; /* total size of physical page
 					     range, including holes */
 	int node_id;
+    /* kswaped页换出守护进程使用的等待队列 */						 
 	wait_queue_head_t kswapd_wait;
 	wait_queue_head_t pfmemalloc_wait;
+	/* 指针指向kswapd内核线程的进程描述符 */
 	struct task_struct *kswapd;	/* Protected by
 					   mem_hotplug_begin/end() */
+	/* kswapd将要创建的空闲块大小取对数的值
+	 * 下面两个值在wakeup_kswapd()中设置
+	 */				   	
 	int kswapd_order;
 	enum zone_type kswapd_classzone_idx;
 

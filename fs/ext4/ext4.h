@@ -1494,7 +1494,11 @@ struct ext4_sb_info {
 	/* Precomputed FS UUID checksum for seeding other checksums */
 	__u32 s_csum_seed;
 
-	/* Reclaim extents from extent status tree */
+	/* Reclaim extents from extent status tree 
+	 *
+	 * ext4_sb_info->s_es_shrinker.scan_objects == ext4_es_scan
+     * ext4_sb_info->s_es_shrinker.count_objects = ext4_es_count; 
+	 */
 	struct shrinker s_es_shrinker;
 	struct list_head s_es_list;	/* List of inodes with reclaimable extents */
 	long s_es_nr_inode;

@@ -1213,6 +1213,12 @@ struct cgroup_root *cgroup_root_from_kf(struct kernfs_root *kf_root)
 	return root_cgrp->root;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  cgroup_init()
+ *   cgroup_setup_root()
+ *    cgroup_init_root_id()
+ */
 static int cgroup_init_root_id(struct cgroup_root *root)
 {
 	int id;
@@ -1892,17 +1898,21 @@ void init_cgroup_root(struct cgroup_root *root, struct cgroup_sb_opts *opts)
 	INIT_LIST_HEAD(&root->root_list);
 	atomic_set(&root->nr_cgrps, 1);
 	cgrp->root = root;
-	
+
+	//初始化cgrp->self的各种链表
 	init_cgroup_housekeeping(cgrp);
 	idr_init(&root->cgroup_idr);
 
 	root->flags = opts->flags;
 	if (opts->release_agent)
 		strscpy(root->release_agent_path, opts->release_agent, PATH_MAX);
+	
 	if (opts->name)
 		strscpy(root->name, opts->name, MAX_CGROUP_ROOT_NAMELEN);
+	
 	if (opts->cpuset_clone_children)
 		set_bit(CGRP_CPUSET_CLONE_CHILDREN, &root->cgrp.flags);
+	
 }
 
 /*

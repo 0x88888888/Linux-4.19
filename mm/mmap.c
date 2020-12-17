@@ -1210,13 +1210,22 @@ struct vm_area_struct *vma_merge(struct mm_struct *mm,
  * there is a vm_ops->close() function, because that indicates that the
  * driver is doing some kind of reference counting. But that doesn't
  * really matter for the anon_vma sharing case.
+ *
+ * anon_vma_prepare()
+ *  __anon_vma_prepare() 
+ *   find_mergeable_anon_vma()
+ *    reusable_anon_vma()
+ *     anon_vma_compatible()
+ *
+ * 两个vma连续, policy相同, 指向同样的file, 在file内的偏移是连续的
+ * vm_flags......
  */
 static int anon_vma_compatible(struct vm_area_struct *a, struct vm_area_struct *b)
 {
-	return a->vm_end == b->vm_start &&
+	return a->vm_end == b->vm_start &&()
 		mpol_equal(vma_policy(a), vma_policy(b)) &&
 		a->vm_file == b->vm_file &&
-		!((a->vm_flags ^ b->vm_flags) & ~(VM_READ|VM_WRITE|VM_EXEC|VM_SOFTDIRTY)) &&
+		!((a->vm_flags ^ b->vm_flags) & ~(VM_READ|VM_WRITE|VM_EXEC|VM_SOFTDIRTY)) && /* vm_flags除了读写属性可以不一样，其余的必须一样 */
 		b->vm_pgoff == a->vm_pgoff + ((b->vm_start - a->vm_start) >> PAGE_SHIFT);
 }
 
@@ -1241,12 +1250,18 @@ static int anon_vma_compatible(struct vm_area_struct *a, struct vm_area_struct *
  * We also make sure that the two vma's are compatible (adjacent,
  * and with the same memory policies). That's all stable, even with just
  * a read lock on the mm_sem.
+ *
+ * anon_vma_prepare()
+ *  __anon_vma_prepare() 
+ *   find_mergeable_anon_vma()
+ *    reusable_anon_vma()
  */
 static struct anon_vma *reusable_anon_vma(struct vm_area_struct *old, struct vm_area_struct *a, struct vm_area_struct *b)
 {
 	if (anon_vma_compatible(a, b)) {
 		struct anon_vma *anon_vma = READ_ONCE(old->anon_vma);
 
+        //old->anon_vma_chain只有一个节点
 		if (anon_vma && list_is_singular(&old->anon_vma_chain))
 			return anon_vma;
 	}
@@ -1260,6 +1275,11 @@ static struct anon_vma *reusable_anon_vma(struct vm_area_struct *old, struct vm_
  * sequence of mprotects and faults may otherwise lead to distinct
  * anon_vmas being allocated, preventing vma merge in subsequent
  * mprotect.
+ *
+ * anon_vma_prepare()
+ *  __anon_vma_prepare() 
+ *   find_mergeable_anon_vma()
+ * 
  */
 struct anon_vma *find_mergeable_anon_vma(struct vm_area_struct *vma)
 {

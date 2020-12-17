@@ -4375,6 +4375,10 @@ early_initcall(rcu_spawn_gp_kthread);
  * expedited, with the requesting task driving the grace period forward.
  * A later core_initcall() rcu_set_runtime_mode() will switch to full
  * runtime RCU functionality.
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   rcu_scheduler_starting()
  */
 void rcu_scheduler_starting(void)
 {

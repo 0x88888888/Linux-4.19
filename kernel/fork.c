@@ -460,18 +460,20 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 	rb_parent = NULL;
 	pprev = &mm->mmap;
 	retval = ksm_fork(mm, oldmm);
-	if (retval)
+	if (retval) //ksm的情况
 		goto out;
+	
 	retval = khugepaged_fork(mm, oldmm);
-	if (retval)
+	if (retval)//huge page的情况
 		goto out;
 
+    //普通page的情况了
 	prev = NULL;
 	//复制VMA
 	for (mpnt = oldmm->mmap; mpnt; mpnt = mpnt->vm_next) {
 		struct file *file;
 
-		if (mpnt->vm_flags & VM_DONTCOPY) {
+		if (mpnt->vm_flags & VM_DONTCOPY) {  //标记不能被copy的，跳过
 			vm_stat_account(mm, mpnt->vm_flags, -vma_pages(mpnt));
 			continue;
 		}
@@ -491,10 +493,13 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 
 			if (security_vm_enough_memory_mm(oldmm, len)) /* sic */
 				goto fail_nomem;
+			
 			charge = len;
 		}
 
 		//创建vma，复制mpnt 这个vma中的内容
+		// vma->anon_vma_chain指向vma->anon_vma_chain自己
+		//
 		tmp = vm_area_dup(mpnt);
 		if (!tmp)
 			goto fail_nomem;
@@ -504,7 +509,8 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 			goto fail_nomem_policy;
 		//新vma所属的mm_struct
 		tmp->vm_mm = mm;
-		
+
+		//安全方面的，跳过，不看了
 		retval = dup_userfaultfd(tmp, &uf);
 		if (retval)
 			goto fail_nomem_anon_vma_fork;
@@ -513,14 +519,16 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 		if (tmp->vm_flags & VM_WIPEONFORK) {
 			/* VM_WIPEONFORK gets a clean slate in the child. */
 			tmp->anon_vma = NULL;
+			
 			if (anon_vma_prepare(tmp))
 				goto fail_nomem_anon_vma_fork;
-		} else if (anon_vma_fork(tmp, mpnt))
+			
+		} else if (anon_vma_fork(tmp, mpnt))  //这个调用很重要，一般走到这里，上面的if不走
 			goto fail_nomem_anon_vma_fork;
 
 			
 		tmp->vm_flags &= ~(VM_LOCKED | VM_LOCKONFAULT);
-		tmp->vm_next = tmp->vm_prev = NULL;
+		tmp->vm_next = tmp->vm_prev = NULL; //前后都为NULL
 
 		//是不是映射大文件的vma
 		file = tmp->vm_file;
@@ -531,13 +539,19 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 			get_file(file);
 			if (tmp->vm_flags & VM_DENYWRITE)
 				atomic_dec(&inode->i_writecount);
+			
 			i_mmap_lock_write(mapping);
 			if (tmp->vm_flags & VM_SHARED)
 				atomic_inc(&mapping->i_mmap_writable);
+			
 			flush_dcache_mmap_lock(mapping);
-			/* insert tmp into the share list, just after mpnt */
+			/* insert tmp into the share list, just after mpnt 
+			 *
+			 * 定义在哪里啊？
+			 */
 			vma_interval_tree_insert_after(tmp, mpnt,
 					&mapping->i_mmap);
+			
 			flush_dcache_mmap_unlock(mapping);
 			i_mmap_unlock_write(mapping);
 		}
@@ -558,7 +572,8 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 		tmp->vm_prev = prev;
 		prev = tmp;
 
-		__vma_link_rb(mm, tmp, rb_link, rb_parent);
+        //挂到mm的红黑树上面去
+  		__vma_link_rb(mm, tmp, rb_link, rb_parent);
 		rb_link = &tmp->vm_rb.rb_right;
 		rb_parent = &tmp->vm_rb;
 

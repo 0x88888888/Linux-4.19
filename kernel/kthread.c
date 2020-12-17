@@ -556,6 +556,12 @@ int kthread_stop(struct task_struct *k)
 }
 EXPORT_SYMBOL(kthread_stop);
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ...
+ *    kthreadd()
+ */
 int kthreadd(void *unused)
 {
 	struct task_struct *tsk = current;
@@ -573,6 +579,7 @@ int kthreadd(void *unused)
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (list_empty(&kthread_create_list))
 			schedule();
+		
 		__set_current_state(TASK_RUNNING);
 
 		spin_lock(&kthread_create_lock);
@@ -588,6 +595,7 @@ int kthreadd(void *unused)
 
 			spin_lock(&kthread_create_lock);
 		}
+		
 		spin_unlock(&kthread_create_lock);
 	}
 

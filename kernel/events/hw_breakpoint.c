@@ -671,6 +671,11 @@ static struct pmu perf_breakpoint = {
 	.read		= hw_breakpoint_pmu_read,
 };
 
+/*
+ * start_kernel()  [init/main.c]
+ *  perf_event_init()
+ *   init_hw_breakpoint()
+ */
 int __init init_hw_breakpoint(void)
 {
 	int cpu, err_cpu;

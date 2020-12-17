@@ -186,6 +186,15 @@ int get_kernel_page(unsigned long start, int write, struct page **pages)
 }
 EXPORT_SYMBOL_GPL(get_kernel_page);
 
+/*
+ * add_ra_bio_pages()
+ * ext4_mpage_readpages()
+ *  add_to_page_cache_lru()
+ *   lru_cache_add()
+ *    __lru_cache_add()
+ *     __pagevec_lru_add()
+ *      pagevec_lru_move_fn( move_fn == __pagevec_lru_add_fn)
+ */
 static void pagevec_lru_move_fn(struct pagevec *pvec,
 	void (*move_fn)(struct page *page, struct lruvec *lruvec, void *arg),
 	void *arg)
@@ -207,6 +216,7 @@ static void pagevec_lru_move_fn(struct pagevec *pvec,
 		}
 
 		lruvec = mem_cgroup_page_lruvec(page, pgdat);
+		// __pagevec_lru_add_fn
 		(*move_fn)(page, lruvec, arg);
 	}
 	if (pgdat)
@@ -337,6 +347,10 @@ void activate_page(struct page *page)
 }
 #endif
 
+/*
+ * mark_page_accessed()
+ *  __lru_cache_activate_page()
+ */
 static void __lru_cache_activate_page(struct page *page)
 {
 	struct pagevec *pvec = &get_cpu_var(lru_add_pvec);
@@ -373,6 +387,22 @@ static void __lru_cache_activate_page(struct page *page)
  *
  * When a newly allocated page is not yet visible, so safe for non-atomic ops,
  * __SetPageReferenced(page) may be substituted for mark_page_accessed(page).
+ *
+ * pagecache_get_page()
+ * generic_file_buffered_read()
+ * kvm_set_pfn_accessed()
+ * try_to_merge_one_page()
+ *  mark_page_accessed() 
+ *
+ *
+ * ext2_lookup()
+ *	ext2_inode_by_name() 
+ *	 ext2_find_entry()
+ *	  ext2_get_page()
+ *     read_cache_page(filler==ext2_readpage)
+ *      do_read_cache_page(filler==ext2_readpage)
+ *       mark_page_accessed()
+ *
  */
 void mark_page_accessed(struct page *page)
 {
@@ -387,9 +417,10 @@ void mark_page_accessed(struct page *page)
 		 * LRU on the next drain.
 		 */
 		if (PageLRU(page))
-			activate_page(page);
+			activate_page(page); 
 		else
-			__lru_cache_activate_page(page);
+			__lru_cache_activate_page(page);//设置PG_active标记
+		
 		ClearPageReferenced(page);
 		if (page_is_file_cache(page))
 			workingset_activation(page);
@@ -401,6 +432,13 @@ void mark_page_accessed(struct page *page)
 }
 EXPORT_SYMBOL(mark_page_accessed);
 
+/*
+ * add_ra_bio_pages()
+ * ext4_mpage_readpages()
+ *  add_to_page_cache_lru()
+ *   lru_cache_add()
+ *    __lru_cache_add()
+ */
 static void __lru_cache_add(struct page *page)
 {
 	struct pagevec *pvec = &get_cpu_var(lru_add_pvec);
@@ -408,6 +446,7 @@ static void __lru_cache_add(struct page *page)
 	get_page(page);
 	if (!pagevec_add(pvec, page) || PageCompound(page))
 		__pagevec_lru_add(pvec);
+	
 	put_cpu_var(lru_add_pvec);
 }
 
@@ -438,6 +477,11 @@ EXPORT_SYMBOL(lru_cache_add_file);
  * to add the page to the [in]active [file|anon] list is deferred until the
  * pagevec is drained. This gives a chance for the caller of lru_cache_add()
  * have the page added to the active list using mark_page_accessed().
+ *
+ * add_ra_bio_pages()
+ * ext4_mpage_readpages()
+ *  add_to_page_cache_lru()
+ *   lru_cache_add()
  */
 void lru_cache_add(struct page *page)
 {
@@ -855,6 +899,16 @@ void lru_add_page_tail(struct page *page, struct page *page_tail,
 }
 #endif /* CONFIG_TRANSPARENT_HUGEPAGE */
 
+/*
+ * add_ra_bio_pages()
+ * ext4_mpage_readpages()
+ *  add_to_page_cache_lru()
+ *   lru_cache_add()
+ *    __lru_cache_add()
+ *     __pagevec_lru_add()
+ *      pagevec_lru_move_fn( move_fn == __pagevec_lru_add_fn)
+ *       __pagevec_lru_add_fn()
+ */
 static void __pagevec_lru_add_fn(struct page *page, struct lruvec *lruvec,
 				 void *arg)
 {
@@ -893,7 +947,7 @@ static void __pagevec_lru_add_fn(struct page *page, struct lruvec *lruvec,
 	smp_mb();
 
 	if (page_evictable(page)) {
-		lru = page_lru(page);
+		lru = page_lru(page); //LRU链表类型
 		update_page_reclaim_stat(lruvec, page_is_file_cache(page),
 					 PageActive(page));
 		if (was_unevictable)
@@ -906,6 +960,7 @@ static void __pagevec_lru_add_fn(struct page *page, struct lruvec *lruvec,
 			count_vm_event(UNEVICTABLE_PGCULLED);
 	}
 
+    //加到链表lruvec->lists[lru]链表里去
 	add_page_to_lru_list(page, lruvec, lru);
 	trace_mm_lru_insertion(page, lru);
 }
@@ -913,6 +968,13 @@ static void __pagevec_lru_add_fn(struct page *page, struct lruvec *lruvec,
 /*
  * Add the passed pages to the LRU, then drop the caller's refcount
  * on them.  Reinitialises the caller's pagevec.
+ *
+ * add_ra_bio_pages()
+ * ext4_mpage_readpages()
+ *  add_to_page_cache_lru()
+ *   lru_cache_add()
+ *    __lru_cache_add()
+ *     __pagevec_lru_add()
  */
 void __pagevec_lru_add(struct pagevec *pvec)
 {

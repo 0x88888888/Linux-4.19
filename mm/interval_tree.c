@@ -69,10 +69,15 @@ static inline unsigned long avc_last_pgoff(struct anon_vma_chain *avc)
 	return vma_last_pgoff(avc->vma);
 }
 
+//这个宏在interval_tree_generic.h中定义
 INTERVAL_TREE_DEFINE(struct anon_vma_chain, rb, unsigned long, rb_subtree_last,
 		     avc_start_pgoff, avc_last_pgoff,
 		     static inline, __anon_vma_interval_tree)
 
+/*
+ * anon_vma_chain_link()
+ *  anon_vma_interval_tree_insert(avc, &anon_vma->rb_root)
+ */
 void anon_vma_interval_tree_insert(struct anon_vma_chain *node,
 				   struct rb_root_cached *root)
 {
@@ -80,6 +85,7 @@ void anon_vma_interval_tree_insert(struct anon_vma_chain *node,
 	node->cached_vma_start = avc_start_pgoff(node);
 	node->cached_vma_last = avc_last_pgoff(node);
 #endif
+    //将anon_vma_chain->rb添加到struct anon_vma->rb_root红黑树中。
 	__anon_vma_interval_tree_insert(node, root);
 }
 

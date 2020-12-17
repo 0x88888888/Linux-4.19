@@ -92,6 +92,10 @@ struct page {
 			 * @lru: Pageout list, eg. active_list protected by
 			 * zone_lru_lock.  Sometimes used as a generic list
 			 * by the page owner.
+			 *
+			 * 
+			 * 包含到页的最近最少使用(LRU)双向链表的指针，
+			 * 用于插入伙伴系统的空闲链表中，只有块中头页框要被插入 
 			 */
 			struct list_head lru;
 			/* See page-flags.h for PAGE_MAPPING_FLAGS 
@@ -99,18 +103,30 @@ struct page {
 			 * 指向address_space对象或者anon_vma对象
 			 */
 			struct address_space *mapping;
+            /* 作为不同的含义被几种内核成分使用。
+             * 例如，它在页磁盘映像或匿名区中标识存放在页框中的数据的位置，
+             * 或者它存放一个换出页标识符 */			
 			pgoff_t index;		/* Our offset within mapping. */
 			/**
 			 * @private: Mapping-private opaque data.
 			 * Usually used for buffer_heads if PagePrivate.
 			 * Used for swp_entry_t if PageSwapCache.
 			 * Indicates order in the buddy system if PageBuddy.
+			 *
+			 * 
+			 * 可用于正在使用页的内核成分
+			 * (例如: 在缓冲页的情况下它是一个缓冲器头指针，
+			 * 如果页是空闲的，则该字段由伙伴系统使用，
+			 * 在给伙伴系统使用时，表明的是块的2的次方数，
+			 * 只有块的第一个页框会使用) 
 			 */
 			unsigned long private;
 		};
 		struct {	/* slab, slob and slub */
 			union {
 				struct list_head slab_list;	/* uses lru */
+				
+				/* SLAB使用 */
 				struct {	/* Partial pages */
 					struct page *next;
 #ifdef CONFIG_64BIT
@@ -124,8 +140,10 @@ struct page {
 			};
 			struct kmem_cache *slab_cache; /* not slob */
 			/* Double-word boundary */
+			/* 用于SLAB描述符，指向第一个空闲对象地址 */
 			void *freelist;		/* first free object */
 			union {
+				/* 用于SLAB描述符，用于执行第一个对象的地址 */
 				void *s_mem;	/* slab: first object */
 				unsigned long counters;		/* SLUB */
 				struct {			/* SLUB */
@@ -210,6 +228,8 @@ struct page {
 	 * WANT_PAGE_VIRTUAL in asm/page.h
 	 */
 #if defined(WANT_PAGE_VIRTUAL)
+    /* 此页框第一个物理地址对应的线性地址，
+     * 如果是没有映射的高端内存的页框，则为空 */
 	void *virtual;			/* Kernel virtual address (NULL if
 					   not kmapped, ie. highmem) */
 #endif /* WANT_PAGE_VIRTUAL */
@@ -234,6 +254,7 @@ struct page_frag_cache {
 	 * containing page->_refcount every time we allocate a fragment.
 	 */
 	unsigned int		pagecnt_bias;
+
 	bool pfmemalloc;
 };
 
@@ -273,6 +294,8 @@ struct vm_userfaultfd_ctx {};
  * per VM-area/task.  A VM area is any part of the process virtual memory
  * space that has a special rule for the page-fault handlers (ie a shared
  * library, the executable area etc).
+ *
+ * 在vm_area_alloc()中分配
  */
 struct vm_area_struct {
 	/* The first cache line has the info for VMA tree walking. */
@@ -314,6 +337,10 @@ struct vm_area_struct {
 	 * list, after a COW of one of the file pages.	A MAP_SHARED vma
 	 * can only be in the i_mmap tree.  An anonymous MAP_PRIVATE, stack
 	 * or brk vma (with NULL file) can only be in an anon_vma list.
+	 *
+	 *
+	 * 链接到anon_vma_chain->same_vma
+	 * 在anon_vma_chain_link()中操作
 	 */
 	struct list_head anon_vma_chain; /* Serialized by mmap_sem &
 					  * page_table_lock */

@@ -549,6 +549,9 @@ void tick_unfreeze(void)
  */
 void __init tick_init(void)
 {
+    //在kernel/time/tick-broadcast.c中
 	tick_broadcast_init();
+
+	//空函数
 	tick_nohz_init();
 }

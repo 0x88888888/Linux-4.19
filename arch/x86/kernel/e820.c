@@ -391,6 +391,14 @@ int __init e820__update_table(struct e820_table *table)
 	return 0;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   e820__memory_setup()
+ *    e820__memory_setup_default()
+ *     append_e820_table()
+ *      __append_e820_table()
+ */
 static int __init __append_e820_table(struct boot_e820_entry *entries, u32 nr_entries)
 {
 	struct boot_e820_entry *entry = entries;
@@ -421,6 +429,12 @@ static int __init __append_e820_table(struct boot_e820_entry *entries, u32 nr_en
  * If we're lucky and live on a modern system, the setup code
  * will have given us a memory map that we can use to properly
  * set up memory.  If we aren't, we'll fake a memory map.
+ *
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   e820__memory_setup()
+ *    e820__memory_setup_default()
+ *     append_e820_table()
  */
 static int __init append_e820_table(struct boot_e820_entry *entries, u32 nr_entries)
 {
@@ -665,6 +679,13 @@ __init void e820__setup_pci_gap(void)
  * This is done after we've performed all the fixes and tweaks to the tables.
  * All functions which modify them are __init functions, which won't exist
  * after free_initmem().
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     free_initmem()
+ *      e820__reallocate_tables()
  */
 __init void e820__reallocate_tables(void)
 {
@@ -1189,6 +1210,11 @@ void __init e820__reserve_resources_late(void)
 
 /*
  * Pass the firmware (bootloader) E820 map to the kernel and process it:
+ *
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   e820__memory_setup()
+ *    e820__memory_setup_default()
  */
 char *__init e820__memory_setup_default(void)
 {
@@ -1227,6 +1253,10 @@ char *__init e820__memory_setup_default(void)
  * Calls e820__memory_setup_default() in essence to pick up the firmware/bootloader
  * E820 map - with an optional platform quirk available for virtual platforms
  * to override this method of boot environment processing:
+ *
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   e820__memory_setup()
  */
 void __init e820__memory_setup(void)
 {
@@ -1235,6 +1265,7 @@ void __init e820__memory_setup(void)
 	/* This is a firmware interface ABI - make sure we don't break it: */
 	BUILD_BUG_ON(sizeof(struct boot_e820_entry) != 20);
 
+    //e820__memory_setup_default 
 	who = x86_init.resources.memory_setup();
 
 	memcpy(e820_table_kexec, e820_table, sizeof(*e820_table_kexec));
@@ -1244,6 +1275,13 @@ void __init e820__memory_setup(void)
 	e820__print_table(who);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   e820__memblock_setup()
+ *
+ * 建立memblock region内存管理
+ */
 void __init e820__memblock_setup(void)
 {
 	int i;
@@ -1258,16 +1296,21 @@ void __init e820__memblock_setup(void)
 	 * This is safe, because this call happens pretty late during x86 setup,
 	 * so we know about reserved memory regions already. (This is important
 	 * so that memblock resizing does no stomp over reserved areas.)
+	 *
+	 * 这个函数,pc一般就什么都不做
 	 */
 	memblock_allow_resize();
 
+    //遍历e820_table
 	for (i = 0; i < e820_table->nr_entries; i++) {
+		
 		struct e820_entry *entry = &e820_table->entries[i];
 
 		end = entry->addr + entry->size;
-		if (addr < entry->addr)
+		if (addr < entry->addr) //保存到memblock.reserved.regions[]中
 			memblock_reserve(addr, entry->addr - addr);
-		addr = end;
+		
+		addr = end;//addr为上一次已经保存的最小addr
 		if (end != (resource_size_t)end)
 			continue;
 
@@ -1277,9 +1320,9 @@ void __init e820__memblock_setup(void)
 		 * such regions are not left uninitialized after bootup.
 		 */
 		if (entry->type != E820_TYPE_RAM && entry->type != E820_TYPE_RESERVED_KERN)
-			memblock_reserve(entry->addr, entry->size);
+			memblock_reserve(entry->addr, entry->size); //保存到memblock.reserved.regions[]中
 		else
-			memblock_add(entry->addr, entry->size);
+			memblock_add(entry->addr, entry->size); //保存到memblock.memory.regions[]中
 	}
 
 	/* Throw away partial pages: */

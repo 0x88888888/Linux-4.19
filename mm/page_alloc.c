@@ -293,6 +293,7 @@ EXPORT_SYMBOL(nr_online_nodes);
 
 int page_group_by_mobility_disabled __read_mostly;
 
+//没有定义
 #ifdef CONFIG_DEFERRED_STRUCT_PAGE_INIT
 /* Returns true if the struct page for the pfn is uninitialised */
 static inline bool __meminit early_page_uninitialised(unsigned long pfn)
@@ -715,6 +716,8 @@ static inline void rmv_page_order(struct page *page)
  * Setting, clearing, and testing PageBuddy is serialized by zone->lock.
  *
  * For recording page's order, we use page_private(page).
+ *
+ * page和buddy是不是可以合并
  */
 static inline int page_is_buddy(struct page *page, struct page *buddy,
 							unsigned int order)
@@ -1299,6 +1302,17 @@ static void __free_pages_ok(struct page *page, unsigned int order)
  *     free_all_bootmem_core()
  *      __free_pages_bootmem()
  *       __free_pages_boot_core()
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      page_alloc_init_late()
+ *       memblock_discard()
+ *        __memblock_free_late()
+ *         __free_pages_bootmem()
+ *          __free_pages_boot_core()
  */
 static void __init __free_pages_boot_core(struct page *page, unsigned int order)
 {
@@ -1381,13 +1395,25 @@ meminit_pfn_in_nid(unsigned long pfn, int node,
  *   mem_init()
  *    free_all_bootmem()
  *     free_all_bootmem_core()
- *      __free_pages_bootmem()
+ *      __free_pages_bootmem( order ==0 或者order==)
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      page_alloc_init_late()
+ *       memblock_discard()
+ *        __memblock_free_late()
+ *         __free_pages_bootmem( order ==0)
  */
 void __init __free_pages_bootmem(struct page *page, unsigned long pfn,
 							unsigned int order)
 {
-	if (early_page_uninitialised(pfn))
+     
+	if (early_page_uninitialised(pfn)) //判断直接返回false
 		return;
+	
 	return __free_pages_boot_core(page, order);
 }
 
@@ -1797,6 +1823,7 @@ void __init page_alloc_init_late(void)
 #endif
 
 
+//有定义
 #ifdef CONFIG_ARCH_DISCARD_MEMBLOCK
 	/* Discard memblock private memory */
 	memblock_discard();
@@ -2792,6 +2819,18 @@ void mark_free_pages(struct zone *zone)
 }
 #endif /* CONFIG_PM */
 
+/*
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   mem_init()
+ *    free_all_bootmem()
+ *     free_all_bootmem_core()
+ *      __free_pages_bootmem()
+ *       __free_pages_boot_core()
+ *        __free_pages()
+ *         free_unref_page()
+ *          free_unref_page_prepare()
+ */
 static bool free_unref_page_prepare(struct page *page, unsigned long pfn)
 {
 	int migratetype;
@@ -2839,6 +2878,16 @@ static void free_unref_page_commit(struct page *page, unsigned long pfn)
 
 /*
  * Free a 0-order page
+ *
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   mem_init()
+ *    free_all_bootmem()
+ *     free_all_bootmem_core()
+ *      __free_pages_bootmem()
+ *       __free_pages_boot_core()
+ *        __free_pages()
+ *         free_unref_page()
  */
 void free_unref_page(struct page *page)
 {
@@ -3828,7 +3877,15 @@ void fs_reclaim_release(gfp_t gfp_mask)
 EXPORT_SYMBOL_GPL(fs_reclaim_release);
 #endif
 
-/* Perform direct synchronous page reclaim */
+/* Perform direct synchronous page reclaim 
+ *
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   __alloc_pages_nodemask()
+ *    __alloc_pages_slowpath()
+ *     __alloc_pages_direct_reclaim()
+ *      __perform_reclaim()
+ */
 static int
 __perform_reclaim(gfp_t gfp_mask, unsigned int order,
 					const struct alloc_context *ac)
@@ -3858,7 +3915,14 @@ __perform_reclaim(gfp_t gfp_mask, unsigned int order,
 	return progress;
 }
 
-/* The really slow allocator path where we enter direct reclaim */
+/* The really slow allocator path where we enter direct reclaim 
+ *
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   __alloc_pages_nodemask()
+ *    __alloc_pages_slowpath()
+ *     __alloc_pages_direct_reclaim()
+ */
 static inline struct page *
 __alloc_pages_direct_reclaim(gfp_t gfp_mask, unsigned int order,
 		unsigned int alloc_flags, const struct alloc_context *ac,
@@ -3889,6 +3953,10 @@ retry:
 	return page;
 }
 
+/*
+ * __alloc_pages_slowpath()
+ *  wake_all_kswapds()
+ */
 static void wake_all_kswapds(unsigned int order, gfp_t gfp_mask,
 			     const struct alloc_context *ac)
 {
@@ -3901,6 +3969,7 @@ static void wake_all_kswapds(unsigned int order, gfp_t gfp_mask,
 					ac->nodemask) {
 		if (last_pgdat != zone->zone_pgdat)
 			wakeup_kswapd(zone, gfp_mask, order, high_zoneidx);
+		
 		last_pgdat = zone->zone_pgdat;
 	}
 }
@@ -4185,6 +4254,7 @@ retry_cpuset:
 	if (!ac->preferred_zoneref->zone)
 		goto nopage;
 
+    //唤醒kswapd回收物理内存
 	if (gfp_mask & __GFP_KSWAPD_RECLAIM)
 		wake_all_kswapds(order, gfp_mask, ac);
 
@@ -4242,7 +4312,9 @@ retry_cpuset:
 	}
 
 retry:
-	/* Ensure kswapd doesn't accidentally go to sleep as long as we loop */
+	/* Ensure kswapd doesn't accidentally go to sleep as long as we loop 
+	 * 唤醒kswapd回收物理内存
+     */
 	if (gfp_mask & __GFP_KSWAPD_RECLAIM)
 		wake_all_kswapds(order, gfp_mask, ac);
 
@@ -5162,6 +5234,22 @@ static void zoneref_set_zone(struct zone *zone, struct zoneref *zoneref)
  * Builds allocation fallback zone lists.
  *
  * Add all populated zones of a node to the zonelist.
+ *
+ * start_kernel()  [init/main.c]
+ *  build_all_zonelists(NULL)
+ *   build_all_zonelists_init()
+ *    __build_all_zonelists(data == NULL)
+ *     build_zonelists(pgdat != NULL的)
+ *      build_zonelists_in_node_order()
+ *       build_zonerefs_node()
+ *
+ * start_kernel()  [init/main.c]
+ *  build_all_zonelists(NULL)
+ *   build_all_zonelists_init()
+ *    __build_all_zonelists(data == NULL)
+ *     build_zonelists(pgdat != NULL的)
+ *      build_thisnode_zonelists()
+ *       build_zonerefs_node()
  */
 static int build_zonerefs_node(pg_data_t *pgdat, struct zoneref *zonerefs)
 {
@@ -5299,6 +5387,13 @@ static int find_next_best_node(int node, nodemask_t *used_node_mask)
  * Build zonelists ordered by node and zones within node.
  * This results in maximum locality--normal zone overflows into local
  * DMA zone, if any--but risks exhausting DMA zone.
+ *
+ * start_kernel()  [init/main.c]
+ *  build_all_zonelists(NULL)
+ *   build_all_zonelists_init()
+ *    __build_all_zonelists(data == NULL)
+ *     build_zonelists(pgdat != NULL的)
+ *      build_zonelists_in_node_order()
  */
 static void build_zonelists_in_node_order(pg_data_t *pgdat, int *node_order,
 		unsigned nr_nodes)
@@ -5310,7 +5405,7 @@ static void build_zonelists_in_node_order(pg_data_t *pgdat, int *node_order,
 
 	for (i = 0; i < nr_nodes; i++) {
 		int nr_zones;
-
+        //依照在上一级函数中排好的秩序来
 		pg_data_t *node = NODE_DATA(node_order[i]);
 
 		nr_zones = build_zonerefs_node(node, zonerefs);
@@ -5322,6 +5417,13 @@ static void build_zonelists_in_node_order(pg_data_t *pgdat, int *node_order,
 
 /*
  * Build gfp_thisnode zonelists
+ *
+ * start_kernel()  [init/main.c]
+ *  build_all_zonelists(NULL)
+ *   build_all_zonelists_init()
+ *    __build_all_zonelists(data == NULL)
+ *     build_zonelists(pgdat != NULL的)
+ *      build_thisnode_zonelists()
  */
 static void build_thisnode_zonelists(pg_data_t *pgdat)
 {
@@ -5340,6 +5442,12 @@ static void build_thisnode_zonelists(pg_data_t *pgdat)
  * This results in conserving DMA zone[s] until all Normal memory is
  * exhausted, but results in overflowing to remote node while memory
  * may still exist in local DMA zone.
+ *
+ * start_kernel()  [init/main.c]
+ *  build_all_zonelists(NULL)
+ *   build_all_zonelists_init()
+ *    __build_all_zonelists(data == NULL)
+ *     build_zonelists(pgdat != NULL的)
  */
 
 static void build_zonelists(pg_data_t *pgdat)
@@ -5356,6 +5464,7 @@ static void build_zonelists(pg_data_t *pgdat)
 	nodes_clear(used_mask);
 
 	memset(node_order, 0, sizeof(node_order));
+	//给node排序，将排序的秩序放入node_order[]中
 	while ((node = find_next_best_node(local_node, &used_mask)) >= 0) {
 		/*
 		 * We don't want to pressure a particular node.
@@ -5372,6 +5481,7 @@ static void build_zonelists(pg_data_t *pgdat)
 	}
 
 	build_zonelists_in_node_order(pgdat, node_order, nr_nodes);
+	
 	build_thisnode_zonelists(pgdat);
 }
 
@@ -5455,6 +5565,12 @@ static void setup_pageset(struct per_cpu_pageset *p, unsigned long batch);
 static DEFINE_PER_CPU(struct per_cpu_pageset, boot_pageset);
 static DEFINE_PER_CPU(struct per_cpu_nodestat, boot_nodestats);
 
+/*
+ * start_kernel()  [init/main.c]
+ *  build_all_zonelists(NULL)
+ *   build_all_zonelists_init()
+ *    __build_all_zonelists(data == NULL)
+ */
 static void __build_all_zonelists(void *data)
 {
 	int nid;
@@ -5475,6 +5591,7 @@ static void __build_all_zonelists(void *data)
 	if (self && !node_online(self->node_id)) {
 		build_zonelists(self);
 	} else {
+	    //走这里
 		for_each_online_node(nid) {
 			pg_data_t *pgdat = NODE_DATA(nid);
 
@@ -5537,13 +5654,13 @@ build_all_zonelists_init(void)
  * [protected by SYSTEM_BOOTING].
  *
  * start_kernel()  [init/main.c]
- *  build_all_zonelists(NULL)
+ *  build_all_zonelists(NULL),system_state==SYSTEM_BOOTING
  *
  */
 void __ref build_all_zonelists(pg_data_t *pgdat)
 {
 	if (system_state == SYSTEM_BOOTING) {
-		build_all_zonelists_init();
+		build_all_zonelists_init(); //走这里
 	} else {
 		__build_all_zonelists(pgdat);
 		/* cpuset refresh routine should be here */
@@ -5619,11 +5736,14 @@ void __meminit memmap_init_zone(unsigned long size, int nid, unsigned long zone,
 
 		if (!early_pfn_valid(pfn))
 			continue;
+		
 		if (!early_pfn_in_nid(pfn, nid))
 			continue;
+		
 		if (!update_defer_init(pgdat, pfn, end_pfn, &nr_initialised))
 			break;
 
+//有定义
 #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
 		/*
 		 * Check given memblock attribute by firmware which can affect
@@ -5637,6 +5757,7 @@ void __meminit memmap_init_zone(unsigned long size, int nid, unsigned long zone,
 						break;
 				r = tmp;
 			}
+			
 			if (pfn >= memblock_region_memory_base_pfn(r) &&
 			    memblock_is_mirror(r)) {
 				/* already initialized as NORMAL */

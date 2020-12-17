@@ -405,6 +405,11 @@ static void __init reserve_initrd(void)
 }
 #endif /* CONFIG_BLK_DEV_INITRD */
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   parse_setup_data()
+ */
 static void __init parse_setup_data(void)
 {
 	struct setup_data *data;
@@ -829,6 +834,8 @@ dump_kernel_offset(struct notifier_block *self, unsigned long v, void *p)
  *
  * start_kernel()  [init/main.c]
  *  setup_arch()
+ *
+ * 建立memblock内存管理
  */
 
 void __init setup_arch(char **cmdline_p)
@@ -885,7 +892,9 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	olpc_ofw_detect();
 
+    //早期的idt_table
 	idt_setup_early_traps();
+	
 	early_cpu_init();
 	arch_init_ideal_nops();
 	jump_label_init();
@@ -900,6 +909,7 @@ void __init setup_arch(char **cmdline_p)
 	apm_info.bios = boot_params.apm_bios_info;
 	ist_info = boot_params.ist_info;
 #endif
+
 	saved_video_mode = boot_params.hdr.vid_mode;
 	bootloader_type = boot_params.hdr.type_of_loader;
 	if ((bootloader_type >> 4) == 0xe) {
@@ -925,6 +935,7 @@ void __init setup_arch(char **cmdline_p)
 	}
 #endif
 
+    //x86_init_noop
 	x86_init.oem.arch_setup();
 
 	iomem_resource.end = (1ULL << boot_cpu_data.x86_phys_bits) - 1;
@@ -935,11 +946,13 @@ void __init setup_arch(char **cmdline_p)
 
 	if (!boot_params.hdr.root_flags)
 		root_mountflags &= ~MS_RDONLY;
+	//设置init_mm
 	init_mm.start_code = (unsigned long) _text;
 	init_mm.end_code = (unsigned long) _etext;
 	init_mm.end_data = (unsigned long) _edata;
 	init_mm.brk = _brk_end;
 
+    //空
 	mpx_mm_init(&init_mm);
 
 	code_resource.start = __pa_symbol(_text);
@@ -979,6 +992,7 @@ void __init setup_arch(char **cmdline_p)
 
 	if (efi_enabled(EFI_BOOT))
 		efi_memblock_x86_reserve_range();
+	
 #ifdef CONFIG_MEMORY_HOTPLUG
 	/*
 	 * Memory used by the kernel cannot be hot-removed because Linux
@@ -1114,6 +1128,7 @@ void __init setup_arch(char **cmdline_p)
 	cleanup_highmap();
 
 	memblock_set_current_limit(ISA_END_ADDRESS);
+	//建立memblock内存管理
 	e820__memblock_setup();
 
 	reserve_bios_regions();

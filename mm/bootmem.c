@@ -222,6 +222,7 @@ static unsigned long __init free_all_bootmem_core(bootmem_data_t *bdata)
 	if (!bdata->node_bootmem_map)
 		return 0;
 
+	/*map为内存使用情况位图的页框指*/
 	map = bdata->node_bootmem_map;
 	start = bdata->node_min_pfn;
 	end = bdata->node_low_pfn;
@@ -234,11 +235,13 @@ static unsigned long __init free_all_bootmem_core(bootmem_data_t *bdata)
 		unsigned shift;
 
 		idx = start - bdata->node_min_pfn;
+		//64位对齐
 		shift = idx & (BITS_PER_LONG - 1);
 		/*
 		 * vec holds at most BITS_PER_LONG map bits,
 		 * bit 0 corresponds to start.
 		 */
+		 // 取反为1则未被使用
 		vec = ~map[idx / BITS_PER_LONG];
 
 		if (shift) {
@@ -253,8 +256,8 @@ static unsigned long __init free_all_bootmem_core(bootmem_data_t *bdata)
 		 * it in one go.
 		 */
 		if (IS_ALIGNED(start, BITS_PER_LONG) && vec == ~0UL) {
-			//计算出order
-			int order = ilog2(BITS_PER_LONG);
+			//计算出order ,order ==6?
+			int order = ilog2(BITS_PER_LONG /* 64 */); 
 
 			__free_pages_bootmem(pfn_to_page(start), start, order);
 			count += BITS_PER_LONG;
@@ -275,6 +278,7 @@ static unsigned long __init free_all_bootmem_core(bootmem_data_t *bdata)
 		}
 	}
 
+    // 释放node_bootmem_map本身 
 	cur = bdata->node_min_pfn;
 	page = virt_to_page(bdata->node_bootmem_map);
 	pages = bdata->node_low_pfn - bdata->node_min_pfn;
@@ -282,6 +286,7 @@ static unsigned long __init free_all_bootmem_core(bootmem_data_t *bdata)
 	count += pages;
 	while (pages--)
 		__free_pages_bootmem(page++, cur++, 0);
+	
 	bdata->node_bootmem_map = NULL;
 
 	bdebug("nid=%td released=%lx\n", bdata - bootmem_node_data, count);

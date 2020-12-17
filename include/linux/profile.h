@@ -37,6 +37,8 @@ enum profile_type {
 	PROFILE_MUNMAP
 };
 
+
+//有定义
 #ifdef CONFIG_PROFILING
 
 extern int prof_on __read_mostly;

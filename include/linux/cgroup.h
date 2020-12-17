@@ -27,6 +27,8 @@
 
 #include <linux/cgroup-defs.h>
 
+
+//y有定义
 #ifdef CONFIG_CGROUPS
 
 /*

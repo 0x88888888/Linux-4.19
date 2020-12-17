@@ -56,6 +56,12 @@ struct shrink_control {
  * context.
  *
  * @flags determine the shrinker abilities, like numa awareness
+ *
+ * dqcache_shrinker, glock_shrinker
+ * deferred_split_shrinker, mmu_shrinker
+ * ext4_sb_info->s_es_shrinker,
+ *
+ * 通过register_shrinker()注入到shrinker_list中去
  */
 struct shrinker {
 	unsigned long (*count_objects)(struct shrinker *,

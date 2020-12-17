@@ -31,6 +31,7 @@ enum x86_hypervisor_type {
 	X86_HYPER_JAILHOUSE,
 };
 
+//有定义
 #ifdef CONFIG_HYPERVISOR_GUEST
 
 #include <asm/kvm_para.h>

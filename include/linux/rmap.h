@@ -25,8 +25,11 @@
  * After unlinking the last vma on the list, we must garbage collect
  * the anon_vma object itself: we're guaranteed no page can be
  * pointing to this anon_vma once its vma list is empty.
+ *
+ * anon_vma对象不可能同时属于两个不同的进程
  */
 struct anon_vma {
+    
 	struct anon_vma *root;		/* Root of this anon_vma tree */
 	struct rw_semaphore rwsem;	/* W: modification, R: walking the list */
 	/*
@@ -57,7 +60,11 @@ struct anon_vma {
 	 * mm_take_all_locks() (mm_all_locks_mutex).
 	 */
 
-	/* Interval tree of private "related" vmas */
+	/* Interval tree of private "related" vmas 
+	 * 存放anon_vma_chain->rb 链接到anon_vma->rb_root的rb树上来
+	 * 看anon_vma_chain_link()中调用anon_vma_interval_tree_insert()
+	 *
+	 */
 	struct rb_root_cached rb_root;
 };
 
@@ -75,22 +82,24 @@ struct anon_vma {
  * which link all the VMAs associated with this anon_vma.
  *
  * 只在匿名映射page是有用这个数据结构
+ *
+ * anon_vma_chain会同时插入到vm_area_struct->same_vma链表
+ * 和anon_vma->rb_root树 上去
  */
 struct anon_vma_chain {
-    //指向该AVC对应的VMA
+    //指向该anon_vma_chain对应的vm_area_struct
 	struct vm_area_struct *vma;
-	//指向该AVC对应的AV
+	//指向该anon_vma_chain对应的anon_vma
 	struct anon_vma *anon_vma;
 
 	/* 
-	 * 在anon_vma_chain_link()中操作same_vam，链接到anon_vma_chain对象
-	 * 
-	 * 链接入VMA链表的节点
+	 * 链接到vm_area_struct->anon_vma_chain
+	 *
+	 * 在anon_vma_chain_link()中操作
 	 */
 	struct list_head same_vma;   /* locked by mmap_sem & page_table_lock */
 	/*
-	 * 链接入AV红黑树的节点
-	 * 构建所属进程 AVC的父子关系
+	 * 链接到 anon_vma->rb_root这颗树上去
 	 */
 	struct rb_node rb;			/* locked by anon_vma->rwsem */
 	unsigned long rb_subtree_last;
@@ -167,6 +176,33 @@ int anon_vma_fork(struct vm_area_struct *, struct vm_area_struct *);
  *     handle_pte_fault()
  *      do_anonymous_page()
  *       anon_vma_prepare()
+ *
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
+ *    copy_mm()
+ *     dup_mm()
+ *      dup_mmap()
+ *       anon_vma_prepare()
+ *
+ * hugetlb_cow()
+ *  anon_vma_prepare()
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    hugetlb_no_page()
+ *     anon_vma_prepare()
+ *
+ * wp_page_copy()
+ *  anon_vma_prepare()
+ *
+ * do_cow_fault()
+ *  anon_vma_prepare()
+ *
+ * 给vma分配anon_vma和anon_vma_chain
+ *
+ * 组建vm_area_struct, anon_vma, anon_vma_chain三者之间的关系
  */
 static inline int anon_vma_prepare(struct vm_area_struct *vma)
 {

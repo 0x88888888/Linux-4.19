@@ -2209,6 +2209,15 @@ static void switched_from_rt(struct rq *rq, struct task_struct *p)
 	rt_queue_pull_task(rq);
 }
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      sched_init_smp() 
+ *       init_sched_rt_class()
+ */
 void __init init_sched_rt_class(void)
 {
 	unsigned int i;

@@ -444,6 +444,16 @@ EXPORT_SYMBOL(unregister_shrinker);
 
 #define SHRINK_BATCH 128
 
+/*
+ * kswapd_run()
+ *  ...
+ *   kswapd()
+ *    balance_pgdat()
+ *     kswapd_shrink_node()
+ *      shrink_node()
+ *       shrink_slab()
+ *        do_shrink_slab()
+ */
 static unsigned long do_shrink_slab(struct shrink_control *shrinkctl,
 				    struct shrinker *shrinker, int priority)
 {
@@ -576,6 +586,17 @@ static unsigned long do_shrink_slab(struct shrink_control *shrinkctl,
 }
 
 #ifdef CONFIG_MEMCG_KMEM
+
+/*
+ * kswapd_run()
+ *  ...
+ *   kswapd()
+ *    balance_pgdat()
+ *     kswapd_shrink_node()
+ *      shrink_node()
+ *       shrink_slab()
+ *        shrink_slab_memcg()
+ */
 static unsigned long shrink_slab_memcg(gfp_t gfp_mask, int nid,
 			struct mem_cgroup *memcg, int priority)
 {
@@ -672,6 +693,14 @@ static unsigned long shrink_slab_memcg(gfp_t gfp_mask, int nid,
  * in order to get the scan target.
  *
  * Returns the number of reclaimed slab objects.
+ *
+ * kswapd_run()
+ *  ...
+ *   kswapd()
+ *    balance_pgdat()
+ *     kswapd_shrink_node()
+ *      shrink_node()
+ *       shrink_slab()
  */
 static unsigned long shrink_slab(gfp_t gfp_mask, int nid,
 				 struct mem_cgroup *memcg,
@@ -1005,6 +1034,10 @@ enum page_references {
 	PAGEREF_ACTIVATE,
 };
 
+/*
+ * shrink_page_list()
+ *  page_check_references()
+ */
 static enum page_references page_check_references(struct page *page,
 						  struct scan_control *sc)
 {
@@ -1253,6 +1286,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 		if (!force_reclaim)
 			references = page_check_references(page, sc);
 
+        //根据page_check_references的返回类型，确定page需要移动的目的链表
 		switch (references) {
 		case PAGEREF_ACTIVATE:
 			goto activate_locked;
@@ -2022,6 +2056,16 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
  * But we had to alter page->flags anyway.
  *
  * Returns the number of pages moved to the given lru.
+ *
+ * kswapd_run()
+ *  ...
+ *   kswapd()
+ *    balance_pgdat()
+ * 	   age_active_anon()
+ *      shrink_active_list()
+ *       move_active_pages_to_lru()
+ *
+ * 从active list移动到inactive list
  */
 
 static unsigned move_active_pages_to_lru(struct lruvec *lruvec,
@@ -2046,17 +2090,22 @@ static unsigned move_active_pages_to_lru(struct lruvec *lruvec,
 		list_move(&page->lru, &lruvec->lists[lru]);
 
 		if (put_page_testzero(page)) {
+			
 			__ClearPageLRU(page);
 			__ClearPageActive(page);
+		
 			del_page_from_lru_list(page, lruvec, lru);
 
 			if (unlikely(PageCompound(page))) {
+				
 				spin_unlock_irq(&pgdat->lru_lock);
 				mem_cgroup_uncharge(page);
+			
 				(*get_compound_page_dtor(page))(page);
 				spin_lock_irq(&pgdat->lru_lock);
 			} else
 				list_add(&page->lru, pages_to_free);
+			
 		} else {
 			nr_moved += nr_pages;
 		}
@@ -2071,6 +2120,16 @@ static unsigned move_active_pages_to_lru(struct lruvec *lruvec,
 	return nr_moved;
 }
 
+ /*
+  * kswapd_run()
+  *  ...
+  *   kswapd()
+  *    balance_pgdat()
+  * 	age_active_anon()
+  *      shrink_active_list()
+  *
+  * 从active转移一部分到inactive
+  */
 static void shrink_active_list(unsigned long nr_to_scan,
 			       struct lruvec *lruvec,
 			       struct scan_control *sc,
@@ -2109,10 +2168,15 @@ static void shrink_active_list(unsigned long nr_to_scan,
 	spin_unlock_irq(&pgdat->lru_lock);
 
 	while (!list_empty(&l_hold)) {
+		
 		cond_resched();
+		
 		page = lru_to_page(&l_hold);
+
+		//从对应的lru链表中摘下来
 		list_del(&page->lru);
 
+		//不能evict,放回去
 		if (unlikely(!page_evictable(page))) {
 			putback_lru_page(page);
 			continue;
@@ -2122,6 +2186,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
 			if (page_has_private(page) && trylock_page(page)) {
 				if (page_has_private(page))
 					try_to_release_page(page, 0);
+				
 				unlock_page(page);
 			}
 		}
@@ -2137,15 +2202,17 @@ static void shrink_active_list(unsigned long nr_to_scan,
 			 * are not likely to be evicted by use-once streaming
 			 * IO, plus JVM can create lots of anon VM_EXEC pages,
 			 * so we ignore them here.
+			 *
+			 * 可执行文件的map,要继续在active的
 			 */
 			if ((vm_flags & VM_EXEC) && page_is_file_cache(page)) {
-				list_add(&page->lru, &l_active);
-				continue;
+				list_add(&page->lru, &l_active);//转移到active
+				continue;//下面的不走了
 			}
 		}
 
 		ClearPageActive(page);	/* we are de-activating */
-		list_add(&page->lru, &l_inactive);
+		list_add(&page->lru, &l_inactive);//转移到inactive
 	}
 
 	/*
@@ -2162,6 +2229,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
 
 	nr_activate = move_active_pages_to_lru(lruvec, &l_active, &l_hold, lru);
 	nr_deactivate = move_active_pages_to_lru(lruvec, &l_inactive, &l_hold, lru - LRU_ACTIVE);
+	
 	__mod_node_page_state(pgdat, NR_ISOLATED_ANON + file, -nr_taken);
 	spin_unlock_irq(&pgdat->lru_lock);
 
@@ -2198,6 +2266,14 @@ static void shrink_active_list(unsigned long nr_to_scan,
  *  100GB      31         3GB
  *    1TB     101        10GB
  *   10TB     320        32GB
+ *
+ *
+ * kswapd_run()
+ *  ...
+ *   kswapd()
+ *    balance_pgdat()
+ *     age_active_anon()
+ *      inactive_list_is_low()
  */
 static bool inactive_list_is_low(struct lruvec *lruvec, bool file,
 				 struct mem_cgroup *memcg,
@@ -2687,6 +2763,14 @@ static bool pgdat_memcg_congested(pg_data_t *pgdat, struct mem_cgroup *memcg)
 		(memcg && memcg_congested(pgdat, memcg));
 }
 
+/*
+ * kswapd_run()
+ *  ...
+ *   kswapd()
+ *    balance_pgdat()
+ *     kswapd_shrink_node()
+ *      shrink_node()
+ */
 static bool shrink_node(pg_data_t *pgdat, struct scan_control *sc)
 {
 	struct reclaim_state *reclaim_state = current->reclaim_state;
@@ -2742,6 +2826,7 @@ static bool shrink_node(pg_data_t *pgdat, struct scan_control *sc)
 			shrink_node_memcg(pgdat, memcg, sc, &lru_pages);
 			node_lru_pages += lru_pages;
 
+            //这个
 			shrink_slab(sc->gfp_mask, pgdat->node_id,
 				    memcg, sc->priority);
 
@@ -2780,6 +2865,7 @@ static bool shrink_node(pg_data_t *pgdat, struct scan_control *sc)
 		if (sc->nr_reclaimed - nr_reclaimed)
 			reclaimable = true;
 
+        //是kswapd在回收page
 		if (current_is_kswapd()) {
 			/*
 			 * If reclaim is isolating dirty pages under writeback,
@@ -2895,6 +2981,17 @@ static inline bool compaction_ready(struct zone *zone, struct scan_control *sc)
  *
  * If a zone is deemed to be full of pinned pages then just give it a light
  * scan then give up on it.
+ *
+ *
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   __alloc_pages_nodemask()
+ *    __alloc_pages_slowpath()
+ *     __alloc_pages_direct_reclaim()
+ *      __perform_reclaim()
+ *       try_to_free_pages()
+ *        do_try_to_free_pages()
+ *         shrink_zones()
  */
 static void shrink_zones(struct zonelist *zonelist, struct scan_control *sc)
 {
@@ -2935,6 +3032,8 @@ static void shrink_zones(struct zonelist *zonelist, struct scan_control *sc)
 			 * reclamation is disruptive enough to become a
 			 * noticeable problem, like transparent huge
 			 * page allocations.
+			 *
+			 * 需要compaction
 			 */
 			if (IS_ENABLED(CONFIG_COMPACTION) &&
 			    sc->order > PAGE_ALLOC_COSTLY_ORDER &&
@@ -2970,6 +3069,7 @@ static void shrink_zones(struct zonelist *zonelist, struct scan_control *sc)
 		/* See comment about same check for global reclaim above */
 		if (zone->zone_pgdat == last_pgdat)
 			continue;
+		
 		last_pgdat = zone->zone_pgdat;
 		shrink_node(zone->zone_pgdat, sc);
 	}
@@ -3015,6 +3115,15 @@ static void snapshot_refaults(struct mem_cgroup *root_memcg, pg_data_t *pgdat)
  *
  * returns:	0, if no pages reclaimed
  * 		else, the number of pages reclaimed
+ *
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   __alloc_pages_nodemask()
+ *    __alloc_pages_slowpath()
+ *     __alloc_pages_direct_reclaim()
+ *      __perform_reclaim()
+ *       try_to_free_pages()
+ *        do_try_to_free_pages()
  */
 static unsigned long do_try_to_free_pages(struct zonelist *zonelist,
 					  struct scan_control *sc)
@@ -3033,6 +3142,7 @@ retry:
 		vmpressure_prio(sc->gfp_mask, sc->target_mem_cgroup,
 				sc->priority);
 		sc->nr_scanned = 0;
+		
 		shrink_zones(zonelist, sc);
 
 		if (sc->nr_reclaimed >= sc->nr_to_reclaim)
@@ -3056,6 +3166,7 @@ retry:
 			continue;
 		last_pgdat = zone->zone_pgdat;
 		snapshot_refaults(sc->target_mem_cgroup, zone->zone_pgdat);
+		
 		set_memcg_congestion(last_pgdat, sc->target_mem_cgroup, false);
 	}
 
@@ -3211,6 +3322,15 @@ out:
 	return false;
 }
 
+/*
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   __alloc_pages_nodemask()
+ *    __alloc_pages_slowpath()
+ *     __alloc_pages_direct_reclaim()
+ *      __perform_reclaim()
+ *       try_to_free_pages()
+ */
 unsigned long try_to_free_pages(struct zonelist *zonelist, int order,
 				gfp_t gfp_mask, nodemask_t *nodemask)
 {
@@ -3340,6 +3460,13 @@ unsigned long try_to_free_mem_cgroup_pages(struct mem_cgroup *memcg,
 }
 #endif
 
+/*
+ * kswapd_run()
+ *  ...
+ *   kswapd()
+ *    balance_pgdat()
+ *     age_active_anon()
+ */
 static void age_active_anon(struct pglist_data *pgdat,
 				struct scan_control *sc)
 {
@@ -3352,6 +3479,7 @@ static void age_active_anon(struct pglist_data *pgdat,
 	do {
 		struct lruvec *lruvec = mem_cgroup_lruvec(pgdat, memcg);
 
+        //inactive和active的比例，太小,就调用shrink_active_list
 		if (inactive_list_is_low(lruvec, false, memcg, sc, true))
 			shrink_active_list(SWAP_CLUSTER_MAX, lruvec,
 					   sc, LRU_ACTIVE_ANON);
@@ -3363,6 +3491,12 @@ static void age_active_anon(struct pglist_data *pgdat,
 /*
  * Returns true if there is an eligible zone balanced for the request order
  * and classzone_idx
+ *
+ * kswapd_run()
+ *  ...
+ *   kswapd()
+ *    balance_pgdat()
+ *     pgdat_balanced()
  */
 static bool pgdat_balanced(pg_data_t *pgdat, int order, int classzone_idx)
 {
@@ -3370,13 +3504,16 @@ static bool pgdat_balanced(pg_data_t *pgdat, int order, int classzone_idx)
 	unsigned long mark = -1;
 	struct zone *zone;
 
+    /*
+     * 
+     */
 	for (i = 0; i <= classzone_idx; i++) {
 		zone = pgdat->node_zones + i;
 
 		if (!managed_zone(zone))
 			continue;
 
-		mark = high_wmark_pages(zone);
+		mark = high_wmark_pages(zone);//zone的high water marker
 		if (zone_watermark_ok_safe(zone, order, mark, classzone_idx))
 			return true;
 	}
@@ -3443,6 +3580,14 @@ static bool prepare_kswapd_sleep(pg_data_t *pgdat, int order, int classzone_idx)
  * Returns true if kswapd scanned at least the requested number of pages to
  * reclaim or if the lack of progress was due to pages under writeback.
  * This is used to determine if the scanning priority needs to be raised.
+ *
+ * kswapd_run()
+ *  ...
+ *   kswapd()
+ *    balance_pgdat()
+ *     kswapd_shrink_node()
+ *
+ *
  */
 static bool kswapd_shrink_node(pg_data_t *pgdat,
 			       struct scan_control *sc)
@@ -3456,7 +3601,7 @@ static bool kswapd_shrink_node(pg_data_t *pgdat,
 		zone = pgdat->node_zones + z;
 		if (!managed_zone(zone))
 			continue;
-
+        //跳转要回收的page数量
 		sc->nr_to_reclaim += max(high_wmark_pages(zone), SWAP_CLUSTER_MAX);
 	}
 
@@ -3491,6 +3636,11 @@ static bool kswapd_shrink_node(pg_data_t *pgdat,
  * found to have free_pages <= high_wmark_pages(zone), any page is that zone
  * or lower is eligible for reclaim until at least one usable zone is
  * balanced.
+ *
+ * kswapd_run()
+ *  ...
+ *   kswapd()
+ *    balance_pgdat()
  */
 static int balance_pgdat(pg_data_t *pgdat, int order, int classzone_idx)
 {
@@ -3498,6 +3648,8 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int classzone_idx)
 	unsigned long nr_soft_reclaimed;
 	unsigned long nr_soft_scanned;
 	struct zone *zone;
+
+	//控制页面扫描
 	struct scan_control sc = {
 		.gfp_mask = GFP_KERNEL,
 		.order = order,
@@ -3512,10 +3664,12 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int classzone_idx)
 	count_vm_event(PAGEOUTRUN);
 
 	do {
+		//需要回收的page数量
 		unsigned long nr_reclaimed = sc.nr_reclaimed;
 		bool raise_priority = true;
 		bool ret;
 
+        //记录zone id
 		sc.reclaim_idx = classzone_idx;
 
 		/*
@@ -3527,6 +3681,8 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int classzone_idx)
 		 * buffers can relieve lowmem pressure. Reclaim may still not
 		 * go ahead if all eligible zones for the original allocation
 		 * request are balanced to avoid excessive reclaim from kswapd.
+		 *
+		 * 跳过，不看先
 		 */
 		if (buffer_heads_over_limit) {
 			for (i = MAX_NR_ZONES - 1; i >= 0; i--) {
@@ -3543,9 +3699,13 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int classzone_idx)
 		 * Only reclaim if there are no eligible zones. Note that
 		 * sc.reclaim_idx is not used as buffer_heads_over_limit may
 		 * have adjusted it.
+		 *
+		 * 已经平衡就跳转到out了
 		 */
 		if (pgdat_balanced(pgdat, sc.order, classzone_idx))
 			goto out;
+
+		//下面开始扫描，回收了
 
 		/*
 		 * Do some background aging of the anon list, to give
@@ -3573,6 +3733,8 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int classzone_idx)
 		 * There should be no need to raise the scanning priority if
 		 * enough pages are already being scanned that that high
 		 * watermark would be met at 100% efficiency.
+		 *
+		 * 这个重要
 		 */
 		if (kswapd_shrink_node(pgdat, &sc))
 			raise_priority = false;
@@ -3581,6 +3743,8 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int classzone_idx)
 		 * If the low watermark is met there is no need for processes
 		 * to be throttled on pfmemalloc_wait as they should not be
 		 * able to safely make forward progress. Wake them
+		 *
+		 * 唤醒等待队列
 		 */
 		if (waitqueue_active(&pgdat->pfmemalloc_wait) &&
 				allow_direct_reclaim(pgdat))
@@ -3633,6 +3797,13 @@ static enum zone_type kswapd_classzone_idx(pg_data_t *pgdat,
 	return max(pgdat->kswapd_classzone_idx, classzone_idx);
 }
 
+/*
+ * kswapd_run()
+ *  ...
+ *   kswapd()
+ *    kswapd_try_to_sleep()
+ *
+ */
 static void kswapd_try_to_sleep(pg_data_t *pgdat, int alloc_order, int reclaim_order,
 				unsigned int classzone_idx)
 {
@@ -3710,6 +3881,7 @@ static void kswapd_try_to_sleep(pg_data_t *pgdat, int alloc_order, int reclaim_o
 		else
 			count_vm_event(KSWAPD_HIGH_WMARK_HIT_QUICKLY);
 	}
+	
 	finish_wait(&pgdat->kswapd_wait, &wait);
 }
 
@@ -3725,6 +3897,10 @@ static void kswapd_try_to_sleep(pg_data_t *pgdat, int alloc_order, int reclaim_o
  *
  * If there are applications that are active memory-allocators
  * (most normal use), this basically shouldn't matter.
+ *
+ * kswapd_run()
+ *  ...
+ *   kswapd()
  */
 static int kswapd(void *p)
 {
@@ -3740,6 +3916,7 @@ static int kswapd(void *p)
 
 	if (!cpumask_empty(cpumask))
 		set_cpus_allowed_ptr(tsk, cpumask);
+	
 	current->reclaim_state = &reclaim_state;
 
 	/*
@@ -3759,6 +3936,7 @@ static int kswapd(void *p)
 
 	pgdat->kswapd_order = 0;
 	pgdat->kswapd_classzone_idx = MAX_NR_ZONES;
+	//这里进入死循环,要一直跑
 	for ( ; ; ) {
 		bool ret;
 
@@ -3769,14 +3947,17 @@ kswapd_try_sleep:
 		kswapd_try_to_sleep(pgdat, alloc_order, reclaim_order,
 					classzone_idx);
 
-		/* Read the new order and classzone_idx */
-		alloc_order = reclaim_order = pgdat->kswapd_order;
-		classzone_idx = kswapd_classzone_idx(pgdat, 0);
+		/* Read the new order and classzone_idx 
+		 *
+		 * 
+		 */
+		alloc_order = reclaim_order = pgdat->kswapd_order;//从0开始
+		classzone_idx = kswapd_classzone_idx(pgdat, 0);//pgdat->kswapd_classzone_idx
 		pgdat->kswapd_order = 0;
 		pgdat->kswapd_classzone_idx = MAX_NR_ZONES;
 
 		ret = try_to_freeze();
-		if (kthread_should_stop())
+		if (kthread_should_stop())//current->flags & KTHREAD_SHOULD_STOP
 			break;
 
 		/*
@@ -3796,12 +3977,14 @@ kswapd_try_sleep:
 		 */
 		trace_mm_vmscan_kswapd_wake(pgdat->node_id, classzone_idx,
 						alloc_order);
+		
 		reclaim_order = balance_pgdat(pgdat, alloc_order, classzone_idx);
 		if (reclaim_order < alloc_order)
 			goto kswapd_try_sleep;
 	}
 
-	tsk->flags &= ~(PF_MEMALLOC | PF_SWAPWRITE | PF_KSWAPD);
+    //去掉几个标签
+ 	tsk->flags &= ~(PF_MEMALLOC | PF_SWAPWRITE | PF_KSWAPD);
 	current->reclaim_state = NULL;
 
 	return 0;
@@ -3813,6 +3996,10 @@ kswapd_try_sleep:
  * pgdat.  It will wake up kcompactd after reclaiming memory.  If kswapd reclaim
  * has failed or is not needed, still wake up kcompactd if only compaction is
  * needed.
+ *
+ * __alloc_pages_slowpath()
+ *  wake_all_kswapds()
+ *   wakeup_kswapd()
  */
 void wakeup_kswapd(struct zone *zone, gfp_t gfp_flags, int order,
 		   enum zone_type classzone_idx)
@@ -3824,11 +4011,13 @@ void wakeup_kswapd(struct zone *zone, gfp_t gfp_flags, int order,
 
 	if (!cpuset_zone_allowed(zone, gfp_flags))
 		return;
+	
 	pgdat = zone->zone_pgdat;
 	pgdat->kswapd_classzone_idx = kswapd_classzone_idx(pgdat,
 							   classzone_idx);
 	pgdat->kswapd_order = max(pgdat->kswapd_order, order);
-	if (!waitqueue_active(&pgdat->kswapd_wait))
+	
+	if (!waitqueue_active(&pgdat->kswapd_wait)) 
 		return;
 
 	/* Hopeless node, leave it to direct reclaim if possible */
@@ -3917,6 +4106,9 @@ static int kswapd_cpu_online(unsigned int cpu)
 /*
  * This kswapd start function will be called by init and node-hot-add.
  * On node-hot-add, kswapd will moved to proper cpus if cpus are hot-added.
+ *
+ * kswapd_init()
+ *  kswapd_run()
  */
 int kswapd_run(int nid)
 {

@@ -162,6 +162,7 @@ enum {
 	FTRACE_OPS_FL_TRACE_ARRAY		= 1 << 15,
 };
 
+//有定义
 #ifdef CONFIG_DYNAMIC_FTRACE
 /* The hash used to know what functions callbacks trace */
 struct ftrace_ops_hash {
@@ -713,6 +714,7 @@ static inline unsigned long get_lock_parent_ip(void)
 # define trace_preempt_off(a0, a1) do { } while (0)
 #endif
 
+//有定义
 #ifdef CONFIG_FTRACE_MCOUNT_RECORD
 extern void ftrace_init(void);
 #else

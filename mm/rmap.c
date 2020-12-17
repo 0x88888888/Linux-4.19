@@ -172,6 +172,8 @@ static void anon_vma_chain_link(struct vm_area_struct *vma,
 	avc->vma = vma;
 	avc->anon_vma = anon_vma;
 	list_add(&avc->same_vma, &vma->anon_vma_chain);
+	//定义在interval_tree.c中
+	//将anon_vma_chain->rb   插入到anon_vma->rb_root中
 	anon_vma_interval_tree_insert(avc, &anon_vma->rb_root);
 }
 
@@ -211,6 +213,8 @@ static void anon_vma_chain_link(struct vm_area_struct *vma,
  *      do_anonymous_page()
  *       anon_vma_prepare()
  *        __anon_vma_prepare()
+ *
+ * 组建vm_area_struct, anon_vma, anon_vma_chain三者之间的关系
  */
 int __anon_vma_prepare(struct vm_area_struct *vma)
 {
@@ -220,10 +224,12 @@ int __anon_vma_prepare(struct vm_area_struct *vma)
 
 	might_sleep();
 
+    //分配anon_vma_chain对象
 	avc = anon_vma_chain_alloc(GFP_KERNEL);
 	if (!avc)
 		goto out_enomem;
 
+    //根据vma的next和prev查找是否有可以复用的anon_vma
 	anon_vma = find_mergeable_anon_vma(vma);
 	allocated = NULL;
 	if (!anon_vma) {
@@ -238,6 +244,12 @@ int __anon_vma_prepare(struct vm_area_struct *vma)
 	spin_lock(&mm->page_table_lock);
 	if (likely(!vma->anon_vma)) {
 		vma->anon_vma = anon_vma;
+		/*
+		 *  vma->anon_vma_chain 链接 avc->same_vma
+		 *    链接 anon_vma->rb_root,avc->rb
+		 *
+		 * 注意:这个avc是在这个函数中新分配的
+		 */
 		anon_vma_chain_link(vma, avc, anon_vma);
 		/* vma reference or self-parent link for new root */
 		anon_vma->degree++;
@@ -249,6 +261,8 @@ int __anon_vma_prepare(struct vm_area_struct *vma)
 
 	if (unlikely(allocated))
 		put_anon_vma(allocated);
+
+	
 	if (unlikely(avc))
 		anon_vma_chain_free(avc);
 
@@ -306,13 +320,16 @@ static inline void unlock_anon_vma_root(struct anon_vma *root)
  *      dup_mmap() 
  *       anon_vma_fork()
  *        anon_vma_clone()
+ *
+ * 这个很重要啊
+ * 
  */
 int anon_vma_clone(struct vm_area_struct *dst, struct vm_area_struct *src)
 {
-	struct anon_vma_chain *avc, *pavc;
+	struct anon_vma_chain *avc, *pavc;// parent anon_vma_chain
 	struct anon_vma *root = NULL;
 
-    //遍历src->anon_vma_chain上的anon_vma_chain
+    //遍历src->anon_vma_chain上的anon_vma_chain，然后用链表建立anon_vma_chain的层级关系,以此anon_vma_chain->save_vma
 	list_for_each_entry_reverse(pavc, &src->anon_vma_chain, same_vma) {
 	
 		struct anon_vma *anon_vma;
@@ -331,7 +348,8 @@ int anon_vma_clone(struct vm_area_struct *dst, struct vm_area_struct *src)
 		
 		anon_vma = pavc->anon_vma;
 		root = lock_anon_vma_root(root, anon_vma);
-		
+
+		//建立vma,avc,anon_vma三者之间的关系
 		anon_vma_chain_link(dst, avc, anon_vma);
 
 		/*
@@ -349,6 +367,7 @@ int anon_vma_clone(struct vm_area_struct *dst, struct vm_area_struct *src)
 	
 	if (dst->anon_vma)
 		dst->anon_vma->degree++;
+	
 	unlock_anon_vma_root(root);
 	return 0;
 
@@ -393,6 +412,8 @@ int anon_vma_fork(struct vm_area_struct *vma, struct vm_area_struct *pvma)
 	/*
 	 * First, attach the new VMA to the parent VMA's anon_vmas,
 	 * so rmap can find non-COWed pages in child processes.
+	 *
+	 * 这个调用很重要
 	 */
 	error = anon_vma_clone(vma, pvma);
 	if (error)
@@ -907,6 +928,8 @@ static bool invalid_page_referenced_vma(struct vm_area_struct *vma, void *arg)
  *
  * Quick test_and_clear_referenced for all mappings to a page,
  * returns the number of ptes which referenced the page.
+ *
+ * 判断page是否被引用过
  */
 int page_referenced(struct page *page,
 		    int is_locked,
@@ -1096,6 +1119,15 @@ void page_move_anon_rmap(struct page *page, struct vm_area_struct *vma)
  * @vma:	VM area to add page to.
  * @address:	User virtual address of the mapping	
  * @exclusive:	the page is exclusively owned by the current process
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_anonymous_page()
+ *       page_add_new_anon_rmap()
+ *        __page_set_anon_rmap(,exclusive==1)
  */
 static void __page_set_anon_rmap(struct page *page,
 	struct vm_area_struct *vma, unsigned long address, int exclusive)
@@ -1221,6 +1253,14 @@ void do_page_add_anon_rmap(struct page *page,
  * Same as page_add_anon_rmap but must only be called on *new* pages.
  * This means the inc-and-test can be bypassed.
  * Page does not have to be locked.
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_anonymous_page()
+ *       page_add_new_anon_rmap()
  */
 void page_add_new_anon_rmap(struct page *page,
 	struct vm_area_struct *vma, unsigned long address, bool compound)
@@ -1241,6 +1281,7 @@ void page_add_new_anon_rmap(struct page *page,
 		atomic_set(&page->_mapcount, 0);
 	}
 	__mod_node_page_state(page_pgdat(page), NR_ANON_MAPPED, nr);
+	
 	__page_set_anon_rmap(page, vma, address, 1);
 }
 
@@ -1257,6 +1298,7 @@ void page_add_file_rmap(struct page *page, bool compound)
 
 	VM_BUG_ON_PAGE(compound && !PageTransHuge(page), page);
 	lock_page_memcg(page);
+	
 	if (compound && PageTransHuge(page)) {
 		for (i = 0, nr = 0; i < HPAGE_PMD_NR; i++) {
 			if (atomic_inc_and_test(&page[i]._mapcount))
@@ -1266,11 +1308,13 @@ void page_add_file_rmap(struct page *page, bool compound)
 			goto out;
 		VM_BUG_ON_PAGE(!PageSwapBacked(page), page);
 		__inc_node_page_state(page, NR_SHMEM_PMDMAPPED);
+		
 	} else {
 		if (PageTransCompound(page) && page_mapping(page)) {
 			VM_WARN_ON_ONCE(!PageLocked(page));
 
 			SetPageDoubleMap(compound_head(page));
+		
 			if (PageMlocked(page))
 				clear_page_mlock(compound_head(page));
 		}

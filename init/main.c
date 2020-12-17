@@ -537,7 +537,8 @@ static void __init mm_init(void)
 	 */
 	//空函数
 	page_ext_init_flatmem();
-	
+
+	//这里相当于建立buddy system了
 	mem_init();
 	
 	kmem_cache_init();
@@ -597,6 +598,7 @@ asmlinkage __visible void __init start_kernel(void)
 	
 	debug_objects_early_init();
 
+    // kernel/cgroup/cgroup.c中
 	cgroup_init_early();
 
 
@@ -616,7 +618,8 @@ asmlinkage __visible void __init start_kernel(void)
 	page_address_init();
 	
 	pr_notice("%s", linux_banner);
-	
+
+	//memblock初始化
 	setup_arch(&command_line);
 	/*
 	 * Set up the the initial canary and entropy after arch
@@ -638,7 +641,7 @@ asmlinkage __visible void __init start_kernel(void)
 	//根据cpu id装载gdt
 	smp_prepare_boot_cpu();	/* arch-specific boot-cpu hooks */
 	boot_cpu_hotplug_init();
-
+    //建立pg_data->nodezone_lists[].zoneref
 	build_all_zonelists(NULL);
 	page_alloc_init();
 
@@ -653,6 +656,7 @@ asmlinkage __visible void __init start_kernel(void)
 		parse_args("Setting init args", after_dashes, NULL, 0, -1, -1,
 			   NULL, set_init_arg);
 
+    //在jump_label.h中
 	jump_label_init();
 
 	/*
@@ -669,7 +673,7 @@ asmlinkage __visible void __init start_kernel(void)
 	//设置中断处理函数和内部异常处理函数
 	trap_init();
 
-	//这个函数结束 slab allocator已经建立好了
+	//这个函数结束 slab allocator已经建立好了,替换掉memblock allocator了
 	mm_init();
 
 	ftrace_init();
@@ -681,6 +685,8 @@ asmlinkage __visible void __init start_kernel(void)
 	 * Set up the scheduler prior starting any interrupts (such as the
 	 * timer interrupt). Full topology setup happens at smp_init()
 	 * time - but meanwhile we still have a functioning scheduler.
+	 *
+	 * 初始化root_task_group和rq
 	 */
 	sched_init();
 	/*
@@ -709,7 +715,10 @@ asmlinkage __visible void __init start_kernel(void)
 
 	rcu_init();
 
-	/* Trace events are available after this */
+	/* Trace events are available after this 
+	 *
+	 * event trace, syscalls trace 这些功能
+	 */
 	trace_init();
 
 	if (initcall_debug) //默认为0
@@ -727,6 +736,7 @@ asmlinkage __visible void __init start_kernel(void)
 	init_IRQ();
 	
 	tick_init();
+	
 	rcu_init_nohz();
 	
 	init_timers();
@@ -743,13 +753,16 @@ asmlinkage __visible void __init start_kernel(void)
 	printk_safe_init();
 	
 	perf_event_init();
+	
 	profile_init();
+	
 	call_function_init();
 	WARN(!irqs_disabled(), "Interrupts were enabled early\n");
 
 	early_boot_irqs_disabled = false;
 	local_irq_enable();
 
+    //走到slab_state == FULL状态
 	kmem_cache_init_late();
 
 	/*
@@ -855,7 +868,8 @@ asmlinkage __visible void __init start_kernel(void)
 
 	//初始化proc文件系统
 	proc_root_init();
-	
+
+	//namespace filesystem
 	nsfs_init();
 	cpuset_init();
 	cgroup_init();
@@ -1257,6 +1271,7 @@ static int __ref kernel_init(void *unused)
 	/* need to finish all async __init code before freeing the memory */
 	async_synchronize_full();
 	ftrace_free_init_mem();
+	//空函数
 	jump_label_invalidate_initmem();
 	free_initmem();
 	mark_readonly();
@@ -1272,6 +1287,7 @@ static int __ref kernel_init(void *unused)
 
 	rcu_end_inkernel_boot();
 
+   // rdinit= 字符串
 	if (ramdisk_execute_command) {
 		ret = run_init_process(ramdisk_execute_command);
 		if (!ret)
@@ -1351,6 +1367,7 @@ static noinline void __init kernel_init_freeable(void)
 
 	page_alloc_init_late();
 
+    //这个内容很丰富了
 	do_basic_setup();
 
 	/* Open the /dev/console on the rootfs, this should never fail */

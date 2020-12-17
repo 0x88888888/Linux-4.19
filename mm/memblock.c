@@ -329,6 +329,13 @@ again:
 	return ret;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   e820__memblock_setup()
+ *    memblock_trim_memory()
+ *     memblock_remove_region()
+ */
 static void __init_memblock memblock_remove_region(struct memblock_type *type, unsigned long r)
 {
 	type->total_size -= type->regions[r].size;
@@ -350,6 +357,14 @@ static void __init_memblock memblock_remove_region(struct memblock_type *type, u
 #ifdef CONFIG_ARCH_DISCARD_MEMBLOCK
 /**
  * memblock_discard - discard memory and reserved arrays if they were allocated
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      page_alloc_init_late()
+ *       memblock_discard()
  */
 void __init memblock_discard(void)
 {
@@ -530,6 +545,20 @@ static void __init_memblock memblock_merge_regions(struct memblock_type *type)
  *
  * Insert new memblock region [@base, @base + @size) into @type at @idx.
  * @type must already have extra room to accommodate the new region.
+ *
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   e820__memblock_setup()
+ *    memblock_add()
+ *     memblock_add_range()
+ *      memblock_insert_region()
+ *
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   e820__memblock_setup()
+ *    memblock_reserve() 
+ *     memblock_add_range() 
+ *      memblock_insert_region()
  */
 static void __init_memblock memblock_insert_region(struct memblock_type *type,
 						   int idx, phys_addr_t base,
@@ -564,6 +593,19 @@ static void __init_memblock memblock_insert_region(struct memblock_type *type,
  *
  * Return:
  * 0 on success, -errno on failure.
+ *
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   e820__memblock_setup()
+ *    memblock_add()
+ *     memblock_add_range()
+ *
+ *
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   e820__memblock_setup()
+ *    memblock_reserve() 
+ *     memblock_add_range()
  */
 int __init_memblock memblock_add_range(struct memblock_type *type,
 				phys_addr_t base, phys_addr_t size,
@@ -610,10 +652,12 @@ repeat:
 		 * area, insert that portion.
 		 */
 		if (rbase > base) {
+			//有定义
 #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
 			WARN_ON(nid != memblock_get_region_node(rgn));
 #endif
 			WARN_ON(flags != rgn->flags);
+
 			nr_new++;
 			if (insert)
 				memblock_insert_region(type, idx++, base,
@@ -679,6 +723,11 @@ int __init_memblock memblock_add_node(phys_addr_t base, phys_addr_t size,
  *
  * Return:
  * 0 on success, -errno on failure.
+ *
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   e820__memblock_setup()
+ *    memblock_add()
  */
 int __init_memblock memblock_add(phys_addr_t base, phys_addr_t size)
 {
@@ -803,6 +852,12 @@ int __init_memblock memblock_free(phys_addr_t base, phys_addr_t size)
 	return memblock_remove_range(&memblock.reserved, base, size);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   e820__memblock_setup()
+ *    memblock_reserve()
+ */ 
 int __init_memblock memblock_reserve(phys_addr_t base, phys_addr_t size)
 {
 	phys_addr_t end = base + size - 1;
@@ -1553,6 +1608,15 @@ void __init __memblock_free_early(phys_addr_t base, phys_addr_t size)
  * This is only useful when the bootmem allocator has already been torn
  * down, but we are still initializing the system.  Pages are released directly
  * to the buddy allocator, no bootmem metadata is updated because it is gone.
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      page_alloc_init_late()
+ *       memblock_discard()
+ *        __memblock_free_late()
  */
 void __init __memblock_free_late(phys_addr_t base, phys_addr_t size)
 {
@@ -1792,6 +1856,12 @@ bool __init_memblock memblock_is_region_reserved(phys_addr_t base, phys_addr_t s
 	return memblock_overlaps_region(&memblock.reserved, base, size);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   e820__memblock_setup()
+ *    memblock_trim_memory()
+ */
 void __init_memblock memblock_trim_memory(phys_addr_t align)
 {
 	phys_addr_t start, end, orig_start, orig_end;

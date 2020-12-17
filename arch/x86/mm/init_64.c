@@ -739,7 +739,13 @@ kernel_physical_mapping_init(unsigned long paddr_start,
 	return paddr_last;
 }
 
+//有定义
 #ifndef CONFIG_NUMA
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   initmem_init()
+ */
 void __init initmem_init(void)
 {
 	memblock_set_node(0, PHYS_ADDR_MAX, &memblock.memory, 0);
@@ -1210,6 +1216,7 @@ void __init mem_init(void)
 	 */
 	free_all_bootmem();
 	after_bootmem = 1;
+	//x86_init_noop
 	x86_init.hyper.init_after_bootmem();
 
 	/*

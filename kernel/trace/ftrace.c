@@ -6051,6 +6051,13 @@ static void add_to_clear_hash_list(struct list_head *clear_list,
 	list_add(&func->list, clear_list);
 }
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     ftrace_free_mem()
+ */
 void ftrace_free_mem(struct module *mod, void *start_ptr, void *end_ptr)
 {
 	unsigned long start = (unsigned long)(start_ptr);
