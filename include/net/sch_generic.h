@@ -767,6 +767,7 @@ static inline void qdisc_bstats_cpu_update(struct Qdisc *sch,
 	bstats_cpu_update(this_cpu_ptr(sch->cpu_bstats), skb);
 }
 
+//更新 qdisc 发送的字节数和包数统计
 static inline void qdisc_bstats_update(struct Qdisc *sch,
 				       const struct sk_buff *skb)
 {

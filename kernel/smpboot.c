@@ -121,6 +121,21 @@ enum {
  * thread.
  *
  * Returns 1 when the thread should exit, 0 otherwise.
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      smp_init()
+ *       cpu_up() 启动cpuid为cpu的CPU
+ *        do_cpu_up()
+ *         _cpu_up()
+ *          cpuhp_up_callbacks()
+ *           cpuhp_invoke_callback( bringup == true)
+ *            smpboot_create_threads()
+ *             __smpboot_create_thread()
+ *              smpboot_thread_fn()
  */
 static int smpboot_thread_fn(void *data)
 {
@@ -145,6 +160,7 @@ static int smpboot_thread_fn(void *data)
 			preempt_enable();
 			if (ht->park && td->status == HP_THREAD_ACTIVE) {
 				BUG_ON(td->cpu != smp_processor_id());
+				//这里执行啥了？
 				ht->park(td->cpu);
 				td->status = HP_THREAD_PARKED;
 			}
@@ -180,11 +196,27 @@ static int smpboot_thread_fn(void *data)
 		} else {
 			__set_current_state(TASK_RUNNING);
 			preempt_enable();
-			ht->thread_fn(td->cpu);
+ 			//这里执行, cpu_stopper_thread
+			ht->thread_fn(td->cpu); 
 		}
 	}
 }
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      smp_init()
+ *       cpu_up() 启动cpuid为cpu的CPU
+ *        do_cpu_up()
+ *         _cpu_up()
+ *          cpuhp_up_callbacks()
+ *           cpuhp_invoke_callback( bringup == true)
+ *            smpboot_create_threads()
+ *             __smpboot_create_thread()
+ */
 static int
 __smpboot_create_thread(struct smp_hotplug_thread *ht, unsigned int cpu)
 {
@@ -228,6 +260,20 @@ __smpboot_create_thread(struct smp_hotplug_thread *ht, unsigned int cpu)
 	return 0;
 }
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      smp_init()
+ *       cpu_up() 启动cpuid为cpu的CPU
+ *        do_cpu_up()
+ *         _cpu_up()
+ *          cpuhp_up_callbacks()
+ *           cpuhp_invoke_callback( bringup == true)
+ *            smpboot_create_threads()
+ */
 int smpboot_create_threads(unsigned int cpu)
 {
 	struct smp_hotplug_thread *cur;

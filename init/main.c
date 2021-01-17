@@ -411,6 +411,8 @@ static noinline void __ref rest_init(void)
 	 * We need to spawn init first so that it obtains pid 1, however
 	 * the init task will end up wanting to create kthreads, which, if
 	 * we schedule it before we create kthreadd, will OOPS.
+	 *
+	 * 调用do_basic_setup,执行各种__init函数
 	 */
 	pid = kernel_thread(kernel_init, NULL, CLONE_FS);
 	/*
@@ -643,6 +645,7 @@ asmlinkage __visible void __init start_kernel(void)
 	boot_cpu_hotplug_init();
     //建立pg_data->nodezone_lists[].zoneref
 	build_all_zonelists(NULL);
+	
 	page_alloc_init();
 
 	pr_notice("Kernel command line: %s\n", boot_command_line);
@@ -662,6 +665,8 @@ asmlinkage __visible void __init start_kernel(void)
 	/*
 	 * These use large bootmem allocations and must precede
 	 * kmem_cache_init()
+	 *
+	 * 从memblock中分配
 	 */
 	setup_log_buf(0);
 
@@ -673,12 +678,19 @@ asmlinkage __visible void __init start_kernel(void)
 	//设置中断处理函数和内部异常处理函数
 	trap_init();
 
-	//这个函数结束 slab allocator已经建立好了,替换掉memblock allocator了
+	/*
+	 * 这个函数结束 slab allocator已经建立好了,
+	 * 替换掉memblock allocator了
+	 */
 	mm_init();
+	
 
 	ftrace_init();
 
-	/* trace_printk can be enabled here */
+	/* trace_printk can be enabled here 
+	 *  
+	 * 分配trace buffer,设置global_trace对象
+	 */
 	early_trace_init();
 
 	/*
@@ -697,7 +709,8 @@ asmlinkage __visible void __init start_kernel(void)
 	if (WARN(!irqs_disabled(),
 		 "Interrupts were enabled *very* early, fixing it\n"))
 		local_irq_disable();
-	
+
+	//分配radix_tree_noce_cachep
 	radix_tree_init();
 
 	/*
@@ -871,7 +884,9 @@ asmlinkage __visible void __init start_kernel(void)
 
 	//namespace filesystem
 	nsfs_init();
+	
 	cpuset_init();
+	
 	cgroup_init();
 	
 	taskstats_init_early();
@@ -1132,6 +1147,8 @@ static void __init do_initcalls(void)
      * 会调用 populate_rootfs,
      *
      * 1. core_initcall(sock_init)
+     * 1. core_initcall(cgroup_wq_init)
+     *
      * 
      * 5. fs_initcall(inet_init)
      */
@@ -1273,6 +1290,7 @@ static int __ref kernel_init(void *unused)
 	ftrace_free_init_mem();
 	//空函数
 	jump_label_invalidate_initmem();
+	//释放 __init标记的代码
 	free_initmem();
 	mark_readonly();
 
@@ -1367,7 +1385,7 @@ static noinline void __init kernel_init_freeable(void)
 
 	page_alloc_init_late();
 
-    //这个内容很丰富了
+    //这个内容很丰富了,调用各种__init函数
 	do_basic_setup();
 
 	/* Open the /dev/console on the rootfs, this should never fail */

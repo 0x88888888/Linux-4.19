@@ -1231,6 +1231,10 @@ skb_flow_dissect_tunnel_info(const struct sk_buff *skb,
 			     struct flow_dissector *flow_dissector,
 			     void *target_container);
 
+/*
+ * __get_xps_queue_idx()
+ *  skb_get_hash()
+ */
 static inline __u32 skb_get_hash(struct sk_buff *skb)
 {
 	if (!skb->l4_hash && !skb->sw_hash)

@@ -939,8 +939,18 @@ static inline void sk_incoming_cpu_update(struct sock *sk)
 		sk->sk_incoming_cpu = cpu;
 }
 
+/*
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ *    sock_sendmsg_nosec()
+ *     inet_sendmsg()
+ *      sock_rps_record_flow()
+ *       sock_rps_record_flow_hash()
+ */
 static inline void sock_rps_record_flow_hash(__u32 hash)
 {
+//有配置
 #ifdef CONFIG_RPS
 	struct rps_sock_flow_table *sock_flow_table;
 
@@ -951,8 +961,20 @@ static inline void sock_rps_record_flow_hash(__u32 hash)
 #endif
 }
 
+/*
+ * 记录最后一个处理该（数据所属的）flow 的 CPU; 
+ * Receive Packet Steering 会用到这个信息
+ *
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ *    sock_sendmsg_nosec()
+ *     inet_sendmsg()
+ *      sock_rps_record_flow()
+ */
 static inline void sock_rps_record_flow(const struct sock *sk)
 {
+//有配置
 #ifdef CONFIG_RPS
 	if (static_key_false(&rfs_needed)) {
 		/* Reading sk->sk_rxhash might incur an expensive cache line

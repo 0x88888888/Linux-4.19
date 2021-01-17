@@ -33,12 +33,22 @@ struct cpu_stop_done {
 	struct completion	completion;	/* fired if nr_todo reaches 0 */
 };
 
-/* the actual stopper, one per every possible cpu, enabled on online cpus */
+/* the actual stopper, one per every possible cpu, enabled on online cpus 
+ *
+ * 每个cpu一个cpu_stoper对象,就在下面定义DEFINE_PER_CPU对象了
+ */
 struct cpu_stopper {
+    /*
+     * 迁移线程描述符,migration{0}
+     *
+     * stop_one_cpu/stop_one_cpu_nowait
+     * smpboot_thread_fn
+     */
 	struct task_struct	*thread;
 
 	raw_spinlock_t		lock;
 	bool			enabled;	/* is this stopper enabled? */
+	//工作队列 ，每个节点都是一个停机工作对象 cpu_stop_work
 	struct list_head	works;		/* list of pending works */
 
 	struct cpu_stop_work	stop_work;	/* for stop_cpus */
@@ -482,6 +492,23 @@ static int cpu_stop_should_run(unsigned int cpu)
 	return run;
 }
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      smp_init()
+ *       cpu_up() 启动cpuid为cpu的CPU
+ *        do_cpu_up()
+ *         _cpu_up()
+ *          cpuhp_up_callbacks()
+ *           cpuhp_invoke_callback( bringup == true)
+ *            smpboot_create_threads()
+ *             __smpboot_create_thread()
+ *              smpboot_thread_fn()
+ *               cpu_stopper_thread()
+ */
 static void cpu_stopper_thread(unsigned int cpu)
 {
 	struct cpu_stopper *stopper = &per_cpu(cpu_stopper, cpu);
@@ -490,14 +517,18 @@ static void cpu_stopper_thread(unsigned int cpu)
 repeat:
 	work = NULL;
 	raw_spin_lock_irq(&stopper->lock);
+
+	//取出一个cpu_stop_work先
 	if (!list_empty(&stopper->works)) {
 		work = list_first_entry(&stopper->works,
 					struct cpu_stop_work, list);
 		list_del_init(&work->list);
 	}
+	
 	raw_spin_unlock_irq(&stopper->lock);
 
 	if (work) {
+		//执行
 		cpu_stop_fn_t fn = work->fn;
 		void *arg = work->arg;
 		struct cpu_stop_done *done = work->done;
@@ -505,6 +536,7 @@ repeat:
 
 		/* cpu stop callbacks must not sleep, make in_atomic() == T */
 		preempt_count_inc();
+		//执行，一般是stop_one_cpu/stop_one_cpu_nowait
 		ret = fn(arg);
 		if (done) {
 			if (ret)

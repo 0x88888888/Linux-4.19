@@ -103,6 +103,7 @@ void netdev_set_default_ethtool_ops(struct net_device *dev,
  * indicates that the device will soon be dropping packets, or already drops
  * some packets of the same priority; prompting us to send less aggressively. */
 #define net_xmit_eval(e)	((e) == NET_XMIT_CN ? 0 : (e))
+//将低层错误转换为 IP 和 UDP 协议层所能理解的错误
 #define net_xmit_errno(e)	((e) != NET_XMIT_CN ? -ENOBUFS : 0)
 
 /* Driver transmit return codes */
@@ -684,6 +685,16 @@ struct rps_sock_flow_table {
 extern u32 rps_cpu_mask;
 extern struct rps_sock_flow_table __rcu *rps_sock_flow_table;
 
+/*
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ *    sock_sendmsg_nosec()
+ *     inet_sendmsg()
+ *      sock_rps_record_flow()
+ *       sock_rps_record_flow_hash()
+ *        rps_record_sock_flow()
+ */
 static inline void rps_record_sock_flow(struct rps_sock_flow_table *table,
 					u32 hash)
 {
@@ -4303,7 +4314,15 @@ int __init dev_proc_init(void);
 #else
 #define dev_proc_init() 0
 #endif
-
+/*
+ * neigh_hh_output()
+ *  dev_queue_xmit()
+ *   __dev_queue_xmit
+ *    dev_hard_start_xmit()
+ *     xmit_one()
+ *      netdev_start_xmit()
+ *       __netdev_start_xmit()
+*/
 static inline netdev_tx_t __netdev_start_xmit(const struct net_device_ops *ops,
 					      struct sk_buff *skb, struct net_device *dev,
 					      bool more)
@@ -4311,6 +4330,15 @@ static inline netdev_tx_t __netdev_start_xmit(const struct net_device_ops *ops,
 	skb->xmit_more = more ? 1 : 0;
 	return ops->ndo_start_xmit(skb, dev);
 }
+
+/*
+ * neigh_hh_output()
+ *  dev_queue_xmit()
+ *   __dev_queue_xmit
+ *    dev_hard_start_xmit()
+ *     xmit_one()
+ *      netdev_start_xmit()
+*/
 
 static inline netdev_tx_t netdev_start_xmit(struct sk_buff *skb, struct net_device *dev,
 					    struct netdev_queue *txq, bool more)

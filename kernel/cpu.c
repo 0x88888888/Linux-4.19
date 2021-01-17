@@ -149,7 +149,7 @@ static struct cpuhp_step *cpuhp_get_step(enum cpuhp_state state)
  *        do_cpu_up()
  *         _cpu_up()
  *          cpuhp_up_callbacks()
- *           cpuhp_invoke_callback()
+ *           cpuhp_invoke_callback( bringup == true)
  */
 static int cpuhp_invoke_callback(unsigned int cpu, enum cpuhp_state state,
 				 bool bringup, struct hlist_node *node,
@@ -172,7 +172,7 @@ static int cpuhp_invoke_callback(unsigned int cpu, enum cpuhp_state state,
 
 	if (!step->multi_instance) {
 		WARN_ON_ONCE(lastp && *lastp);
-		//cb是bringup_cpu
+		//cb是bringup_cpu  ,step->startup->single == smpboot_create_threads
 		cb = bringup ? step->startup.single : step->teardown.single;
 		if (!cb)
 			return 0;

@@ -8,6 +8,7 @@
 #include <asm/ptrace.h>
 
 
+//没有定义
 #ifdef CONFIG_CONTEXT_TRACKING
 extern void context_tracking_cpu_set(int cpu);
 
@@ -81,6 +82,7 @@ static inline enum ctx_state ct_state(void)
 		this_cpu_read(context_tracking.state) : CONTEXT_DISABLED;
 }
 #else
+//用这里的
 static inline void user_enter(void) { }
 static inline void user_exit(void) { }
 static inline void user_enter_irqoff(void) { }
@@ -99,6 +101,7 @@ static inline void context_tracking_init(void) { }
 #endif /* CONFIG_CONTEXT_TRACKING_FORCE */
 
 
+//没有定义
 #ifdef CONFIG_VIRT_CPU_ACCOUNTING_GEN
 /* must be called with irqs disabled */
 static inline void guest_enter_irqoff(void)

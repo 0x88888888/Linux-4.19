@@ -730,6 +730,7 @@ void __put_task_struct(struct task_struct *tsk)
 }
 EXPORT_SYMBOL_GPL(__put_task_struct);
 
+
 void __init __weak arch_task_cache_init(void) { }
 
 /*
@@ -798,8 +799,10 @@ void __init fork_init(void)
 #endif
 
 	/* do the arch specific task caches init */
+    //x86,空函数
 	arch_task_cache_init();
 
+    //设定max_threads
 	set_max_threads(MAX_THREADS);
 
 	init_task.signal->rlim[RLIMIT_NPROC].rlim_cur = max_threads/2;

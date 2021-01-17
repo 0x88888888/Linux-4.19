@@ -57,6 +57,8 @@ static void context_tracking_recursion_exit(void)
  * to user or guest space, when it's guaranteed the remaining kernel
  * instructions to execute won't use any RCU read side critical section
  * because this function sets RCU in extended quiescent state.
+ *
+ * cpu即将进入user 或者 guset mode了
  */
 void __context_tracking_enter(enum ctx_state state)
 {
@@ -79,6 +81,7 @@ void __context_tracking_enter(enum ctx_state state)
 				trace_user_enter(0);
 				vtime_user_enter(current);
 			}
+			
 			rcu_user_enter();
 		}
 		/*

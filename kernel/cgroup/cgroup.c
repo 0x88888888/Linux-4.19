@@ -113,6 +113,16 @@ struct percpu_rw_semaphore cgroup_threadgroup_rwsem;
  */
 static struct workqueue_struct *cgroup_destroy_wq;
 
+
+/* cgroup_subsys[]中有下面这些cgroup_subsys对象
+ *
+ * cpuset_cgrp_subsys, cpu_cgrp_subsys, cpuacct_cgrp_subsys,
+ * io_cgrp_subsys, memory_cgrp_subsys, devices_cgrp_subsys,
+ * freezer_cgrp_subsys, net_cls,perf_event_cgrp_subsys, 
+ * net_prio_cgrp_subsys, hugetlb,pids,rdma_cgrp_subsys,
+ * debug_cgrp_subsys
+ */
+ 
 /* generate an array of cgroup subsystem pointers */
 #define SUBSYS(_x) [_x ## _cgrp_id] = &_x ## _cgrp_subsys,
 struct cgroup_subsys *cgroup_subsys[] = {
@@ -120,7 +130,14 @@ struct cgroup_subsys *cgroup_subsys[] = {
 };
 #undef SUBSYS
 
-/* array of cgroup subsystem names */
+/* array of cgroup subsystem names 
+ *
+ * cpuset, cpu, cpuacct,
+ * io, memory, devices,
+ * freezer, net_cls,perf_event, 
+ * net_prio, hugetlb,pids,rdma,
+ * debug
+ */
 #define SUBSYS(_x) [_x ## _cgrp_id] = #_x,
 static const char *cgroup_subsys_name[] = {
 #include <linux/cgroup_subsys.h>
@@ -5286,6 +5303,9 @@ static void __init cgroup_init_subsys(struct cgroup_subsys *ss, bool early)
  *
  * start_kernel()  [init/main.c]
  *  cgroup_init_early()
+ *
+ * 初始化需要尽早初始化的子系统。
+ * 一般这些需要尽早初始化的子系统都包括：cpuset，cpu，cpuacct
  */
 int __init cgroup_init_early(void)
 {
@@ -5294,10 +5314,12 @@ int __init cgroup_init_early(void)
 	int i;
 
 	init_cgroup_root(&cgrp_dfl_root, &opts);
+	
 	cgrp_dfl_root.cgrp.self.flags |= CSS_NO_REF;
 
 	RCU_INIT_POINTER(init_task.cgroups, &init_css_set);
 
+    //遍历cgroup_subsys[]
 	for_each_subsys(ss, i) {
 		WARN(!ss->css_alloc || !ss->css_free || ss->name || ss->id,
 		     "invalid cgroup_subsys %d:%s css_alloc=%p css_free=%p id:name=%d:%s\n",
@@ -5314,6 +5336,7 @@ int __init cgroup_init_early(void)
 		if (ss->early_init)
 			cgroup_init_subsys(ss, true);
 	}
+	
 	return 0;
 }
 

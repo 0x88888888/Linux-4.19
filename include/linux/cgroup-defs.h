@@ -126,7 +126,10 @@ struct cgroup_subsys_state {
 	/* reference count - access via css_[try]get() and css_put() */
 	struct percpu_ref refcnt;
 
-	/* siblings list anchored at the parent's ->children */
+	/* siblings list anchored at the parent's ->children 
+	 *
+	 * 负责将同一层级的cgroup连接成一颗cgroup树
+	 */
 	struct list_head sibling;
 	struct list_head children;
 
@@ -162,6 +165,8 @@ struct cgroup_subsys_state {
 	/*
 	 * PI: the parent css.	Placed here for cache proximity to following
 	 * fields of the containing structure.
+	 *
+	 * 负责将同一层级的cgroup连接成一颗cgroup树
 	 */
 	struct cgroup_subsys_state *parent;
 };
@@ -178,10 +183,17 @@ struct css_set {
 	 * Set of subsystem states, one for each subsystem. This array is
 	 * immutable after creation apart from the init_css_set during
 	 * subsystem registration (at boot time).
+	 *
+	 * 存储一组指向cgroup_subsys_state的指针。
+	 * 一个cgroup_subsys_state就是进程与一个特定的子系统相关的信息。
+	 * 通过这个指针，进程就可以获得相应的cgroups控制信息了
 	 */
 	struct cgroup_subsys_state *subsys[CGROUP_SUBSYS_COUNT];
 
-	/* reference count */
+	/* reference count
+	 * 引用计数,css_set可以被多个进程共享,
+	 * 只要这些进程的cgroup信息相同，比如:在所有已经创建的层级里面都在同一个cgroup里的进程。
+	 */
 	refcount_t refcount;
 
 	/*
@@ -204,8 +216,11 @@ struct css_set {
 	 * process of being migrated out or in.  Protected by
 	 * css_set_rwsem, but, during migration, once tasks are moved to
 	 * mg_tasks, it can be read safely while holding cgroup_mutex.
+	 *
+	 * tasks是将所有引用此css_set的进程连接成链表
 	 */
 	struct list_head tasks;
+	//正在从这个cgroup group迁移出去或者迁移进来的task(task_struct)对象
 	struct list_head mg_tasks;
 
 	/* all css_task_iters currently walking this cset */
@@ -227,12 +242,16 @@ struct css_set {
 	/*
 	 * List running through all cgroup groups in the same hash
 	 * slot. Protected by css_set_lock
+	 *
+	 * 用于把所有的css_set组成一个hash表，这样内核可以快速查找特定的css_set
 	 */
 	struct hlist_node hlist;
 
 	/*
 	 * List of cgrp_cset_links pointing at cgroups referenced from this
 	 * css_set.  Protected by css_set_lock.
+	 *
+	 * 链接到cgrp_cset_link->cgrp_link
 	 */
 	struct list_head cgrp_links;
 
@@ -392,6 +411,8 @@ struct cgroup {
 	/*
 	 * List of cgrp_cset_links pointing at css_sets with tasks in this
 	 * cgroup.  Protected by css_set_lock.
+	 *
+	 * 链接到cgroup->cset_link,形成链表
 	 */
 	struct list_head cset_links;
 
@@ -454,22 +475,37 @@ struct cgroup {
 struct cgroup_root {
 	struct kernfs_root *kf_root;
 
-	/* The bitmask of subsystems attached to this hierarchy */
+	/* The bitmask of subsystems attached to this hierarchy 
+	 *
+	 * subsys_mask指向将要附加到层级的子系统，在子系统附加到层级时使用。
+	 */
 	unsigned int subsys_mask;
 
-	/* Unique id for this hierarchy. */
+	/* Unique id for this hierarchy. 
+	 *
+	 * 该层级唯一的id
+	 */
 	int hierarchy_id;
 
-	/* The root cgroup.  Root is destroyed on its release. */
+	/* The root cgroup.  Root is destroyed on its release.
+	 *
+	 * 指向该层级的根cgroup
+	 */
 	struct cgroup cgrp;
 
 	/* for cgrp->ancestor_ids[0] */
 	int cgrp_ancestor_id_storage;
 
-	/* Number of cgroups in the hierarchy, used only for /proc/cgroups */
+	/* Number of cgroups in the hierarchy, used only for /proc/cgroups 
+	 *
+	 * 记录该层级cgroup的个数
+	 */
 	atomic_t nr_cgrps;
 
-	/* A list running through the active hierarchies */
+	/* A list running through the active hierarchies
+	 *
+	 * 是一个嵌入的list_head，用于将系统所有的层级连成链表
+	 */
 	struct list_head root_list;
 
 	/* Hierarchy-specific flags */

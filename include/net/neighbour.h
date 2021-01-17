@@ -36,6 +36,12 @@
 
 #define NUD_IN_TIMER	(NUD_INCOMPLETE|NUD_REACHABLE|NUD_DELAY|NUD_PROBE)
 #define NUD_VALID	(NUD_PERMANENT|NUD_NOARP|NUD_REACHABLE|NUD_PROBE|NUD_STALE|NUD_DELAY)
+/*
+ * 邻居被认为是 NUD_CONNECTED，如果它满足以下一个或多个条件：
+ * NUD_PERMANENT：静态路由
+ * NUD_NOARP：不需要 ARP 请求（例如，目标是多播或广播地址，或环回设备）
+ * NUD_REACHABLE：邻居是“可达的。”只要成功处理了ARP 请求，目标就会被标记为可达
+ */
 #define NUD_CONNECTED	(NUD_PERMANENT|NUD_NOARP|NUD_REACHABLE)
 
 struct neighbour;
@@ -430,12 +436,18 @@ static inline struct neighbour * neigh_clone(struct neighbour *neigh)
 
 #define neigh_hold(n)	refcount_inc(&(n)->refcnt)
 
+/*
+ * neigh_output()
+ *  neigh_resolve_output()
+ *   neigh_event_send()
+ */
 static inline int neigh_event_send(struct neighbour *neigh, struct sk_buff *skb)
 {
 	unsigned long now = jiffies;
 	
 	if (neigh->used != now)
 		neigh->used = now;
+	
 	if (!(neigh->nud_state&(NUD_CONNECTED|NUD_DELAY|NUD_PROBE)))
 		return __neigh_event_send(neigh, skb);
 	return 0;
@@ -455,6 +467,23 @@ static inline int neigh_hh_bridge(struct hh_cache *hh, struct sk_buff *skb)
 }
 #endif
 
+/*
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ *    sock_sendmsg_nosec()
+ *     inet_sendmsg()
+ *      udp_sendmsg()
+ *       udp_send_skb()
+ *        ip_send_skb()
+ *         ip_local_out()
+ *          dst_output()
+ *           ip_output()
+ *            ip_finish_output()
+ *             ip_finish_output2()
+ *              neigh_output()
+ *               neigh_hh_output()
+ */
 static inline int neigh_hh_output(const struct hh_cache *hh, struct sk_buff *skb)
 {
 	unsigned int seq;
@@ -477,14 +506,38 @@ static inline int neigh_hh_output(const struct hh_cache *hh, struct sk_buff *skb
 	return dev_queue_xmit(skb);
 }
 
+/*
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ *    sock_sendmsg_nosec()
+ *     inet_sendmsg()
+ *      udp_sendmsg()
+ *       udp_send_skb()
+ *        ip_send_skb()
+ *         ip_local_out()
+ *          dst_output()
+ *           ip_output()
+ *            ip_finish_output()
+ *             ip_finish_output2()
+ *              neigh_output()
+ */
 static inline int neigh_output(struct neighbour *n, struct sk_buff *skb)
 {
 	const struct hh_cache *hh = &n->hh;
 
+    /*
+     * 邻居被认为是 NUD_CONNECTED，如果它满足以下一个或多个条件：
+     * NUD_PERMANENT：静态路由
+     * NUD_NOARP：不需要 ARP 请求（例如，目标是多播或广播地址，或环回设备）
+     * NUD_REACHABLE：邻居是“可达的。”只要成功处理了ARP 请求，目标就会被标记为可达
+     *
+     * 进一步，如果“硬件头”（hh）被缓存, 将调用 neigh_hh_output
+     */
 	if ((n->nud_state & NUD_CONNECTED) && hh->hh_len)
 		return neigh_hh_output(hh, skb);
-	else
-		return n->output(n, skb);
+	else //如果目标不是 NUD_CONNECTED 或硬件头尚未缓存
+		return n->output(n, skb); // neigh_resolve_output
 }
 
 static inline struct neighbour *

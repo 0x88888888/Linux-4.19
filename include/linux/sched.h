@@ -856,6 +856,7 @@ struct task_struct {
 	struct sysv_sem			sysvsem;
 	struct sysv_shm			sysvshm;
 #endif
+
 #ifdef CONFIG_DETECT_HUNG_TASK
 	unsigned long			last_switch_count;
 	unsigned long			last_switch_time;
@@ -986,9 +987,16 @@ struct task_struct {
 	int				cpuset_slab_spread_rotor;
 #endif
 #ifdef CONFIG_CGROUPS
-	/* Control Group info protected by css_set_lock: */
+	/* Control Group info protected by css_set_lock: 
+	 *
+	 * css_set存储了与进程相关的cgroups信息
+     */
 	struct css_set __rcu		*cgroups;
-	/* cg_list protected by css_set_lock and tsk->alloc_lock: */
+	/* cg_list protected by css_set_lock and tsk->alloc_lock:
+	 *
+	 * 链接到task_struct->cg_list,
+	 * cg_list将使用同一个css_set的进程链接在一起
+	 */
 	struct list_head		cg_list;
 #endif
 #ifdef CONFIG_INTEL_RDT

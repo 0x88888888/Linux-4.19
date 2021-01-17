@@ -172,7 +172,9 @@ void rcu_segcblist_enqueue(struct rcu_segcblist *rsclp,
 		rsclp->len_lazy++;
 	smp_mb(); /* Ensure counts are updated before callback is enqueued. */
 	rhp->next = NULL;
+	//挂到链表上一次结束的末尾
 	*rsclp->tails[RCU_NEXT_TAIL] = rhp;
+	//通常链表最新的末尾的为NULL了
 	rsclp->tails[RCU_NEXT_TAIL] = &rhp->next;
 }
 
@@ -327,6 +329,14 @@ void rcu_segcblist_insert_pend_cbs(struct rcu_segcblist *rsclp,
  *   __note_gp_changes()
  *    rcu_advance_cbs()
  *     rcu_segcblist_advance()
+ *
+ * call_rcu()
+ *  __call_rcu()
+ *   __call_rcu_core()
+ *    note_gp_changes()
+ *     __note_gp_changes()
+ *      rcu_advance_cbs()
+ *       rcu_segcblist_advance]()
  */
 void rcu_segcblist_advance(struct rcu_segcblist *rsclp, unsigned long seq)
 {
@@ -341,6 +351,8 @@ void rcu_segcblist_advance(struct rcu_segcblist *rsclp, unsigned long seq)
 	/*
 	 * Find all callbacks whose ->gp_seq numbers indicate that they
 	 * are ready to invoke, and put them into the RCU_DONE_TAIL segment.
+	 *
+	 * 移动到RCU_DONE_TAIL链表中
 	 */
 	for (i = RCU_WAIT_TAIL; i < RCU_NEXT_TAIL; i++) {
 		if (ULONG_CMP_LT(seq, rsclp->gp_seq[i]))

@@ -39,6 +39,7 @@ struct l3mdev_ops {
 						 struct flowi6 *fl6);
 };
 
+//有配置
 #ifdef CONFIG_NET_L3_MASTER_DEV
 
 int l3mdev_fib_rule_match(struct net *net, struct flowi *fl,
@@ -163,6 +164,20 @@ struct sk_buff *l3mdev_ip6_rcv(struct sk_buff *skb)
 	return l3mdev_l3_rcv(skb, AF_INET6);
 }
 
+/*
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ *    sock_sendmsg_nosec()
+ *     inet_sendmsg()
+ *      udp_sendmsg()
+ *       udp_send_skb()
+ *        ip_send_skb()
+ *         ip_local_out()
+ *          __ip_local_out() 
+ *           l3mdev_ip_out()
+ *            l3mdev_l3_out()
+ */
 static inline
 struct sk_buff *l3mdev_l3_out(struct sock *sk, struct sk_buff *skb, u16 proto)
 {
@@ -180,6 +195,19 @@ struct sk_buff *l3mdev_l3_out(struct sock *sk, struct sk_buff *skb, u16 proto)
 	return skb;
 }
 
+/*
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ *    sock_sendmsg_nosec()
+ *     inet_sendmsg()
+ *      udp_sendmsg()
+ *       udp_send_skb()
+ *        ip_send_skb()
+ *         ip_local_out()
+ *          __ip_local_out() 
+ *           l3mdev_ip_out()
+ */
 static inline
 struct sk_buff *l3mdev_ip_out(struct sock *sk, struct sk_buff *skb)
 {

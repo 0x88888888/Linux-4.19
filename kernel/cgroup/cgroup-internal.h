@@ -47,10 +47,16 @@ struct cgrp_cset_link {
 	struct cgroup		*cgrp;
 	struct css_set		*cset;
 
-	/* list of cgrp_cset_links anchored at cgrp->cset_links */
+	/* list of cgrp_cset_links anchored at cgrp->cset_links 
+	 *
+	 * 链接到cgroup->cset_links
+	 */
 	struct list_head	cset_link;
 
-	/* list of cgrp_cset_links anchored at css_set->cgrp_links */
+	/* list of cgrp_cset_links anchored at css_set->cgrp_links 
+	 *
+	 * 链接到css_set->cgrp_links和cgrp_cset_link->cgrp_link,形成链表
+	 */
 	struct list_head	cgrp_link;
 };
 

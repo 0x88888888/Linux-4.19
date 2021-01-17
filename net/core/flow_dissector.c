@@ -1263,6 +1263,10 @@ EXPORT_SYMBOL_GPL(__skb_get_hash_symmetric);
  * and src/dst port numbers.  Sets hash in skb to non-zero hash value
  * on success, zero indicates no valid hash.  Also, sets l4_hash in skb
  * if hash is a canonical 4-tuple hash over transport ports.
+ *
+ * __get_xps_queue_idx()
+ *  skb_get_hash()
+ *   __skb_get_hash()
  */
 void __skb_get_hash(struct sk_buff *skb)
 {

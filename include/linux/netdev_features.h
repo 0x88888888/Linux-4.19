@@ -122,6 +122,12 @@ enum {
 #define NETIF_F_RXCSUM		__NETIF_F(RXCSUM)
 #define NETIF_F_RXHASH		__NETIF_F(RXHASH)
 #define NETIF_F_SCTP_CRC	__NETIF_F(SCTP_CRC)
+/*
+ * 绝大多数网卡支持分散/收集（ scatter/gather）IO
+ * 支持该特性的网卡可以处理数据 被分散到多个 buffer 的数据包;
+ * 内核不需要花时间将多个缓冲区合并成一个缓冲区中。
+ * 避免这种额外的复制会提升性能,大多数网卡都支持此功能
+ */
 #define NETIF_F_SG		__NETIF_F(SG)
 #define NETIF_F_TSO6		__NETIF_F(TSO6)
 #define NETIF_F_TSO_ECN		__NETIF_F(TSO_ECN)

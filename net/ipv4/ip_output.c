@@ -94,11 +94,24 @@ void ip_send_check(struct iphdr *iph)
 }
 EXPORT_SYMBOL(ip_send_check);
 
+/*
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ *    sock_sendmsg_nosec()
+ *     inet_sendmsg()
+ *      udp_sendmsg()
+ *       udp_send_skb()
+ *        ip_send_skb()
+ *         ip_local_out()
+ *          __ip_local_out()
+ */
 int __ip_local_out(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
 	struct iphdr *iph = ip_hdr(skb);
 
 	iph->tot_len = htons(skb->len);
+	//设置check sum
 	ip_send_check(iph);
 
 	/* if egress device is enslaved to an L3 master device pass the
@@ -115,6 +128,17 @@ int __ip_local_out(struct net *net, struct sock *sk, struct sk_buff *skb)
 		       dst_output);
 }
 
+/*
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ *    sock_sendmsg_nosec()
+ *     inet_sendmsg()
+ *      udp_sendmsg()
+ *       udp_send_skb()
+ *        ip_send_skb()
+ *         ip_local_out()
+ */
 int ip_local_out(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
 	int err;
@@ -181,11 +205,28 @@ int ip_build_and_send_pkt(struct sk_buff *skb, const struct sock *sk,
 }
 EXPORT_SYMBOL_GPL(ip_build_and_send_pkt);
 
+
+/*
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ *    sock_sendmsg_nosec()
+ *     inet_sendmsg()
+ *      udp_sendmsg()
+ *       udp_send_skb()
+ *        ip_send_skb()
+ *         ip_local_out()
+ *          dst_output()
+ *           ip_output()
+ *            ip_finish_output()
+ *             ip_finish_output2()
+ */
 static int ip_finish_output2(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
 	struct dst_entry *dst = skb_dst(skb);
 	struct rtable *rt = (struct rtable *)dst;
 	struct net_device *dev = dst->dev;
+	//链路层空间大小
 	unsigned int hh_len = LL_RESERVED_SPACE(dev);
 	struct neighbour *neigh;
 	u32 nexthop;
@@ -218,14 +259,19 @@ static int ip_finish_output2(struct net *net, struct sock *sk, struct sk_buff *s
 	}
 
 	rcu_read_lock_bh();
+	//得到next hop
 	nexthop = (__force u32) rt_nexthop(rt, ip_hdr(skb)->daddr);
+	//查找neighbour
 	neigh = __ipv4_neigh_lookup_noref(dev, nexthop);
 	if (unlikely(!neigh))
 		neigh = __neigh_create(&arp_tbl, &nexthop, dev, false);
+
+	//创建neigh成功之后
 	if (!IS_ERR(neigh)) {
 		int res;
 
 		sock_confirm_neigh(skb, neigh);
+	
 		res = neigh_output(neigh, skb);
 
 		rcu_read_unlock_bh();
@@ -289,6 +335,20 @@ static int ip_finish_output_gso(struct net *net, struct sock *sk,
 	return ret;
 }
 
+/*
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ *    sock_sendmsg_nosec()
+ *     inet_sendmsg()
+ *      udp_sendmsg()
+ *       udp_send_skb()
+ *        ip_send_skb()
+ *         ip_local_out()
+ *          dst_output()
+ *           ip_output()
+ *            ip_finish_output()
+ */
 static int ip_finish_output(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
 	unsigned int mtu;
@@ -307,10 +367,16 @@ static int ip_finish_output(struct net *net, struct sock *sk, struct sk_buff *sk
 		return dst_output(net, sk, skb);
 	}
 #endif
+
+   //查找path mtu
 	mtu = ip_skb_dst_mtu(sk, skb);
 	if (skb_is_gso(skb))
 		return ip_finish_output_gso(net, sk, skb, mtu);
 
+	/*
+	 * 如果数据包的长度大于 MTU 并且分片不会 offload 到设备，
+	 * 则会调用 ip_fragment 在发送之前对数据包进行分片
+	 */
 	if (skb->len > mtu || (IPCB(skb)->flags & IPSKB_FRAG_PMTU))
 		return ip_fragment(net, sk, skb, mtu, ip_finish_output2);
 
@@ -393,6 +459,19 @@ int ip_mc_output(struct net *net, struct sock *sk, struct sk_buff *skb)
 			    !(IPCB(skb)->flags & IPSKB_REROUTED));
 }
 
+/*
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ *    sock_sendmsg_nosec()
+ *     inet_sendmsg()
+ *      udp_sendmsg()
+ *       udp_send_skb()
+ *        ip_send_skb()
+ *         ip_local_out()
+ *          dst_output()
+ *           ip_output()
+ */
 int ip_output(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
 	struct net_device *dev = skb_dst(skb)->dev;
@@ -856,6 +935,31 @@ csum_page(struct page *page, int offset, int copy)
 	return csum;
 }
 
+/*
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ *    sock_sendmsg_nosec()
+ *     inet_sendmsg()
+ *      udp_sendmsg()
+ *       ip_append_data()
+ *        __ip_append_data( getfrag == ip_generic_getfrag)
+ *
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ *    sock_sendmsg_nosec()
+ *     inet_sendmsg()
+ *      udp_sendmsg()
+ *       ip_make_skb()
+ *        __ip_append_data(getfrag == ip_generic_getfrag)
+ *
+ * 如果socket是 corked，则从ip_append_data 调用此函数；
+ * 如果socket未被 cork，则从ip_make_skb 调用此函数。
+ * 在任何一种情况下，函数都将分配一个新缓冲区来存储传入的数据，
+ * 或者将数据附加到现有数据中。这种工作的方式围绕 socket 的发送队列。
+ * 等待发送的现有数据（例如,如果socket被cork）将在队列中有一个对应条目，可以被追加数据 
+ */
 static int __ip_append_data(struct sock *sk,
 			    struct flowi4 *fl4,
 			    struct sk_buff_head *queue,
@@ -933,6 +1037,7 @@ static int __ip_append_data(struct sock *sk,
 		copy = mtu - skb->len;
 		if (copy < length)
 			copy = maxfraglen - skb->len;
+		
 		if (copy <= 0) {
 			char *data;
 			unsigned int datalen;
@@ -1171,6 +1276,17 @@ static int ip_setup_cork(struct sock *sk, struct inet_cork *cork,
  *	this interface potentially.
  *
  *	LATER: length must be adjusted by pad at tail, when it is required.
+ *
+ *
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ *    sock_sendmsg_nosec()
+ *     inet_sendmsg()
+ *      udp_sendmsg()
+ *       ip_append_data(getfrag == ip_generic_getfrag)
+ *
+ *
  */
 int ip_append_data(struct sock *sk, struct flowi4 *fl4,
 		   int getfrag(void *from, char *to, int offset, int len,
@@ -1182,9 +1298,17 @@ int ip_append_data(struct sock *sk, struct flowi4 *fl4,
 	struct inet_sock *inet = inet_sk(sk);
 	int err;
 
+/*
+ * 检查是否从用户传入了 MSG_PROBE 标志。
+ * 该标志表示用户不想真正发送数据，只是做路径探测（例如，确定PMTU）
+ */
 	if (flags&MSG_PROBE)
 		return 0;
 
+    /*
+     * 检查 socket 的发送队列是否为空。如果为空，
+     * 意味着没有 cork 数据等待处理，因此调用 ip_setup_cork 来设置 corking
+     */
 	if (skb_queue_empty(&sk->sk_write_queue)) {
 		err = ip_setup_cork(sk, &inet->cork.base, ipc, rtp);
 		if (err)
@@ -1434,6 +1558,16 @@ out:
 	return skb;
 }
 
+/*
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ *    sock_sendmsg_nosec()
+ *     inet_sendmsg()
+ *      udp_sendmsg()
+ *       udp_send_skb()
+ *        ip_send_skb()
+ */
 int ip_send_skb(struct net *net, struct sk_buff *skb)
 {
 	int err;
@@ -1441,7 +1575,8 @@ int ip_send_skb(struct net *net, struct sk_buff *skb)
 	err = ip_local_out(net, skb->sk, skb);
 	if (err) {
 		if (err > 0)
-			err = net_xmit_errno(err);
+			err = net_xmit_errno(err); //将低层错误转换为 IP 和 UDP 协议层所能理解的错误
+			
 		if (err)
 			IP_INC_STATS(net, IPSTATS_MIB_OUTDISCARDS);
 	}
@@ -1481,6 +1616,15 @@ void ip_flush_pending_frames(struct sock *sk)
 	__ip_flush_pending_frames(sk, &sk->sk_write_queue, &inet_sk(sk)->cork.base);
 }
 
+/*
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ *    sock_sendmsg_nosec()
+ *     inet_sendmsg()
+ *      udp_sendmsg()
+ *       ip_make_skb()
+ */
 struct sk_buff *ip_make_skb(struct sock *sk,
 			    struct flowi4 *fl4,
 			    int getfrag(void *from, char *to, int offset,
@@ -1500,18 +1644,21 @@ struct sk_buff *ip_make_skb(struct sock *sk,
 	cork->flags = 0;
 	cork->addr = 0;
 	cork->opt = NULL;
+	
 	err = ip_setup_cork(sk, cork, ipc, rtp);
 	if (err)
 		return ERR_PTR(err);
 
+    //追加数据
 	err = __ip_append_data(sk, fl4, &queue, cork,
 			       &current->task_frag, getfrag,
 			       from, length, transhdrlen, flags);
-	if (err) {
+	if (err) { //追加数据失败，丢弃
 		__ip_flush_pending_frames(sk, &queue, cork);
 		return ERR_PTR(err);
 	}
 
+    // 将skb出队，添加IP选项，并返回一个准备好传递给更底层发送的 skb
 	return __ip_make_skb(sk, fl4, &queue, cork);
 }
 

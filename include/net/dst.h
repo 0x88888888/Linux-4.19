@@ -438,9 +438,22 @@ static inline void dst_set_expires(struct dst_entry *dst, int timeout)
 		dst->expires = expires;
 }
 
-/* Output packet to network from transport.  */
+/* Output packet to network from transport.  
+ *
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ *    sock_sendmsg_nosec()
+ *     inet_sendmsg()
+ *      udp_sendmsg()
+ *       udp_send_skb()
+ *        ip_send_skb()
+ *         ip_local_out()
+ *          dst_output()
+ */
 static inline int dst_output(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
+    //通常是ip_output
 	return skb_dst(skb)->output(net, sk, skb);
 }
 

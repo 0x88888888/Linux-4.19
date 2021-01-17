@@ -27,10 +27,12 @@
  * @MEMBLOCK_MIRROR: mirrored region
  * @MEMBLOCK_NOMAP: don't add to kernel direct mapping
  */
+ //为memblock_region->flags的值
 enum memblock_flags {
 	MEMBLOCK_NONE		= 0x0,	/* No special request */
 	MEMBLOCK_HOTPLUG	= 0x1,	/* hotpluggable region */
 	MEMBLOCK_MIRROR		= 0x2,	/* mirrored region */
+	//不添加到内核直接映射
 	MEMBLOCK_NOMAP		= 0x4,	/* don't add to kernel direct mapping */
 };
 
@@ -42,8 +44,11 @@ enum memblock_flags {
  * @nid: NUMA node id
  */
 struct memblock_region {
+    // 起始物理地址
 	phys_addr_t base;
+    // 长度
 	phys_addr_t size;
+	//
 	enum memblock_flags flags;
 #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
 	int nid;
@@ -59,8 +64,11 @@ struct memblock_region {
  * @name: the memory type symbolic name
  */
 struct memblock_type {
+    //region的数量
 	unsigned long cnt;
+	//已经分配的数组的大小
 	unsigned long max;
+	//所有region的长度
 	phys_addr_t total_size;
 	struct memblock_region *regions;
 	char *name;
@@ -74,12 +82,24 @@ struct memblock_type {
  * @reserved: reserved memory regions
  * @physmem: all physical memory
  */
+ //全局对象memblock
 struct memblock {
+    //true:是从低地址向上的方向分配
 	bool bottom_up;  /* is bottom up direction? */
+	//表示可分配的最大物理地址
 	phys_addr_t current_limit;
+	/*
+	 * 包括已经分配内存和未分配的内存类型
+	 *
+	 * memblock->memory和memblock->physmem的区别是 memblock->memory是memblock->physmem的子集
+	 * 在引导时可以使用参数mem=nn[KMG]指定可用内存的大小，不过，这样会导致内核不能看见所有的内存
+	 * memblock->physmem会包含所有的物理内存，memblock->memory只包含参数mem=nn[KMG]指定的大小。
+	 */
 	struct memblock_type memory;
+	//预留内存类型(分配内存)
 	struct memblock_type reserved;
 #ifdef CONFIG_HAVE_MEMBLOCK_PHYS_MAP
+    //物理内存类型
 	struct memblock_type physmem;
 #endif
 };

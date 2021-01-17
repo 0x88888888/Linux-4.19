@@ -66,7 +66,7 @@ struct rcu_cblist {
  * Note that RCU_WAIT_TAIL cannot be empty unless RCU_NEXT_READY_TAIL is also
  * empty.
  *
- * The ->gp_seq[] array contains the grace-period number at which the
+ * The ->gp_seq[] ( rcu_segcblist->gp_seq[] ?) array contains the grace-period number at which the
  * corresponding segment of callbacks will be ready to invoke.  A given
  * element of this array is meaningful only when the corresponding segment
  * is non-empty, and it is never valid for RCU_DONE_TAIL (whose callbacks

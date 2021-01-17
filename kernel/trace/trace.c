@@ -7668,6 +7668,14 @@ struct dentry *trace_instance_dir;
 static void
 init_tracer_tracefs(struct trace_array *tr, struct dentry *d_tracer);
 
+
+/*
+ * start_kernel()  [init/main.c]
+ *	early_trace_init()
+ *   tracer_alloc_buffers()
+ *    allocate_trace_buffers(allocate_trace_buffers(tr== global_trace))
+ *     allocate_trace_buffer(allocate_trace_buffers(tr== global_trace))
+ */
 static int
 allocate_trace_buffer(struct trace_array *tr, struct trace_buffer *buf, int size)
 {
@@ -7695,6 +7703,12 @@ allocate_trace_buffer(struct trace_array *tr, struct trace_buffer *buf, int size
 	return 0;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *	early_trace_init()
+ *   tracer_alloc_buffers()
+ *    allocate_trace_buffers(tr== global_trace)
+ */
 static int allocate_trace_buffers(struct trace_array *tr, int size)
 {
 	int ret;
@@ -7703,6 +7717,7 @@ static int allocate_trace_buffers(struct trace_array *tr, int size)
 	if (ret)
 		return ret;
 
+//没有定义
 #ifdef CONFIG_TRACER_MAX_TRACE
 	ret = allocate_trace_buffer(tr, &tr->max_buffer,
 				    allocate_snapshot ? size : 1);

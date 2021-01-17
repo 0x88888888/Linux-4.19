@@ -123,14 +123,14 @@ static inline int __dev_requeue_skb(struct sk_buff *skb, struct Qdisc *q)
 	while (skb) {
 		struct sk_buff *next = skb->next;
 
-		__skb_queue_tail(&q->gso_skb, skb);
+		__skb_queue_tail(&q->gso_skb, skb);//添加到 qdisc->gso_skb上
 		q->qstats.requeues++;
 		qdisc_qstats_backlog_inc(q, skb);
 		q->q.qlen++;	/* it's still part of the queue */
 
 		skb = next;
 	}
-	__netif_schedule(q);
+	__netif_schedule(q); //触发softirq
 
 	return 0;
 }
@@ -184,6 +184,8 @@ static inline int dev_requeue_skb_locked(struct sk_buff *skb, struct Qdisc *q)
  *         qdisc_restart()
  *          sch_direct_xmit()
  *           dev_requeue_skb()
+ *
+ *  将 qdisc 队列的剩余长度作为返回值
  */
 static inline int dev_requeue_skb(struct sk_buff *skb, struct Qdisc *q)
 {
@@ -246,7 +248,7 @@ static void try_bulk_dequeue_skb_slow(struct Qdisc *q,
 static struct sk_buff *dequeue_skb(struct Qdisc *q, bool *validate,
 				   int *packets)
 {
-	const struct netdev_queue *txq = q->dev_queue;
+	const struct netdev_queue *txq = q->dev_queue; // 之前发送失败的包所在的队列
 	struct sk_buff *skb = NULL;
 
 	*packets = 1;
@@ -258,12 +260,12 @@ static struct sk_buff *dequeue_skb(struct Qdisc *q, bool *validate,
 			spin_lock(lock);
 		}
 
-		skb = skb_peek(&q->gso_skb);
+		skb = skb_peek(&q->gso_skb); // 待发送包
 
 		/* skb may be null if another cpu pulls gso_skb off in between
 		 * empty check and lock.
 		 */
-		if (!skb) {
+		if (!skb) { //
 			if (lock)
 				spin_unlock(lock);
 			goto validate;
@@ -333,6 +335,14 @@ trace:
  *        __qdisc_run()
  *         qdisc_restart()
  *          sch_direct_xmit()
+ *
+ *
+ * dev_queue_xmit()
+ *  __dev_queue_xmit()
+ *   __dev_xmit_skb()
+ *    sch_direct_xmit()
+ *
+ * 发送数据给网卡驱动
  */
 bool sch_direct_xmit(struct sk_buff *skb, struct Qdisc *q,
 		     struct net_device *dev, struct netdev_queue *txq,
@@ -362,7 +372,7 @@ bool sch_direct_xmit(struct sk_buff *skb, struct Qdisc *q,
 	if (likely(skb)) {
 		HARD_TX_LOCK(dev, txq, smp_processor_id());
 		if (!netif_xmit_frozen_or_stopped(txq))
-			skb = dev_hard_start_xmit(skb, dev, txq, &ret);
+			skb = dev_hard_start_xmit(skb, dev, txq, &ret); //将数据发送给网卡驱动
 
 		HARD_TX_UNLOCK(dev, txq);
 	} else {
@@ -374,12 +384,14 @@ bool sch_direct_xmit(struct sk_buff *skb, struct Qdisc *q,
 	if (root_lock)
 		spin_lock(root_lock);
 
-	if (!dev_xmit_complete(ret)) {
+    
+	if (!dev_xmit_complete(ret)) { //驱动发送失败
 		/* Driver returned NETDEV_TX_BUSY - requeue skb */
 		if (unlikely(ret != NETDEV_TX_BUSY))
 			net_warn_ratelimited("BUG %s code %d qlen %d\n",
 					     dev->name, ret, q->q.qlen);
 
+        //    将 qdisc 队列的剩余长度作为返回值
 		dev_requeue_skb(skb, q);
 		return false;
 	}
@@ -414,6 +426,8 @@ bool sch_direct_xmit(struct sk_buff *skb, struct Qdisc *q,
  *       qdisc_run()
  *        __qdisc_run()
  *         qdisc_restart()
+ *
+ * 从队列取出一个 skb 并发送，剩余队列不为空时返回非零 
  */
 static inline bool qdisc_restart(struct Qdisc *q, int *packets)
 {
@@ -424,6 +438,7 @@ static inline bool qdisc_restart(struct Qdisc *q, int *packets)
 	bool validate;
 
 	/* Dequeue packet */
+	//从 qdisc 中取出要发送的 skb
 	skb = dequeue_skb(q, &validate, packets);
 	if (unlikely(!skb))
 		return false;
@@ -446,19 +461,27 @@ static inline bool qdisc_restart(struct Qdisc *q, int *packets)
  *      net_tx_action()
  *       qdisc_run()
  *        __qdisc_run()
+ *
+ * dev_queue_xmit()
+ *  __dev_queue_xmit()
+ *   __dev_xmit_skb()
+ *    __qdisc_run()
  */
 void __qdisc_run(struct Qdisc *q)
 {
 	int quota = dev_tx_weight;
 	int packets;
 
-	while (qdisc_restart(q, &packets)) {
+	while (qdisc_restart(q, &packets)) { // 从队列取出一个 skb 并发送，剩余队列不为空时返回非零
 		/*
 		 * Ordered by possible occurrence: Postpone processing if
 		 * 1. we've exceeded packet quota
 		 * 2. another process needs the CPU;
 		 */
 		quota -= packets;
+        // 如果发生下面情况之一，则延后处理：
+        // 1. quota 用尽
+        // 2. 其他进程需要 CPU		
 		if (quota <= 0 || need_resched()) {
 			__netif_schedule(q);
 			break;

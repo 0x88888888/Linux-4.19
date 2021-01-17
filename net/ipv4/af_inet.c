@@ -796,16 +796,30 @@ int inet_getname(struct socket *sock, struct sockaddr *uaddr,
 }
 EXPORT_SYMBOL(inet_getname);
 
+/*
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ *    sock_sendmsg_nosec()
+ *     inet_sendmsg()
+ */
 int inet_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
 {
 	struct sock *sk = sock->sk;
 
+    /*
+     * 记录最后一个处理该（数据所属的）flow 的 CPU; 
+     * Receive Packet Steering 会用到这个信息
+     */
 	sock_rps_record_flow(sk);
 
 	/* We may need to bind the socket. */
 	if (!inet_sk(sk)->inet_num && !sk->sk_prot->no_autobind &&
 	    inet_autobind(sk))
 		return -EAGAIN;
+    /* 如果传输层使用的是UDP，则sk_prot为udp_prot，sendmsg指向udp_sendmsg()
+     * raw: raw_sendmsg  
+     */
 
 	return sk->sk_prot->sendmsg(sk, msg, size);
 }

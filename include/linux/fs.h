@@ -1822,6 +1822,9 @@ static inline ssize_t call_write_iter(struct file *file, struct kiocb *kio,
 
 static inline int call_mmap(struct file *file, struct vm_area_struct *vma)
 {
+    /*
+     * hugetlbfs_file_mmap
+     */
 	return file->f_op->mmap(file, vma);
 }
 

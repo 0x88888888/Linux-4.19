@@ -70,6 +70,10 @@ enum {
 #define IPPROTO_COMP		IPPROTO_COMP
   IPPROTO_SCTP = 132,		/* Stream Control Transport Protocol	*/
 #define IPPROTO_SCTP		IPPROTO_SCTP
+/*
+ * 通常是这样使用 socket(PF_INET6, SOCK_DGRAM, IPPROTO_UDPLITE)
+ *
+ */
   IPPROTO_UDPLITE = 136,	/* UDP-Lite (RFC 3828)			*/
 #define IPPROTO_UDPLITE		IPPROTO_UDPLITE
   IPPROTO_MPLS = 137,		/* MPLS in IP (RFC 4023)		*/

@@ -616,13 +616,25 @@ void __sock_tx_timestamp(__u16 tsflags, __u8 *tx_flags)
 }
 EXPORT_SYMBOL(__sock_tx_timestamp);
 
+/*
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ *    sock_sendmsg_nosec()
+ */
 static inline int sock_sendmsg_nosec(struct socket *sock, struct msghdr *msg)
 {
+                         //inet_sendmsg
 	int ret = sock->ops->sendmsg(sock, msg, msg_data_left(msg));
 	BUG_ON(ret == -EIOCBQUEUED);
 	return ret;
 }
 
+/*
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ */
 int sock_sendmsg(struct socket *sock, struct msghdr *msg)
 {
 	int err = security_socket_sendmsg(sock, msg,
@@ -1781,6 +1793,9 @@ SYSCALL_DEFINE3(getpeername, int, fd, struct sockaddr __user *, usockaddr,
  *	Send a datagram to a given address. We move the address into kernel
  *	space and check the user space data area is readable before invoking
  *	the protocol.
+ *
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
  */
 int __sys_sendto(int fd, void __user *buff, size_t len, unsigned int flags,
 		 struct sockaddr __user *addr,  int addr_len)

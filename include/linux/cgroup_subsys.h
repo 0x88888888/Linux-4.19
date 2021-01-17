@@ -24,6 +24,7 @@ SUBSYS(cpuacct)
 #if IS_ENABLED(CONFIG_BLK_CGROUP)
 SUBSYS(io)
 #endif
+cpu
 
 #if IS_ENABLED(CONFIG_MEMCG)
 SUBSYS(memory)

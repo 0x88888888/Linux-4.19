@@ -21,6 +21,9 @@ typedef int (*cpu_stop_fn_t)(void *arg);
 
 #ifdef CONFIG_SMP
 
+/*
+ * 作为cpu_stopper->works链表出现
+ */
 struct cpu_stop_work {
 	struct list_head	list;		/* cpu_stopper->works */
 	cpu_stop_fn_t		fn;
@@ -47,6 +50,24 @@ struct cpu_stop_work {
 	void			*arg;
 };
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      smp_init()
+ *       cpu_up() 启动cpuid为cpu的CPU
+ *        do_cpu_up()
+ *         _cpu_up()
+ *          cpuhp_up_callbacks()
+ *           cpuhp_invoke_callback( bringup == true)
+ *            smpboot_create_threads()
+ *             __smpboot_create_thread()
+ *              smpboot_thread_fn()
+ *               cpu_stopper_thread()
+ *                stop_one_cpu()
+ */
 static inline int stop_one_cpu(unsigned int cpu, cpu_stop_fn_t fn, void *arg)
 {
 	int ret = -ENOENT;

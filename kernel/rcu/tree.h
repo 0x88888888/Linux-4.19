@@ -36,7 +36,7 @@
 
 /*
  * Dynticks per-CPU state.
- *   classic RCU至少会在一个gracep period内唤醒每一个处于睡眠状态的CPU。
+ *   classic RCU至少会在一个grace period内唤醒每一个处于睡眠状态的CPU。
  * 当其他大多数CPU都处于空闲状态时，这些个别的CPU进行rcu写操作，
  * 会使得这种处理方法不是最优的。这种情形将在周期性的高负载系统中发生，
  * 我们需要更好的处理这种情况。
@@ -49,12 +49,44 @@
  * rcu_data中的一个成员
  */
 struct rcu_dynticks {
+    /*
+     * rcu_eqs_enter() 中 --1
+     * rcu_eqs_exit() 中 ++1
+     * rcu_init_percpu_data() 中 =0
+     */
 	long dynticks_nesting;      /* Track process nesting level. */
+	/*
+	 * rcu_eqs_enter()中设置为0
+	 *
+	 * rcu_nmi_enter()中增加
+	 * rcu_nmi_exit()中减少
+	 */
 	long dynticks_nmi_nesting;  /* Track irq/NMI nesting level. */
+
+	/* 
+	 *在rcu_dynticks_eqs_enter()中增加RCU_DYNTICK_CTRL_CTR
+	 *在rcu_dynticks_eqs_online()中增加RCU_DYNTICK_CTRL_CTR
+	 */
 	atomic_t dynticks;	    /* Even value for idle, else odd. */
+	/*
+	 * 在rcu_momentary_dyntick_idle()中写入false
+	 *
+	 * 在rcu_implicit_dynticks_qs()中写成true
+	 */
 	bool rcu_need_heavy_qs;     /* GP old, need heavy quiescent state. */
+	/*
+	 * rcu_note_context_switch()中 +1
+	 * rcu_all_qs() 中 +1
+	 */
 	unsigned long rcu_qs_ctr;   /* Light universal quiescent state ctr. */
+	/*
+	 * rcu_note_context_switch()中写为false
+	 * rcu_all_qs()中写为false
+	 * rcu_request_urgent_qs_task()中写为true
+	 * sync_sched_exp_handler()中写为true
+	 */
 	bool rcu_urgent_qs;	    /* GP old need light quiescent state. */
+	//没有定义
 #ifdef CONFIG_RCU_FAST_NO_HZ
 	bool all_lazy;		    /* Are all CPU's CBs lazy? */
 	unsigned long nonlazy_posted;
@@ -69,7 +101,10 @@ struct rcu_dynticks {
 #endif /* #ifdef CONFIG_RCU_FAST_NO_HZ */
 };
 
-/* Communicate arguments to a workqueue handler. */
+/* Communicate arguments to a workqueue handler. 
+ *
+ *　_synchronize_rcu_expedited()中使用
+ */
 struct rcu_exp_work {
 	smp_call_func_t rew_func;
 	struct rcu_state *rew_rsp;
@@ -89,9 +124,11 @@ struct rcu_exp_work {
  * Definition for node within the RCU grace-period-detection hierarchy.
  */
 struct rcu_node {
+    //保护本节点的自旋锁
 	raw_spinlock_t __private lock;	/* Root rcu_node's lock protects */
 					/*  some rcu_state fields as well as */
 					/*  following. */
+	//本节点宽限期编号，等于或小于根节点的gp_seqgp_seq			
 	unsigned long gp_seq;	/* Track rsp->rcu_gp_seq. */
 	unsigned long gp_seq_needed; /* Track rsp->rcu_gp_seq_needed. */
 	unsigned long completedqs; /* All QSes done for this node. */
@@ -105,6 +142,8 @@ struct rcu_node {
 				/*  an rcu_data structure, otherwise, each */
 				/*  bit corresponds to a child rcu_node */
 				/*  structure. */
+				
+		
 	unsigned long rcu_gp_init_mask;	/* Mask of offline CPUs at GP init. */
 	/*
 	 * 每个GP初始化时,qsmaskinit等于qsmark的初始值。
@@ -130,11 +169,15 @@ struct rcu_node {
 	//在父节点中qsmask中的bit的位置
 	unsigned long grpmask;	/* Mask to apply to parent qsmask. */
 				/*  Only one bit will be set in this mask. */
+	//该分组的CPU最小编号
 	int	grplo;		/* lowest-numbered CPU or group here. */
+	//该分组的CPU最小编号			
 	int	grphi;		/* highest-numbered CPU or group here. */
-	
+	//该分组在上一层分组里的编号
 	u8	grpnum;		/* CPU/group number for next level up. */
+	//在树中的层级，Root为0
 	u8	level;		/* root is at level 0. */
+	
 	bool	wait_blkd_tasks;/* Necessary to wait for blocked tasks to */
 				/*  exit RCU read-side critical sections */
 				/*  before propagating offline up the */
@@ -210,12 +253,34 @@ union rcu_noqs {
  */
 struct rcu_data {
 	/* 1) quiescent-state and grace-period handling : */
+    /*
+     * __note_gp_changes(),rcu_init_percpu_data()中修改
+     * 
+     * 都是rdp->gp_seq = rnp->gp_seq这种赋值
+     */
 	unsigned long	gp_seq;		/* Track rsp->rcu_gp_seq counter. */
+	/*
+	 * rcu_start_this_gp()中修改
+	 * 都是rdp->gp_seq_needed = rnp->gp_seq_needed这种赋值
+	 */
 	unsigned long	gp_seq_needed;	/* Track rsp->rcu_gp_seq_needed ctr. */
+	/*
+	 * __note_gp_changes()中修改,rdp->rcu_qs_ctr_snap = __this_cpu_read(rcu_dynticks.rcu_qs_ctr)
+	 * rcu_report_qs_rdp()中修改,rdp->rcu_qs_ctr_snap = __this_cpu_read(rcu_dynticks.rcu_qs_ctr)
+	 * rcu_init_percpu_data()中修改,rdp->rcu_qs_ctr_snap = __this_cpu_read(rcu_dynticks.rcu_qs_ctr)
+	 */
 	unsigned long	rcu_qs_ctr_snap;/* Snapshot of rcu_qs_ctr to check */
 					/*  for rcu_all_qs() invocations. */
-	
+
+	//记录本cpu是否经历了QS状态
 	union rcu_noqs	cpu_no_qs;	/* No QSes yet for this CPU. */
+	/*
+	 * RCU需要本CPU上报QS状态
+	 *
+	 * __note_gp_change()中设置 
+	 *
+	 * rcu_report_qs_rdp()和rcu_init_percpu_data()中设置为false
+	 */
 	bool		core_needs_qs;	/* Core waits for quiesc state. */
 	/* CPU是否在线，不在线的CPU需要特殊处理，以提高性能*/
 	bool		beenonline;	/* CPU online at least once. */
@@ -227,9 +292,12 @@ struct rcu_data {
      * 一个rcu_node对应多个cpu
      */  
 	struct rcu_node *mynode;	/* This CPU's leaf of hierarchy */
-	/* 占用1bit，对应与所属的rcu_node. */
+	/* 占用1bit，对应与所属的rcu_node. 本CPU在分组的位图中的掩码*/
 	unsigned long grpmask;		/* Mask to apply to leaf qsmask. */
-	
+
+	/*
+	 * increment_cpu_stall_ticks()中 +1
+	 */
 	unsigned long	ticks_this_gp;	/* The number of scheduling-clock */
 					/*  ticks this CPU has handled */
 					/*  during and after the last grace */
@@ -237,6 +305,7 @@ struct rcu_data {
 
 	/* 2) batch handling  
 	 *
+	 *　回调函数链表，用于存放call_rcu注册的延后执行的回调函数
 	 * 这个数据结构很重要
 	 * 当中的 *head,**tails[]很重要
 	 */
@@ -370,21 +439,26 @@ do {									\
  * 用RCU_STATE_INITIALIZER()去定义
  */
 struct rcu_state {
-    /* 保存了所有的rcu_node节点. 
+    /* 保存了所有的rcu_node节点. 组织成一棵树
      * node[0] 为root 节点
      */ 
 	struct rcu_node node[NUM_RCU_NODES];	/* Hierarchy. */
-	/* 每个层级所指向的节点. */
+	/* 指向每个层级的首个rcu_node节点. */
 	struct rcu_node *level[RCU_NUM_LVLS + 1];
 						/* Hierarchy levels (+1 to */
 						/*  shut bogus gcc warning) */
 	/* 指向rcu_data. 
 	 * 每个cpu一个rcu_data对象
-	 *
 	 * 
 	 */					
 	struct rcu_data __percpu *rda;		/* pointer of percu rcu_data. */
-					
+
+	/*
+	 * call_rcu_sched
+     * call_rcu_bh
+     *
+     * call_rcu
+     */
 	call_rcu_func_t call;			/* call_rcu() flavor. */
 	int ncpus;				/* # CPUs seen so far. */
 
@@ -397,6 +471,8 @@ struct rcu_state {
 	/*
 	 * 应该是当前正在进行的grace period
 	 * 初始值为-300
+	 *
+	 * //当前宽限期编号，gp_seq > ()，表明正处在grace period内
 	*/
 	unsigned long gp_seq;			/* Grace-period sequence #. */
 	/*
@@ -408,7 +484,22 @@ struct rcu_state {
 	 * 在rcu_gp_kthread_wake中唤醒
 	 */
 	struct swait_queue_head gp_wq;		/* Where GP task waits. */
+	/*
+	 * RCU_GP_FLAG_INIT, RCU_GP_FLAG_FQS
+	 */
 	short gp_flags;				/* Commands for GP task. */
+
+	/*
+	 * RCU_GP_IDLE
+     * RCU_GP_WAIT_GPS
+     * RCU_GP_DONE_GPS
+     * RCU_GP_ONOFF
+     * RCU_GP_INIT
+     * RCU_GP_WAIT_FQS
+     * RCU_GP_DOING_FQS
+     * RCU_GP_CLEANUP
+     * RCU_GP_CLEANED
+     */
 	short gp_state;				/* GP kthread sleep state. */
 
 	/* End of fields guarded by root rcu_node's lock. */
@@ -422,21 +513,40 @@ struct rcu_state {
 
 	struct mutex exp_mutex;			/* Serialize expedited GP. */
 	struct mutex exp_wake_mutex;		/* Serialize wakeup. */
+	
 	unsigned long expedited_sequence;	/* Take a ticket. */
 	atomic_t expedited_need_qs;		/* # CPUs left to check in. */
 	struct swait_queue_head expedited_wq;	/* Wait for check-ins. */
 	int ncpus_snap;				/* # CPUs seen last time. */
 
+    /*
+     * rcu_gp_kthread()中设置
+     */
 	unsigned long jiffies_force_qs;		/* Time at which to invoke */
 						/*  force_quiescent_state(). */
+	/*
+	 * rcu_stall_kick_kthreads(),rcu_gp_kthread()中设置
+	 */
 	unsigned long jiffies_kick_kthreads;	/* Time at which to kick */
 						/*  kthreads, if configured. */
+	/*
+	 * rcu_gp_fqs()中设置
+	 */
 	unsigned long n_force_qs;		/* Number of calls to */
 						/*  force_quiescent_state(). */
+	/*
+	 * record_gp_stall_check_time()中设置
+	 */
 	unsigned long gp_start;			/* Time at which GP started, */
 						/*  but in jiffies. */
+	/*
+	 * rcu_gp_init(),rcu_gp_cleanup(),rcu_gp_kthread()中设置
+	 */
 	unsigned long gp_activity;		/* Time of last GP kthread */
 						/*  activity in jiffies. */
+	/*
+	 * rcu_gp_cleanup(),rcu_start_this_gp()中设置
+	 */
 	unsigned long gp_req_activity;		/* Time of last GP request */
 						/*  in jiffies. */
 	unsigned long jiffies_stall;		/* Time at which to check */
@@ -449,6 +559,9 @@ struct rcu_state {
 						/*  jiffies. */
 	const char *name;			/* Name of structure. */
 	char abbr;				/* Abbreviated name. */
+	/*
+	 * 链接到rcu_struct_flavors链表上
+	 */
 	struct list_head flavors;		/* List of RCU flavors. */
 
 	spinlock_t ofl_lock ____cacheline_internodealigned_in_smp;
@@ -471,6 +584,7 @@ struct rcu_state {
 #define RCU_GP_CLEANUP   7	/* Grace-period cleanup started. */
 #define RCU_GP_CLEANED   8	/* Grace-period cleanup complete. */
 
+//没有定义
 #ifndef RCU_TREE_NONCORE
 static const char * const gp_state_names[] = {
 	"RCU_GP_IDLE",
@@ -485,6 +599,9 @@ static const char * const gp_state_names[] = {
 };
 #endif /* #ifndef RCU_TREE_NONCORE */
 
+/*
+ * rcu_bh_state->flavors,rcu_sched_state->flavors链接到这个上面
+ */
 extern struct list_head rcu_struct_flavors;
 
 /* Sequence through rcu_state structures for each RCU flavor. */
@@ -505,6 +622,7 @@ extern struct rcu_state rcu_preempt_state;
 
 int rcu_dynticks_snap(struct rcu_dynticks *rdtp);
 
+//没有定义
 #ifdef CONFIG_RCU_BOOST
 DECLARE_PER_CPU(unsigned int, rcu_cpu_kthread_status);
 DECLARE_PER_CPU(int, rcu_cpu_kthread_cpu);
@@ -512,12 +630,15 @@ DECLARE_PER_CPU(unsigned int, rcu_cpu_kthread_loops);
 DECLARE_PER_CPU(char, rcu_cpu_has_work);
 #endif /* #ifdef CONFIG_RCU_BOOST */
 
+//是没有定义的，所以走的
 #ifndef RCU_TREE_NONCORE
 
 /* Forward declarations for rcutree_plugin.h */
 static void rcu_bootup_announce(void);
 static void rcu_preempt_note_context_switch(bool preempt);
 static int rcu_preempt_blocked_readers_cgp(struct rcu_node *rnp);
+
+//有定义
 #ifdef CONFIG_HOTPLUG_CPU
 static bool rcu_preempt_has_tasks(struct rcu_node *rnp);
 #endif /* #ifdef CONFIG_HOTPLUG_CPU */
@@ -535,10 +656,13 @@ static void rcu_initiate_boost(struct rcu_node *rnp, unsigned long flags);
 static void rcu_preempt_boost_start_gp(struct rcu_node *rnp);
 static void invoke_rcu_callbacks_kthread(void);
 static bool rcu_is_callbacks_kthread(void);
+
+//没有定义
 #ifdef CONFIG_RCU_BOOST
 static int rcu_spawn_one_boost_kthread(struct rcu_state *rsp,
 						 struct rcu_node *rnp);
 #endif /* #ifdef CONFIG_RCU_BOOST */
+
 static void __init rcu_spawn_boost_kthreads(void);
 static void rcu_prepare_kthreads(int cpu);
 static void rcu_cleanup_after_idle(void);
@@ -564,6 +688,8 @@ static void do_nocb_deferred_wakeup(struct rcu_data *rdp);
 static void rcu_boot_init_nocb_percpu_data(struct rcu_data *rdp);
 static void rcu_spawn_all_nocb_kthreads(int cpu);
 static void __init rcu_spawn_nocb_kthreads(void);
+
+//没有定义
 #ifdef CONFIG_RCU_NOCB_CPU
 static void __init rcu_organize_nocb_kthreads(struct rcu_state *rsp);
 #endif /* #ifdef CONFIG_RCU_NOCB_CPU */
@@ -573,6 +699,7 @@ static bool rcu_nohz_full_cpu(struct rcu_state *rsp);
 static void rcu_dynticks_task_enter(void);
 static void rcu_dynticks_task_exit(void);
 
+//有定义
 #ifdef CONFIG_SRCU
 void srcu_online_cpu(unsigned int cpu);
 void srcu_offline_cpu(unsigned int cpu);

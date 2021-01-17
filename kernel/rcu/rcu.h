@@ -24,6 +24,7 @@
 #define __LINUX_RCU_H
 
 #include <trace/events/rcu.h>
+//没有定义
 #ifdef CONFIG_RCU_TRACE
 #define RCU_TRACE(stmt) stmt
 #else /* #ifdef CONFIG_RCU_TRACE */
@@ -39,11 +40,13 @@
  */
 
 #define RCU_SEQ_CTR_SHIFT	2
-#define RCU_SEQ_STATE_MASK	((1 << RCU_SEQ_CTR_SHIFT) - 1)
+#define RCU_SEQ_STATE_MASK	((1 << RCU_SEQ_CTR_SHIFT /* 2 */) - 1)
 
 /*
  * Return the counter portion of a sequence number previously returned
  * by rcu_seq_snap() or rcu_seq_current().
+ *
+ * 从
  */
 static inline unsigned long rcu_seq_ctr(unsigned long s)
 {
@@ -53,6 +56,21 @@ static inline unsigned long rcu_seq_ctr(unsigned long s)
 /*
  * Return the state portion of a sequence number previously returned
  * by rcu_seq_snap() or rcu_seq_current().
+ *
+ * do_IRQ()
+ *  exiting_irq()
+ *   irq_exit()
+ *    invoke_softirq()
+ *     __do_softirq()
+ *      rcu_process_callbacks()
+ *       __rcu_process_callbacks()
+ *        rcu_gp_in_progress()
+ *         rcu_seq_state(&rsp->gp_seq)
+ *
+ * rcu_start_this_gp()
+ *  rcu_seq_state(rnp->gp_seq)
+ *
+ * 从sequence number 得到 state部分
  */
 static inline int rcu_seq_state(unsigned long s)
 {
@@ -69,7 +87,14 @@ static inline void rcu_seq_set_state(unsigned long *sp, int newstate)
 	WRITE_ONCE(*sp, (*sp & ~RCU_SEQ_STATE_MASK) + newstate);
 }
 
-/* Adjust sequence number for start of update-side operation. */
+/* Adjust sequence number for start of update-side operation. 
+ *
+ * rcu_gp_init()
+ *  rcu_seq_start(&rsp->gp_seq)
+ *
+ * _rcu_barrier()
+ *  rcu_seq_start(&rsp->barrier_sequence)
+ */
 static inline void rcu_seq_start(unsigned long *sp)
 {
 	WRITE_ONCE(*sp, *sp + 1);
@@ -101,6 +126,15 @@ static inline void rcu_seq_end(unsigned long *sp)
  * current time. This value is the current grace-period number plus two to the
  * power of the number of low-order bits reserved for state, then rounded up to
  * the next value in which the state bits are all zero.
+ *
+ * rcu_accelerate_cbs()
+ *  rcu_seq_snap(&rsp->gp_seq)
+ *
+ * rcu_exp_gp_seq_snap()
+ *  rcu_seq_snap(&rsp->expedited_sequence)
+ *
+ * _rcu_barrier()
+ *  rcu_seq_snap(&rsp->barrier_sequence)
  */
 static inline unsigned long rcu_seq_snap(unsigned long *sp)
 {
@@ -111,7 +145,10 @@ static inline unsigned long rcu_seq_snap(unsigned long *sp)
 	return s;
 }
 
-/* Return the current value the update side's sequence number, no ordering. */
+/* Return the current value the update side's sequence number, no ordering. 
+ *
+ * sp为rsp->gp_seq或者 rnp->gp_seq
+ */
 static inline unsigned long rcu_seq_current(unsigned long *sp)
 {
 	return READ_ONCE(*sp);
@@ -120,6 +157,9 @@ static inline unsigned long rcu_seq_current(unsigned long *sp)
 /*
  * Given a snapshot from rcu_seq_snap(), determine whether or not the
  * corresponding update-side operation has started.
+ *
+ * rcu_start_this_gp()
+ *  rcu_seq_started(&rnp->gp_seq, rcu_state->gp_seq)
  */
 static inline bool rcu_seq_started(unsigned long *sp, unsigned long s)
 {
@@ -137,6 +177,8 @@ static inline bool rcu_seq_done(unsigned long *sp, unsigned long s)
 
 /*
  * Has a grace period completed since the time the old gp_seq was collected?
+ *
+ * old < new就是completed了
  */
 static inline bool rcu_seq_completed_gp(unsigned long old, unsigned long new)
 {
@@ -145,6 +187,8 @@ static inline bool rcu_seq_completed_gp(unsigned long old, unsigned long new)
 
 /*
  * Has a grace period started since the time the old gp_seq was collected?
+ *
+ * (old + RCU_SEQ_STATE_MASK) & ~RCU_SEQ_STATE_MASK < new 
  */
 static inline bool rcu_seq_new_gp(unsigned long old, unsigned long new)
 {

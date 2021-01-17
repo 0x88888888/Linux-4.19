@@ -49,6 +49,7 @@
 
 /* Exported common interfaces */
 
+//没有定义
 #ifdef CONFIG_PREEMPT_RCU
 void call_rcu(struct rcu_head *head, rcu_callback_t func);
 #else /* #ifdef CONFIG_PREEMPT_RCU */
@@ -117,6 +118,7 @@ static inline void rcu_sysrq_start(void) { }
 static inline void rcu_sysrq_end(void) { }
 #endif /* #else #ifdef CONFIG_RCU_STALL_COMMON */
 
+//没有定义
 #ifdef CONFIG_NO_HZ_FULL
 void rcu_user_enter(void);
 void rcu_user_exit(void);
@@ -125,6 +127,7 @@ static inline void rcu_user_enter(void) { }
 static inline void rcu_user_exit(void) { }
 #endif /* CONFIG_NO_HZ_FULL */
 
+//没有定义
 #ifdef CONFIG_RCU_NOCB_CPU
 void rcu_init_nohz(void);
 #else /* #ifdef CONFIG_RCU_NOCB_CPU */
@@ -160,6 +163,8 @@ static inline void rcu_init_nohz(void) { }
 /*
  * Note a quasi-voluntary context switch for RCU-tasks's benefit.
  * This is a macro rather than an inline function to avoid #include hell.
+ *
+ * 没有定义
  */
 #ifdef CONFIG_TASKS_RCU
 #define rcu_tasks_qs(t) \
@@ -202,7 +207,7 @@ do { \
  * Infrastructure to implement the synchronize_() primitives in
  * TREE_RCU and rcu_barrier_() primitives in TINY_RCU.
  */
-
+//有定义
 #if defined(CONFIG_TREE_RCU) || defined(CONFIG_PREEMPT_RCU)
 #include <linux/rcutree.h>
 #elif defined(CONFIG_TINY_RCU)
@@ -219,6 +224,7 @@ do { \
  * structures.  However, rcu_head structures allocated dynamically in the
  * heap don't need any initialization.
  */
+//没有定义
 #ifdef CONFIG_DEBUG_OBJECTS_RCU_HEAD
 void init_rcu_head(struct rcu_head *head);
 void destroy_rcu_head(struct rcu_head *head);
@@ -691,7 +697,7 @@ static inline void rcu_read_unlock(void)
 			 "rcu_read_unlock() used illegally while idle");
 	__release(RCU);
 	//打开内核抢占
-	__rcu_read_unlock();
+	__rcu_read_unlock();//在rcupdata.h中
 	rcu_lock_release(&rcu_lock_map); /* Keep acq info for rls diags. */
 }
 

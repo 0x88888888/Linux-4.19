@@ -51,9 +51,18 @@ static int __init cpu_idle_nopoll_setup(char *__unused)
 __setup("hlt", cpu_idle_nopoll_setup);
 #endif
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   cpu_startup_entry(CPUHP_ONLINE)
+ *    do_idle()
+ *     cpu_idle_poll()
+ */
 static noinline int __cpuidle cpu_idle_poll(void)
 {
+    
 	rcu_idle_enter();
+	
 	trace_cpu_idle_rcuidle(0, smp_processor_id());
 	local_irq_enable();
 	stop_critical_timings();
@@ -220,6 +229,11 @@ exit_idle:
  * Generic idle loop implementation
  *
  * Called with polling cleared.
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   cpu_startup_entry(CPUHP_ONLINE)
+ *    do_idle()
  */
 static void do_idle(void)
 {
@@ -256,8 +270,11 @@ static void do_idle(void)
 		 * idle as we know that the IPI is going to arrive right away.
 		 */
 		if (cpu_idle_force_poll || tick_check_broadcast_expired()) {
+			
 			tick_nohz_idle_restart_tick();
+			
 			cpu_idle_poll();
+		
 		} else {
 			cpuidle_idle_call();
 		}
@@ -345,6 +362,11 @@ void play_idle(unsigned long duration_ms)
 }
 EXPORT_SYMBOL_GPL(play_idle);
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   cpu_startup_entry(CPUHP_ONLINE)
+ */
 void cpu_startup_entry(enum cpuhp_state state)
 {
 	/*
@@ -362,6 +384,7 @@ void cpu_startup_entry(enum cpuhp_state state)
 	 */
 	boot_init_stack_canary();
 #endif
+
 	arch_cpu_idle_prepare();
 	cpuhp_online_idle(state);
 	while (1)

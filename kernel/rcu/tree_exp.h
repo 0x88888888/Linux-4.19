@@ -290,6 +290,7 @@ static void rcu_report_exp_rdp(struct rcu_state *rsp, struct rcu_data *rdp,
 static bool sync_exp_work_done(struct rcu_state *rsp, unsigned long s)
 {
 	if (rcu_exp_gp_seq_done(rsp, s)) {
+		
 		trace_rcu_exp_grace_period(rsp->name, s, TPS("done"));
 		/* Ensure test happens before caller kfree(). */
 		smp_mb__before_atomic(); /* ^^^ */
@@ -671,7 +672,7 @@ static void wait_rcu_exp_gp(struct work_struct *wp)
  *
  * synchronize_rcu()
  *  synchronize_rcu_expedited()
- *   _synchronize_rcu_expedited(func == sync_rcu_exp_handler)
+ *   _synchronize_rcu_expedited(rsp==rcu_sched_state, func == sync_rcu_exp_handler)
  * 
  */
 static void _synchronize_rcu_expedited(struct rcu_state *rsp,
@@ -739,6 +740,10 @@ static void _synchronize_rcu_expedited(struct rcu_state *rsp,
  * locking to expedited grace periods, but using the sequence counter to
  * determine when someone else has already done the work instead of for
  * retrying readers.
+ *
+ * synchronize_rcu()
+ *  synchronize_sched()
+ *   synchronize_sched_expedited()
  */
 void synchronize_sched_expedited(void)
 {
@@ -765,6 +770,12 @@ EXPORT_SYMBOL_GPL(synchronize_sched_expedited);
  * next rcu_read_unlock() record the quiescent state up the
  * ->expmask fields in the rcu_node tree.  Otherwise, immediately
  * report the quiescent state.
+ *
+ * synchronize_rcu()
+ *  synchronize_rcu_expedited()
+ *   _synchronize_rcu_expedited(func == sync_rcu_exp_handler)
+ *    ...
+ *     sync_rcu_exp_handler()
  */
 static void sync_rcu_exp_handler(void *info)
 {

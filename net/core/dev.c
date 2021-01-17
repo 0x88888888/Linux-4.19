@@ -1979,8 +1979,14 @@ static inline bool skb_loop_sk(struct packet_type *ptype, struct sk_buff *skb)
 /*
  *	Support routine. Sends outgoing frames to any network
  *	taps currently in use.
+ *
+ * neigh_hh_output()
+ *  dev_queue_xmit()
+ *   __dev_queue_xmit()
+ *    dev_hard_start_xmit()
+ *     xmit_one()
+ *      dev_queue_xmit_nit()
  */
-
 void dev_queue_xmit_nit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct packet_type *ptype;
@@ -3257,12 +3263,20 @@ netdev_features_t netif_skb_features(struct sk_buff *skb)
 }
 EXPORT_SYMBOL(netif_skb_features);
 
+/*
+ * neigh_hh_output()
+ *  dev_queue_xmit()
+ *   __dev_queue_xmit()
+ *    dev_hard_start_xmit()
+ *     xmit_one()
+ */
 static int xmit_one(struct sk_buff *skb, struct net_device *dev,
 		    struct netdev_queue *txq, bool more)
 {
 	unsigned int len;
 	int rc;
 
+    //嗅探器
 	if (!list_empty(&ptype_all) || !list_empty(&dev->ptype_all))
 		dev_queue_xmit_nit(skb, dev);
 
@@ -3274,6 +3288,16 @@ static int xmit_one(struct sk_buff *skb, struct net_device *dev,
 	return rc;
 }
 
+/*
+ * neigh_hh_output()
+ *  dev_queue_xmit()
+ *   __dev_queue_xmit()
+ *    dev_hard_start_xmit()
+ *
+ * 这个函数处理两种主要情况：
+ *  1.已经准备好要发送的数据，或
+ *  2.需要 segmentation offloading 的数据
+ */
 struct sk_buff *dev_hard_start_xmit(struct sk_buff *first, struct net_device *dev,
 				    struct netdev_queue *txq, int *ret)
 {
@@ -3446,6 +3470,11 @@ static void qdisc_pkt_len_init(struct sk_buff *skb)
 	}
 }
 
+/*
+ * dev_queue_xmit()
+ *  __dev_queue_xmit()
+ *   __dev_xmit_skb()
+ */
 static inline int __dev_xmit_skb(struct sk_buff *skb, struct Qdisc *q,
 				 struct net_device *dev,
 				 struct netdev_queue *txq)
@@ -3482,19 +3511,21 @@ static inline int __dev_xmit_skb(struct sk_buff *skb, struct Qdisc *q,
 		spin_lock(&q->busylock);
 
 	spin_lock(root_lock);
-	if (unlikely(test_bit(__QDISC_STATE_DEACTIVATED, &q->state))) {
+	
+	if (unlikely(test_bit(__QDISC_STATE_DEACTIVATED, &q->state))) { //如果 qdisc 已停用
 		__qdisc_drop(skb, &to_free);
 		rc = NET_XMIT_DROP;
 	} else if ((q->flags & TCQ_F_CAN_BYPASS) && !qdisc_qlen(q) &&
-		   qdisc_run_begin(q)) {
+		   qdisc_run_begin(q)) { //如果 qdisc 允许数据包 bypass 排队系统，并且没有其他包要发送，并且 qdisc 当前没有运 行
 		/*
 		 * This is a work-conserving queue; there are no old skbs
 		 * waiting to be sent out; and the qdisc is not running -
 		 * xmit the skb directly.
 		 */
-
+        //更新 qdisc 发送的字节数和包数统计
 		qdisc_bstats_update(q, skb);
 
+        //sch_direct_xmit发送数据给网卡驱动
 		if (sch_direct_xmit(skb, q, dev, txq, root_lock, true)) {
 			if (unlikely(contended)) {
 				spin_unlock(&q->busylock);
@@ -3525,6 +3556,13 @@ static inline int __dev_xmit_skb(struct sk_buff *skb, struct Qdisc *q,
 }
 
 #if IS_ENABLED(CONFIG_CGROUP_NET_PRIO)
+/*
+ * dev_queue_xmit()
+ *  __dev_queue_xmit()
+ *   skb_update_prio()
+ *
+ * 如果启用了网络优先级 cgroups，这会设置 skb 的优先级
+ */
 static void skb_update_prio(struct sk_buff *skb)
 {
 	const struct netprio_map *map;
@@ -3542,6 +3580,7 @@ static void skb_update_prio(struct sk_buff *skb)
 
 	prioidx = sock_cgroup_prioidx(&sk->sk_cgrp_data);
 
+    //修改skb的优先级
 	if (prioidx < map->priomap_len)
 		skb->priority = map->priomap[prioidx];
 }
@@ -3613,6 +3652,9 @@ sch_handle_egress(struct sk_buff *skb, int *ret, struct net_device *dev)
 }
 #endif /* CONFIG_NET_EGRESS */
 
+/*
+ * 有配置
+ */
 #ifdef CONFIG_XPS
 static int __get_xps_queue_idx(struct net_device *dev, struct sk_buff *skb,
 			       struct xps_dev_maps *dev_maps, unsigned int tci)
@@ -3632,6 +3674,7 @@ static int __get_xps_queue_idx(struct net_device *dev, struct sk_buff *skb,
 		else
 			queue_index = map->queues[reciprocal_scale(
 						skb_get_hash(skb), map->len)];
+		
 		if (unlikely(queue_index >= dev->real_num_tx_queues))
 			queue_index = -1;
 	}
@@ -3639,6 +3682,11 @@ static int __get_xps_queue_idx(struct net_device *dev, struct sk_buff *skb,
 }
 #endif
 
+/*
+ * 发送数据包控制（XPS）是一项功能，
+ * 允许系统管理员配置哪些 CPU 可以处理网卡的哪些发送 队列。
+ * XPS 的主要目的是避免处理发送请求时的锁竞争
+ */
 static int get_xps_queue(struct net_device *dev, struct net_device *sb_dev,
 			 struct sk_buff *skb)
 {
@@ -3697,6 +3745,14 @@ u16 dev_pick_tx_cpu_id(struct net_device *dev, struct sk_buff *skb,
 }
 EXPORT_SYMBOL(dev_pick_tx_cpu_id);
 
+/*
+ * dev_queue_xmit()
+ *  __dev_queue_xmit()
+ *   netdev_pick_tx()
+ *    __netdev_pick_tx()
+ *
+ * 选择发送队列
+ */
 static u16 __netdev_pick_tx(struct net_device *dev, struct sk_buff *skb,
 			    struct net_device *sb_dev)
 {
@@ -3707,6 +3763,7 @@ static u16 __netdev_pick_tx(struct net_device *dev, struct sk_buff *skb,
 
 	if (queue_index < 0 || skb->ooo_okay ||
 	    queue_index >= dev->real_num_tx_queues) {
+	    //Transmit Packet Steering
 		int new_index = get_xps_queue(dev, sb_dev, skb);
 
 		if (new_index < 0)
@@ -3723,6 +3780,13 @@ static u16 __netdev_pick_tx(struct net_device *dev, struct sk_buff *skb,
 	return queue_index;
 }
 
+/*
+ * dev_queue_xmit()
+ *  __dev_queue_xmit()
+ *   netdev_pick_tx()
+ *
+ * 选择发送队列
+ */
 struct netdev_queue *netdev_pick_tx(struct net_device *dev,
 				    struct sk_buff *skb,
 				    struct net_device *sb_dev)
@@ -3736,18 +3800,26 @@ struct netdev_queue *netdev_pick_tx(struct net_device *dev,
 		skb->sender_cpu = raw_smp_processor_id() + 1;
 #endif
 
+    //选择发送队列index
+    /*
+     * 如果网络设备仅支持单个 TX 队列，则会跳过复杂的代码，直接返回单个 TX 队列。
+     * 大多高端服务器上使用的设备都有多个 TX 队列。具有多个 TX 队列的设备有两种情况：
+     *   1. 驱动程序实现 ndo_select_queue，以硬件或 feature-specific 的方式更智能地选择 TX 队列
+     *   2. 驱动程序没有实现 ndo_select_queue，这种情况需要内核自己选择设备
+     */
 	if (dev->real_num_tx_queues != 1) {
 		const struct net_device_ops *ops = dev->netdev_ops;
 
 		if (ops->ndo_select_queue)
 			queue_index = ops->ndo_select_queue(dev, skb, sb_dev,
 							    __netdev_pick_tx);
-		else
+		else //通常是走这里，选择网卡的队列号
 			queue_index = __netdev_pick_tx(dev, skb, sb_dev);
 
 		queue_index = netdev_cap_txqueue(dev, queue_index);
 	}
 
+    //设定skb->queue_mapping
 	skb_set_queue_mapping(skb, queue_index);
 	return netdev_get_tx_queue(dev, queue_index);
 }
@@ -3777,6 +3849,25 @@ struct netdev_queue *netdev_pick_tx(struct net_device *dev,
  *      When calling this method, interrupts MUST be enabled.  This is because
  *      the BH enable code must have IRQs enabled so that it will not deadlock.
  *          --BLG
+ *
+ *
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ *    sock_sendmsg_nosec()
+ *     inet_sendmsg()
+ *      udp_sendmsg()
+ *       udp_send_skb()
+ *        ip_send_skb()
+ *         ip_local_out()
+ *          dst_output()
+ *           ip_output()
+ *            ip_finish_output()
+ *             ip_finish_output2()
+ *              neigh_output()
+ *               neigh_hh_output()
+ *                dev_queue_xmit()
+ *                 __dev_queue_xmit()
  */
 static int __dev_queue_xmit(struct sk_buff *skb, struct net_device *sb_dev)
 {
@@ -3796,9 +3887,11 @@ static int __dev_queue_xmit(struct sk_buff *skb, struct net_device *sb_dev)
 	 */
 	rcu_read_lock_bh();
 
+    // 如果启用了网络优先级 cgroups，这会设置 skb 的优先级
 	skb_update_prio(skb);
 
 	qdisc_pkt_len_init(skb);
+	
 #ifdef CONFIG_NET_CLS_ACT
 	skb->tc_at_ingress = 0;
 # ifdef CONFIG_NET_EGRESS
@@ -3818,6 +3911,10 @@ static int __dev_queue_xmit(struct sk_buff *skb, struct net_device *sb_dev)
 		skb_dst_force(skb);
 
 	txq = netdev_pick_tx(dev, skb, sb_dev);
+/*
+ * 单发送队列设备的默认类型是 pfifo_fast qdisc，
+ * 而对于多队列设备，默认类型是 mq qdisc
+ */
 	q = rcu_dereference_bh(txq->qdisc);
 
 	trace_net_dev_queue(skb);
@@ -3825,6 +3922,7 @@ static int __dev_queue_xmit(struct sk_buff *skb, struct net_device *sb_dev)
 		rc = __dev_xmit_skb(skb, q, dev, txq);
 		goto out;
 	}
+    //当q->enqueue ==NULL时，就直接走到了这里
 
 	/* The device has no queue. Common case for software devices:
 	 * loopback, all the sorts of tunnels...
@@ -3839,9 +3937,10 @@ static int __dev_queue_xmit(struct sk_buff *skb, struct net_device *sb_dev)
 	 *Either shot noqueue qdisc, it is even simpler 8)
 	 */
 	if (dev->flags & IFF_UP) {
+		
 		int cpu = smp_processor_id(); /* ok because BHs are off */
 
-		if (txq->xmit_lock_owner != cpu) {
+		if (txq->xmit_lock_owner != cpu) { //如果发送锁不由此 CPU 拥有
 			if (unlikely(__this_cpu_read(xmit_recursion) >
 				     XMIT_RECURSION_LIMIT))
 				goto recursion_alert;
@@ -3854,7 +3953,9 @@ static int __dev_queue_xmit(struct sk_buff *skb, struct net_device *sb_dev)
 
 			if (!netif_xmit_stopped(txq)) {
 				__this_cpu_inc(xmit_recursion);
+				
 				skb = dev_hard_start_xmit(skb, dev, txq, &rc);
+			
 				__this_cpu_dec(xmit_recursion);
 				if (dev_xmit_complete(rc)) {
 					HARD_TX_UNLOCK(dev, txq);
@@ -3885,6 +3986,24 @@ out:
 	return rc;
 }
 
+/*
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ *    sock_sendmsg_nosec()
+ *     inet_sendmsg()
+ *      udp_sendmsg()
+ *       udp_send_skb()
+ *        ip_send_skb()
+ *         ip_local_out()
+ *          dst_output()
+ *           ip_output()
+ *            ip_finish_output()
+ *             ip_finish_output2()
+ *              neigh_output()
+ *               neigh_hh_output()
+ *                dev_queue_xmit()
+ */
 int dev_queue_xmit(struct sk_buff *skb)
 {
 	return __dev_queue_xmit(skb, NULL);
@@ -4554,6 +4673,10 @@ EXPORT_SYMBOL(netif_rx_ni);
  *    invoke_softirq()
  *     __do_softirq()
  *      net_tx_action()
+ *
+ * 分别处理executing CPU 的 softnet_data 实例的两个 queue：
+ *  1.completion queue
+ *  2.output queue
  */
 static __latent_entropy void net_tx_action(struct softirq_action *h)
 {
@@ -4563,6 +4686,7 @@ static __latent_entropy void net_tx_action(struct softirq_action *h)
 		struct sk_buff *clist;
 
 		local_irq_disable();
+	    //用while处理competion queue
 		clist = sd->completion_queue;
 		sd->completion_queue = NULL;
 		local_irq_enable();
@@ -4587,6 +4711,7 @@ static __latent_entropy void net_tx_action(struct softirq_action *h)
 		__kfree_skb_flush();
 	}
 
+    //用while 循环处理output queue
 	if (sd->output_queue) {
 		struct Qdisc *head;
 

@@ -242,15 +242,18 @@ void __init setup_per_cpu_areas(void)
 		per_cpu(x86_cpu_to_acpiid, cpu) =
 			early_per_cpu_map(x86_cpu_to_acpiid, cpu);
 #endif
+
 #ifdef CONFIG_X86_32
 		per_cpu(x86_cpu_to_logical_apicid, cpu) =
 			early_per_cpu_map(x86_cpu_to_logical_apicid, cpu);
 #endif
+
 #ifdef CONFIG_X86_64
 		per_cpu(irq_stack_ptr, cpu) =
 			per_cpu(irq_stack_union.irq_stack, cpu) +
 			IRQ_STACK_SIZE;
 #endif
+
 #ifdef CONFIG_NUMA
 		per_cpu(x86_cpu_to_node_map, cpu) =
 			early_per_cpu_map(x86_cpu_to_node_map, cpu);
@@ -267,6 +270,8 @@ void __init setup_per_cpu_areas(void)
 		/*
 		 * Up to this point, the boot CPU has been using .init.data
 		 * area.  Reload any changed state for the boot CPU.
+		 *
+		 * 加载新的gdt
 		 */
 		if (!cpu)
 			switch_to_new_gdt(cpu);

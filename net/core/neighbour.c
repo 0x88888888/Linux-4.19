@@ -486,6 +486,22 @@ struct neighbour *neigh_lookup_nodev(struct neigh_table *tbl, struct net *net,
 }
 EXPORT_SYMBOL(neigh_lookup_nodev);
 
+/*
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ *    sock_sendmsg_nosec()
+ *     inet_sendmsg()
+ *      udp_sendmsg()
+ *       udp_send_skb()
+ *        ip_send_skb()
+ *         ip_local_out()
+ *          dst_output()
+ *           ip_output()
+ *            ip_finish_output()
+ *             ip_finish_output2()
+ *              __neigh_create()
+ */
 struct neighbour *__neigh_create(struct neigh_table *tbl, const void *pkey,
 				 struct net_device *dev, bool want_ref)
 {
@@ -1000,6 +1016,12 @@ out:
 	neigh_release(neigh);
 }
 
+/*
+ * neigh_output()
+ *  neigh_resolve_output()
+ *   neigh_event_send()
+ *    __neigh_event_send()
+ */
 int __neigh_event_send(struct neighbour *neigh, struct sk_buff *skb)
 {
 	int rc;
@@ -1341,8 +1363,26 @@ static void neigh_hh_init(struct neighbour *n)
 	write_unlock_bh(&n->lock);
 }
 
-/* Slow and careful. */
-
+/* Slow and careful. 
+ *
+ * SYSCALL_DEFINE6(sendto)
+ *  __sys_sendto()
+ *   sock_sendmsg()
+ *    sock_sendmsg_nosec()
+ *     inet_sendmsg()
+ *      udp_sendmsg()
+ *       udp_send_skb()
+ *        ip_send_skb()
+ *         ip_local_out()
+ *          dst_output()
+ *           ip_output()
+ *            ip_finish_output()
+ *             ip_finish_output2()
+ *              neigh_output()
+ *               neigh_resolve_output()
+ *
+ * 此函数的目的是解析未连接的邻居，或已连接但没有缓存硬件头的邻居
+ */
 int neigh_resolve_output(struct neighbour *neigh, struct sk_buff *skb)
 {
 	int rc = 0;
@@ -1352,12 +1392,15 @@ int neigh_resolve_output(struct neighbour *neigh, struct sk_buff *skb)
 		struct net_device *dev = neigh->dev;
 		unsigned int seq;
 
+        //
 		if (dev->header_ops->cache && !neigh->hh.hh_len)
 			neigh_hh_init(neigh);
 
 		do {
 			__skb_pull(skb, skb_network_offset(skb));
 			seq = read_seqbegin(&neigh->ha_lock);
+
+			//写入以太网头
 			err = dev_hard_header(skb, dev, ntohs(skb->protocol),
 					      neigh->ha, NULL, skb->len);
 		} while (read_seqretry(&neigh->ha_lock, seq));

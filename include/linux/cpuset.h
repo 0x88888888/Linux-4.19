@@ -17,6 +17,7 @@
 #include <linux/mm.h>
 #include <linux/jump_label.h>
 
+//有定义
 #ifdef CONFIG_CPUSETS
 
 /*

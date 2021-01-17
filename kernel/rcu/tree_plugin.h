@@ -1875,7 +1875,11 @@ static void zero_cpu_stall_ticks(struct rcu_data *rdp)
 	rdp->softirq_snap = kstat_softirqs_cpu(RCU_SOFTIRQ, smp_processor_id());
 }
 
-/* Increment ->ticks_this_gp for all flavors of RCU. */
+/* Increment ->ticks_this_gp for all flavors of RCU. 
+ *
+ * rcu_check_callbacks()
+ *  increment_cpu_stall_ticks()
+ */
 static void increment_cpu_stall_ticks(void)
 {
 	struct rcu_state *rsp;
@@ -1884,6 +1888,7 @@ static void increment_cpu_stall_ticks(void)
 		raw_cpu_inc(rsp->rda->ticks_this_gp);
 }
 
+//没有定义
 #ifdef CONFIG_RCU_NOCB_CPU
 
 /*
@@ -2784,7 +2789,17 @@ static void rcu_bind_gp_kthread(void)
 	housekeeping_affine(current, HK_FLAG_RCU);
 }
 
-/* Record the current task on dyntick-idle entry. */
+/* Record the current task on dyntick-idle entry.
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   cpu_startup_entry(CPUHP_ONLINE)
+ *    do_idle()
+ *     cpu_idle_poll()
+ *      rcu_idle_enter()
+ *       rcu_eqs_enter(false)
+ *        rcu_dynticks_task_enter()
+ */
 static void rcu_dynticks_task_enter(void)
 {
 #if defined(CONFIG_TASKS_RCU) && defined(CONFIG_NO_HZ_FULL)
@@ -2799,9 +2814,19 @@ static void rcu_dynticks_task_enter(void)
  *   irq_enter()
  *    rcu_irq_enter()
  *     rcu_dynticks_task_exit()
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   cpu_startup_entry(CPUHP_ONLINE)
+ *    do_idle()
+ *     cpu_idle_poll()
+ *      rcu_idle_exit()
+ *       rcu_eqs_exit()
+ *        rcu_dynticks_task_exit()
  */
 static void rcu_dynticks_task_exit(void)
 {
+//没有定义
 #if defined(CONFIG_TASKS_RCU) && defined(CONFIG_NO_HZ_FULL)
 	WRITE_ONCE(current->rcu_tasks_idle_cpu, -1);
 #endif /* #if defined(CONFIG_TASKS_RCU) && defined(CONFIG_NO_HZ_FULL) */
