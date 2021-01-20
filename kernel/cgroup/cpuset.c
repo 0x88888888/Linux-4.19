@@ -2551,6 +2551,10 @@ static struct cpuset *nearest_hardwall_ancestor(struct cpuset *cs)
  *	tsk_is_oom_victim   - any node ok
  *	GFP_KERNEL   - any node in enclosing hardwalled cpuset ok
  *	GFP_USER     - only nodes in current tasks mems allowed ok.
+ *
+ * __cpuset_zone_allowed()
+ *  __cpuset_node_allowed()
+ *  
  */
 bool __cpuset_node_allowed(int node, gfp_t gfp_mask)
 {
@@ -2560,6 +2564,7 @@ bool __cpuset_node_allowed(int node, gfp_t gfp_mask)
 
 	if (in_interrupt())
 		return true;
+	
 	if (node_isset(node, current->mems_allowed))
 		return true;
 	/*

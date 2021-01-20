@@ -4236,6 +4236,13 @@ static unsigned long node_pagecache_reclaimable(struct pglist_data *pgdat)
 
 /*
  * Try to free up some pages from this node through reclaim.
+ *
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   __alloc_pages_nodemask()
+ *    get_page_from_freelist()
+ *     node_reclaim()
+ *      __node_reclaim()
  */
 static int __node_reclaim(struct pglist_data *pgdat, gfp_t gfp_mask, unsigned int order)
 {
@@ -4284,6 +4291,13 @@ static int __node_reclaim(struct pglist_data *pgdat, gfp_t gfp_mask, unsigned in
 	return sc.nr_reclaimed >= nr_pages;
 }
 
+/*
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   __alloc_pages_nodemask()
+ *    get_page_from_freelist()
+ *     node_reclaim()
+ */
 int node_reclaim(struct pglist_data *pgdat, gfp_t gfp_mask, unsigned int order)
 {
 	int ret;

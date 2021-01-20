@@ -77,6 +77,8 @@ struct page {
     /*
      * 在enum pageflags中
      * 同时也存放section编号,node节点编号,zone编号,LAST_CPUID等等
+     *
+     * 函数set_pageblock_migratetype()用来在页块标志位图中设置页块的迁移类型
     */
 	unsigned long flags;		/* Atomic flags, some possibly
 					 * updated asynchronously */
@@ -154,11 +156,15 @@ struct page {
 			};
 		};
 		struct {	/* Tail pages of compound page */
+			//页首的地址，并且设置最低位
 			unsigned long compound_head;	/* Bit zero is set */
 
 			/* First tail page only */
+			//compound page释放时调用的函数
 			unsigned char compound_dtor;
+			//compound page 的order
 			unsigned char compound_order;
+			//表示复合页的映射计数，即多少个虚拟页映射到这个物理页，初始值是−1
 			atomic_t compound_mapcount;
 		};
 		struct {	/* Second tail page of compound page */

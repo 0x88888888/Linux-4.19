@@ -2082,6 +2082,18 @@ out:
  *
  * alloc_pages()
  *  alloc_pages_current()
+ *
+ * do_page_fault()
+ *	__do_page_fault()
+ *	 handle_mm_fault()
+ *	  __handle_mm_fault()
+ *	   handle_pte_fault()
+ *		do_anonymous_page()
+ *		 pte_alloc()
+ *        __pte_alloc()
+ *         pte_alloc_one()
+ *          alloc_pages(gfp_mask == __userpte_alloc_gfp == PGALLOC_GFP | PGALLOC_USER_GFP)
+ *           alloc_pages_current(gfp_mask == __userpte_alloc_gfp == PGALLOC_GFP | PGALLOC_USER_GFP)
  */
 struct page *alloc_pages_current(gfp_t gfp, unsigned order)
 {

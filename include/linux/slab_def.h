@@ -93,6 +93,7 @@ struct kmem_cache {
 	unsigned int useroffset;	/* Usercopy region offset */
 	unsigned int usersize;		/* Usercopy region size */
 
+    //每个node，都有一个kmem_cache_node对象
 	struct kmem_cache_node *node[MAX_NUMNODES];
 };
 

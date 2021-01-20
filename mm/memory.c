@@ -647,6 +647,16 @@ void free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *vma,
 	}
 }
 
+/*
+ * do_page_fault()
+ *	__do_page_fault()
+ *	 handle_mm_fault()
+ *	  __handle_mm_fault()
+ *	   handle_pte_fault()
+ *		do_anonymous_page()
+ *		 pte_alloc()
+ *        __pte_alloc()
+ */
 int __pte_alloc(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
 {
 	spinlock_t *ptl;

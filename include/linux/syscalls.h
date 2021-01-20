@@ -746,7 +746,9 @@ asmlinkage long sys_recvmsg(int fd, struct user_msghdr __user *msg, unsigned fla
 asmlinkage long sys_readahead(int fd, loff_t offset, size_t count);
 
 /* mm/nommu.c, also with MMU */
+// mmap.c中 SYSCALL_DEFINE1(brk....)
 asmlinkage long sys_brk(unsigned long brk);
+//mmap.c中 SYSCALL_DEFINE2(munmap....)
 asmlinkage long sys_munmap(unsigned long addr, size_t len);
 asmlinkage long sys_mremap(unsigned long addr,
 			   unsigned long old_len, unsigned long new_len,

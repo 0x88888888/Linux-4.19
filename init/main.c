@@ -1149,8 +1149,9 @@ static void __init do_initcalls(void)
      * 1. core_initcall(sock_init)
      * 1. core_initcall(cgroup_wq_init)
      *
-     * 
+     * 4. subsys_initcall(init_user_reserve)
      * 5. fs_initcall(inet_init)
+     * 
      */
 	for (level = 0; level < ARRAY_SIZE(initcall_levels) - 1; level++)
 		do_initcall_level(level);

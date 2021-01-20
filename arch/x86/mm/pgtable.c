@@ -15,6 +15,7 @@ EXPORT_SYMBOL(physical_mask);
 
 #define PGALLOC_GFP (GFP_KERNEL_ACCOUNT | __GFP_ZERO)
 
+//没有定义
 #ifdef CONFIG_HIGHPTE
 #define PGALLOC_USER_GFP __GFP_HIGHMEM
 #else
@@ -28,6 +29,17 @@ pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 	return (pte_t *)__get_free_page(PGALLOC_GFP & ~__GFP_ACCOUNT);
 }
 
+/*
+ * do_page_fault()
+ *	__do_page_fault()
+ *	 handle_mm_fault()
+ *	  __handle_mm_fault()
+ *	   handle_pte_fault()
+ *		do_anonymous_page()
+ *		 pte_alloc()
+ *        __pte_alloc()
+ *         pte_alloc_one()
+ */
 pgtable_t pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
 	struct page *pte;

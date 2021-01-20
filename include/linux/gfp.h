@@ -211,6 +211,7 @@ struct vm_area_struct;
  * %__GFP_ZERO returns a zeroed page on success.
  */
 #define __GFP_NOWARN	((__force gfp_t)___GFP_NOWARN)
+//分配一个compound page
 #define __GFP_COMP	((__force gfp_t)___GFP_COMP)
 #define __GFP_ZERO	((__force gfp_t)___GFP_ZERO)
 
@@ -296,6 +297,7 @@ struct vm_area_struct;
 #define GFP_USER	(__GFP_RECLAIM | __GFP_IO | __GFP_FS | __GFP_HARDWALL)
 #define GFP_DMA		__GFP_DMA
 #define GFP_DMA32	__GFP_DMA32
+
 #define GFP_HIGHUSER	(GFP_USER | __GFP_HIGHMEM)
 #define GFP_HIGHUSER_MOVABLE	(GFP_HIGHUSER | __GFP_MOVABLE)
 #define GFP_TRANSHUGE_LIGHT	((GFP_HIGHUSER_MOVABLE | __GFP_COMP | \
@@ -416,6 +418,9 @@ static inline bool gfpflags_allow_blocking(const gfp_t gfp_flags)
 	| 1 << (___GFP_MOVABLE | ___GFP_DMA32 | ___GFP_DMA | ___GFP_HIGHMEM)  \
 )
 
+/*
+ * 根据flags得到zone_type
+ */
 static inline enum zone_type gfp_zone(gfp_t flags)
 {
 	enum zone_type z;
@@ -507,6 +512,18 @@ static inline struct page *alloc_pages_node(int nid, gfp_t gfp_mask,
 #ifdef CONFIG_NUMA
 extern struct page *alloc_pages_current(gfp_t gfp_mask, unsigned order);
 
+/*
+ * do_page_fault()
+ *	__do_page_fault()
+ *	 handle_mm_fault()
+ *	  __handle_mm_fault()
+ *	   handle_pte_fault()
+ *		do_anonymous_page()
+ *		 pte_alloc()
+ *        __pte_alloc()
+ *         pte_alloc_one()
+ *          alloc_pages(gfp_mask == __userpte_alloc_gfp == PGALLOC_GFP | PGALLOC_USER_GFP)
+ */
 static inline struct page *
 alloc_pages(gfp_t gfp_mask, unsigned int order)
 {

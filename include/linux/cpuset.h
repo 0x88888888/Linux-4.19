@@ -71,7 +71,9 @@ static inline bool cpuset_node_allowed(int node, gfp_t gfp_mask)
 		return __cpuset_node_allowed(node, gfp_mask);
 	return true;
 }
-
+/*
+ * cpuset是否允许从z所在的节点分配page
+ */
 static inline bool __cpuset_zone_allowed(struct zone *z, gfp_t gfp_mask)
 {
 	return __cpuset_node_allowed(zone_to_nid(z), gfp_mask);

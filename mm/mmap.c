@@ -188,6 +188,7 @@ static struct vm_area_struct *remove_vma(struct vm_area_struct *vma)
 
 static int do_brk_flags(unsigned long addr, unsigned long request, unsigned long flags,
 		struct list_head *uf);
+
 SYSCALL_DEFINE1(brk, unsigned long, brk)
 {
 	unsigned long retval;
@@ -2944,6 +2945,9 @@ static inline void verify_mm_writelocked(struct mm_struct *mm)
  *  this is really a simplified "do_mmap".  it only handles
  *  anonymous maps.  eventually we may be able to do some
  *  brk-specific accounting here.
+ *
+ * SYSCALL_DEFINE1(brk ,....)
+ *  do_brk_flags()
  */
 static int do_brk_flags(unsigned long addr, unsigned long len, unsigned long flags, struct list_head *uf)
 {

@@ -1944,6 +1944,15 @@ static inline void pgtable_page_dtor(struct page *page)
 	pte_unmap(pte);					\
 } while (0)
 
+/*
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_anonymous_page()
+ *       pte_alloc()
+ */
 #define pte_alloc(mm, pmd, address)			\
 	(unlikely(pmd_none(*(pmd))) && __pte_alloc(mm, pmd, address))
 

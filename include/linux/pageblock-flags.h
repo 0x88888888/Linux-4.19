@@ -44,11 +44,13 @@ enum pageblock_bits {
 #ifdef CONFIG_HUGETLB_PAGE_SIZE_VARIABLE
 
 /* Huge page sizes are variable */
+//Huge page的长度是可变的
 extern unsigned int pageblock_order;
 
 #else /* CONFIG_HUGETLB_PAGE_SIZE_VARIABLE */
 
 /* Huge pages are a constant size */
+// Huge page的长度是固定的
 #define pageblock_order		HUGETLB_PAGE_ORDER
 
 #endif /* CONFIG_HUGETLB_PAGE_SIZE_VARIABLE */
@@ -56,6 +58,7 @@ extern unsigned int pageblock_order;
 #else /* CONFIG_HUGETLB_PAGE */
 
 /* If huge pages are not used, group by MAX_ORDER_NR_PAGES */
+//内核没有开启huge page,按buddy system的最大分配介分组
 #define pageblock_order		(MAX_ORDER-1)
 
 #endif /* CONFIG_HUGETLB_PAGE */
@@ -81,6 +84,9 @@ void set_pfnblock_flags_mask(struct page *page,
 	get_pfnblock_flags_mask(page, page_to_pfn(page),		\
 			end_bitidx,					\
 			(1 << (end_bitidx - start_bitidx + 1)) - 1)
+/* 
+ * set_pageblock_migratetype(start_bitidx== PB_migrate, end_bitidx==PB_migrate_end)
+ */
 #define set_pageblock_flags_group(page, flags, start_bitidx, end_bitidx) \
 	set_pfnblock_flags_mask(page, flags, page_to_pfn(page),		\
 			end_bitidx,					\

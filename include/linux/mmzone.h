@@ -39,7 +39,7 @@
 enum migratetype {
 	MIGRATE_UNMOVABLE,
 	MIGRATE_MOVABLE,
-	MIGRATE_RECLAIMABLE,
+	MIGRATE_RECLAIMABLE, //真正有用的就前面这三个
 	MIGRATE_PCPTYPES,	/* the number of types on the pcp lists */
 	MIGRATE_HIGHATOMIC = MIGRATE_PCPTYPES,
 #ifdef CONFIG_CMA
@@ -58,6 +58,7 @@ enum migratetype {
 	 */
 	MIGRATE_CMA,
 #endif
+//有配置
 #ifdef CONFIG_MEMORY_ISOLATION
 	/* 
 	 * 不能从这个链表分配页框，
@@ -390,16 +391,26 @@ struct zone {
 	 */
 	long lowmem_reserve[MAX_NR_ZONES];
 
+//有定义
 #ifdef CONFIG_NUMA
 	int node;
 #endif
 	struct pglist_data	*zone_pgdat;
 	struct per_cpu_pageset __percpu *pageset;
 
+// 有定义
 #ifndef CONFIG_SPARSEMEM
 	/*
 	 * Flags for a pageblock_nr_pages block. See pageblock-flags.h.
 	 * In SPARSEMEM, this map is stored in struct mem_section
+	 *
+	 * 释放物理页的时候，需要把物理页插入物理页所属迁移类型的空闲链表，
+	 * 内核怎么知道物理页的迁移类型？内存区域的zone结构体的成员pageblock_flags指向页块标志位图，
+	 * 页块的大小是分组阶数pageblock_order，我们把这种页块称为分组页块
+	 *
+	 *每个分组页块在位图中占用4位，其中3位用来存放页块的迁移类型。
+	 *
+	 * 函数set_pageblock_migratetype()用来在页块标志位图中设置页块的迁移类型
 	 */
 	unsigned long		*pageblock_flags;
 #endif /* CONFIG_SPARSEMEM */
@@ -454,6 +465,7 @@ struct zone {
 
 	const char		*name;
 
+//有定义
 #ifdef CONFIG_MEMORY_ISOLATION
 	/*
 	 * Number of isolated pageblock. It is used to solve incorrect
@@ -464,6 +476,7 @@ struct zone {
 	unsigned long		nr_isolate_pageblock;
 #endif
 
+//有定义
 #ifdef CONFIG_MEMORY_HOTPLUG
 	/* see spanned/present_pages for more description */
 	seqlock_t		span_seqlock;
@@ -494,13 +507,14 @@ struct zone {
 	 */
 	unsigned long percpu_drift_mark;
 
-#if defined CONFIG_COMPACTION || defined CONFIG_CMA
+#if defined CONFIG_COMPACTION /*有定义*/ || defined CONFIG_CMA /* 没有定义 */
 	/* pfn where compaction free scanner should start */
 	unsigned long		compact_cached_free_pfn;
 	/* pfn where async and sync compaction migration scanner should start */
 	unsigned long		compact_cached_migrate_pfn[2];
 #endif
 
+/*有定义*/
 #ifdef CONFIG_COMPACTION
 	/*
 	 * On compaction failure, 1<<compact_defer_shift compactions
@@ -512,7 +526,8 @@ struct zone {
 	int			compact_order_failed;
 #endif
 
-#if defined CONFIG_COMPACTION || defined CONFIG_CMA
+/*有定义*/
+#if defined CONFIG_COMPACTION || defined CONFIG_CMA /* 没有定义 */
 	/* Set to true when the PG_migrate_skip bits should be cleared */
 	bool			compact_blockskip_flush;
 #endif
