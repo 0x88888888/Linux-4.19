@@ -1629,6 +1629,7 @@ void __init __memblock_free_late(phys_addr_t base, phys_addr_t size)
 	cursor = PFN_UP(base);
 	end = PFN_DOWN(base + size);
 
+    //一个个 page来，放到buddy system?
 	for (; cursor < end; cursor++) {
 		__free_pages_bootmem(pfn_to_page(cursor), cursor, 0);
 		totalram_pages++;

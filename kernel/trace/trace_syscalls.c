@@ -549,6 +549,7 @@ void __init init_ftrace_syscalls(void)
 		return;
 	}
 
+    //将所有的系统调用，都保存在syscalls_metadata[]中
 	for (i = 0; i < NR_syscalls; i++) {
 		addr = arch_syscall_addr(i);
 		meta = find_syscall_meta(addr);

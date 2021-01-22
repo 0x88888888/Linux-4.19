@@ -115,6 +115,7 @@ struct ioapic_domain_cfg;
 #define	IOAPIC_MAP_ALLOC		0x1
 #define	IOAPIC_MAP_CHECK		0x2
 
+//有定义
 #ifdef CONFIG_X86_IO_APIC
 
 /*

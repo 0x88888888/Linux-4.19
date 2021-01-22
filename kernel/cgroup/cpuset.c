@@ -2396,6 +2396,10 @@ static struct notifier_block cpuset_track_online_nodes_nb = {
  * cpuset_init_smp - initialize cpus_allowed
  *
  * Description: Finish top cpuset after cpu, node maps are initialized
+ *
+ * start_kernel()
+ *  do_basic_setup()
+ *   cpuset_init_smp()
  */
 void __init cpuset_init_smp(void)
 {

@@ -195,6 +195,12 @@ int __cpuhp_setup_state_cpuslocked(enum cpuhp_state state, const char *name,
  *
  * Installs the callback functions and invokes the startup callback on
  * the present cpus which have already reached the @state.
+ *
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    cpucache_init()
+ *     cpuhp_setup_state(,startup == slab_online_cpu, teardown==slab_offline_cpu)
  */
 static inline int cpuhp_setup_state(enum cpuhp_state state,
 				    const char *name,

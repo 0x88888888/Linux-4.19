@@ -1748,6 +1748,14 @@ EXPORT_SYMBOL_GPL(__cpuhp_state_add_instance);
  *      Positive state number if @state is CPUHP_AP_ONLINE_DYN
  *      0 for all other states
  *   On failure: proper (negative) error code
+ *
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *	  cpucache_init()
+ *	   cpuhp_setup_state(,startup == slab_online_cpu, teardown==slab_offline_cpu)
+ *      __cpuhp_setup_state(invoke==true,startup == slab_online_cpu, teardown==slab_offline_cpu, multi_instance==false)
+ *       __cpuhp_setup_state_cpuslocked(....)
  */
 int __cpuhp_setup_state_cpuslocked(enum cpuhp_state state,
 				   const char *name, bool invoke,
@@ -1808,6 +1816,14 @@ out:
 }
 EXPORT_SYMBOL(__cpuhp_setup_state_cpuslocked);
 
+/*  
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *	  cpucache_init()
+ *	   cpuhp_setup_state(,startup == slab_online_cpu, teardown==slab_offline_cpu)
+ *      __cpuhp_setup_state(invoke==true,startup == slab_online_cpu, teardown==slab_offline_cpu, multi_instance==false)
+ */
 int __cpuhp_setup_state(enum cpuhp_state state,
 			const char *name, bool invoke,
 			int (*startup)(unsigned int cpu),
@@ -2337,6 +2353,9 @@ void __init boot_cpu_init(void)
 
 /*
  * Must be called _AFTER_ setting up the per_cpu areas
+ *
+ * start_kernel()
+ *  boot_cpu_hotplug_init()
  */
 void __init boot_cpu_hotplug_init(void)
 {

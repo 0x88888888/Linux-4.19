@@ -558,6 +558,17 @@ static void next_reap_node(void)
  * Add the CPU number into the expiration time to minimize the possibility of
  * the CPUs getting into lockstep and contending for the global cache chain
  * lock.
+ *
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *	  cpucache_init()
+ *	   cpuhp_setup_state(,startup == slab_online_cpu, teardown==slab_offline_cpu)
+ *      __cpuhp_setup_state(invoke==true,startup == slab_online_cpu, teardown==slab_offline_cpu, multi_instance==false)
+ *       __cpuhp_setup_state_cpuslocked(....)
+ *        ....
+ *         slab_online_cpu()
+ *          start_cpu_timer()
  */
 static void start_cpu_timer(int cpu)
 {
@@ -565,6 +576,7 @@ static void start_cpu_timer(int cpu)
 
 	if (reap_work->work.func == NULL) {
 		init_reap_node(cpu);
+		//
 		INIT_DEFERRABLE_WORK(reap_work, cache_reap);
 		schedule_delayed_work_on(cpu, reap_work,
 					__round_jiffies_relative(HZ, cpu));
@@ -1116,6 +1128,17 @@ int slab_dead_cpu(unsigned int cpu)
 }
 #endif
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *	  cpucache_init()
+ *	   cpuhp_setup_state(,startup == slab_online_cpu, teardown==slab_offline_cpu)
+ *      __cpuhp_setup_state(invoke==true,startup == slab_online_cpu, teardown==slab_offline_cpu, multi_instance==false)
+ *       __cpuhp_setup_state_cpuslocked(....)
+ *        ...
+ *         slab_online_cpu()
+ */
 static int slab_online_cpu(unsigned int cpu)
 {
 	start_cpu_timer(cpu);
@@ -1359,6 +1382,12 @@ void __init kmem_cache_init_late(void)
 	 */
 }
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    cpucache_init()
+ */
 static int __init cpucache_init(void)
 {
 	int ret;
@@ -4098,6 +4127,19 @@ static void drain_array(struct kmem_cache *cachep, struct kmem_cache_node *n,
  *
  * If we cannot acquire the cache chain mutex then just give up - we'll try
  * again on the next iteration.
+ *
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *	  cpucache_init()
+ *	   cpuhp_setup_state(,startup == slab_online_cpu, teardown==slab_offline_cpu)
+ *      __cpuhp_setup_state(invoke==true,startup == slab_online_cpu, teardown==slab_offline_cpu, multi_instance==false)
+ *       __cpuhp_setup_state_cpuslocked(....)
+ *        ....
+ *         slab_online_cpu()
+ *          start_cpu_timer()
+ *           ...
+ *            cache_reap()
  */
 static void cache_reap(struct work_struct *w)
 {

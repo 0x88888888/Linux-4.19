@@ -57,12 +57,16 @@
  *
  * NOTE: this must only be called from functions that never return,
  * and it must always be inlined.
+ *
+ * start_kernel()
+ *  boot_init_stack_canary()
  */
 static __always_inline void boot_init_stack_canary(void)
 {
 	u64 canary;
 	u64 tsc;
-
+	
+//有定义 
 #ifdef CONFIG_X86_64
 	BUILD_BUG_ON(offsetof(union irq_stack_union, stack_canary) != 40);
 #endif
@@ -78,6 +82,7 @@ static __always_inline void boot_init_stack_canary(void)
 	canary &= CANARY_MASK;
 
 	current->stack_canary = canary;
+//有定义	
 #ifdef CONFIG_X86_64
 	this_cpu_write(irq_stack_union.stack_canary, canary);
 #else

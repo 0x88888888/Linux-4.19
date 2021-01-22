@@ -44,6 +44,8 @@ struct vm_struct {
 	// 对应的虚拟内存的大小，总是4096的整数倍
 	unsigned long		size;
 	/*
+	 * 使用vmap分配的话，就不会设置VM_ALLOC,并且pages是空指针,nr_pages == 0
+	 *
 	 * VM_ALLOC指定由vmalloc产生的子区域,映射的是实际的物理内存
      * VM_MAP表示将现存pages集合映射到连续的虚拟地址空间中。
      * VM_IOREMAP表示将IO内存映射到vmalloc区域中,映射的是IO设备的内存。
@@ -56,11 +58,22 @@ struct vm_struct {
 	const void		*caller;
 };
 
+/*
+ * 表示[va_start, va_end)这段虚拟内存区域
+ */
 struct vmap_area {
 	unsigned long va_start;
 	unsigned long va_end;
+	/*
+	 * 如果设置了标志位VM_VM_AREA，表示成员vm指向一个vm_struct实例.
+	 * 
+	 */
 	unsigned long flags;
 	struct rb_node rb_node;         /* address sorted rbtree */
+	/*
+	 * 用来把vmap_area实例加入头节点是vmap_area_list的链表中，
+	 * 这条链表按虚拟地址从小到大排序
+	 */
 	struct list_head list;          /* address sorted list */
 	struct llist_node purge_list;    /* "lazy purge" list */
 	struct vm_struct *vm;

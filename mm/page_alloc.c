@@ -453,6 +453,16 @@ void set_pfnblock_flags_mask(struct page *page, unsigned long flags,
 }
 
 /*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   paging_init()
+ *    zone_sizes_init()
+ *     free_area_init_nodes()
+ *      free_area_init_node()
+ *       free_area_init_core()
+ *        memmap_init()
+ *         memmap_init_zone()
+ *          set_pageblock_migratetype(migratetype==MIGRATE_MOVABLE)
  */
 void set_pageblock_migratetype(struct page *page, int migratetype)
 {
@@ -1229,6 +1239,18 @@ static void free_one_page(struct zone *zone,
 	spin_unlock(&zone->lock);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   paging_init()
+ *    zone_sizes_init()
+ *     free_area_init_nodes()
+ *      free_area_init_node()
+ *       free_area_init_core()
+ *        memmap_init()
+ *         memmap_init_zone(...,context == MEMMAP_EARLY)
+ *          __init_single_page()
+ */
 static void __meminit __init_single_page(struct page *page, unsigned long pfn,
 				unsigned long zone, int nid)
 {
@@ -1348,6 +1370,16 @@ static void __free_pages_ok(struct page *page, unsigned int order)
  *        __memblock_free_late()
  *         __free_pages_bootmem()
  *          __free_pages_boot_core()
+ *
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   mem_init()
+ *    free_all_bootmem() [nobootmem.c]
+ *     free_low_memory_core_early() [nobootmem.c]
+ *      __free_memory_core() [nobootmem.c]
+ *       __free_pages_memory() [nobootmem.c]
+ *        __free_pages_memory(order !=0)
+ *         __free_pages_boot_core(order !=0)
  */
 static void __init __free_pages_boot_core(struct page *page, unsigned int order)
 {
@@ -1441,6 +1473,18 @@ meminit_pfn_in_nid(unsigned long pfn, int node,
  *       memblock_discard()
  *        __memblock_free_late()
  *         __free_pages_bootmem( order ==0)
+ *
+ * __free_pages_memory()
+ *  __free_pages_memory(order !=0)
+ *
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   mem_init()
+ *    free_all_bootmem() [nobootmem.c]
+ *     free_low_memory_core_early() [nobootmem.c]
+ *      __free_memory_core() [nobootmem.c]
+ *       __free_pages_memory() [nobootmem.c]
+ *        __free_pages_memory(order !=0)
  */
 void __init __free_pages_bootmem(struct page *page, unsigned long pfn,
 							unsigned int order)
@@ -4796,6 +4840,17 @@ EXPORT_SYMBOL(get_zeroed_page);
  *
  * free_pages()
  *  __free_pages()
+ *
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   mem_init()
+ *    free_all_bootmem() [nobootmem.c]
+ *     free_low_memory_core_early() [nobootmem.c]
+ *      __free_memory_core() [nobootmem.c]
+ *       __free_pages_memory() [nobootmem.c]
+ *        __free_pages_memory(order !=0)
+ *         __free_pages_boot_core(order !=0)
+ *          __free_pages(order !=0)
  */
 void __free_pages(struct page *page, unsigned int order)
 {
@@ -5889,12 +5944,13 @@ void __ref build_all_zonelists(pg_data_t *pgdat)
  *      free_area_init_node()
  *       free_area_init_core()
  *        memmap_init()
- *         memmap_init_zone()
+ *         memmap_init_zone(context == MEMMAP_EARLY)
  */
 void __meminit memmap_init_zone(unsigned long size, int nid, unsigned long zone,
 		unsigned long start_pfn, enum memmap_context context,
 		struct vmem_altmap *altmap)
 {
+    //zone中的最后一个page frame number
 	unsigned long end_pfn = start_pfn + size;
 	pg_data_t *pgdat = NODE_DATA(nid);
 	unsigned long pfn;
@@ -5914,7 +5970,7 @@ void __meminit memmap_init_zone(unsigned long size, int nid, unsigned long zone,
 	if (altmap && start_pfn == altmap->base_pfn)
 		start_pfn += altmap->reserve;
 
-    //每个page都是MIGRATE_MOVABLE的迁移类型
+    //每个page都是MIGRATE_MOVABLE的迁移类型,设置page的每个成员
 	for (pfn = start_pfn; pfn < end_pfn; pfn++) {
 		/*
 		 * There can be holes in boot-time mem_map[]s handed to this
@@ -5958,6 +6014,7 @@ void __meminit memmap_init_zone(unsigned long size, int nid, unsigned long zone,
 
 not_early:
 		page = pfn_to_page(pfn);
+		
 		__init_single_page(page, pfn, zone, nid);
 		if (context == MEMMAP_HOTPLUG)
 			SetPageReserved(page);
@@ -5994,6 +6051,7 @@ static void __meminit zone_init_free_lists(struct zone *zone)
 	}
 }
 
+//没有定义,所以成立
 #ifndef __HAVE_ARCH_MEMMAP_INIT
 /*
  * start_kernel()  [init/main.c]
@@ -6186,6 +6244,16 @@ static __meminit void zone_pcp_init(struct zone *zone)
 					 zone_batchsize(zone));
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   paging_init()
+ *    zone_sizes_init()
+ *     free_area_init_nodes()
+ *      free_area_init_node()
+ *       free_area_init_core()
+ *        init_currently_empty_zone()
+ */
 void __meminit init_currently_empty_zone(struct zone *zone,
 					unsigned long zone_start_pfn,
 					unsigned long size)
@@ -6554,6 +6622,7 @@ static void __meminit calculate_node_totalpages(struct pglist_data *pgdat,
 							realtotalpages);
 }
 
+//有定义
 #ifndef CONFIG_SPARSEMEM
 /*
  * Calculate the size of the zone->blockflags rounded to an unsigned long
@@ -6690,6 +6759,16 @@ static void __meminit pgdat_init_internals(struct pglist_data *pgdat)
 	lruvec_init(node_lruvec(pgdat));
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   paging_init()
+ *    zone_sizes_init()
+ *     free_area_init_nodes()
+ *      free_area_init_node()
+ *       free_area_init_core()
+ *        zone_init_internals()
+ */
 static void __meminit zone_init_internals(struct zone *zone, enum zone_type idx, int nid,
 							unsigned long remaining_pages)
 {
@@ -6746,9 +6825,11 @@ static void __init free_area_init_core(struct pglist_data *pgdat)
 	pgdat_init_internals(pgdat);
 	pgdat->per_cpu_nodestats = &boot_nodestats;
 
+    //逐个zone遍历过去
 	for (j = 0; j < MAX_NR_ZONES; j++) {
 		struct zone *zone = pgdat->node_zones + j;
 		unsigned long size, freesize, memmap_pages;
+	
 		unsigned long zone_start_pfn = zone->zone_start_pfn;
 
 		size = zone->spanned_pages;
@@ -6758,6 +6839,8 @@ static void __init free_area_init_core(struct pglist_data *pgdat)
 		 * Adjust freesize so that it accounts for how much memory
 		 * is used by this zone for memmap. This affects the watermark
 		 * and per-cpu initialisations
+		 *
+		 * 计算出zone中的page数量
 		 */
 		memmap_pages = calc_memmap_size(size, freesize);
 		if (!is_highmem_idx(j)) {
@@ -6784,20 +6867,26 @@ static void __init free_area_init_core(struct pglist_data *pgdat)
 		/* Charge for highmem memmap if there are enough kernel pages */
 		else if (nr_kernel_pages > memmap_pages * 2)
 			nr_kernel_pages -= memmap_pages;
+		
 		nr_all_pages += freesize;
 
 		/*
 		 * Set an approximate value for lowmem here, it will be adjusted
 		 * when the bootmem allocator frees pages into the buddy system.
 		 * And all highmem pages will be managed by the buddy system.
+		 *
+		 * 
 		 */
 		zone_init_internals(zone, j, nid, freesize);
 
 		if (!size)
 			continue;
 
+		//设置pageblock_order
 		set_pageblock_order();
+		//空函数
 		setup_usemap(pgdat, zone, zone_start_pfn, size);
+		
 		init_currently_empty_zone(zone, zone_start_pfn, size);
 		//
 		memmap_init(size, nid, j, zone_start_pfn);

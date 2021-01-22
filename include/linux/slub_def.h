@@ -43,6 +43,7 @@ struct kmem_cache_cpu {
 	unsigned long tid;	/* Globally unique transaction id */
 	struct page *page;	/* The slab from which we are allocating */
 #ifdef CONFIG_SLUB_CPU_PARTIAL
+    //
 	struct page *partial;	/* Partially allocated frozen slabs */
 #endif
 #ifdef CONFIG_SLUB_STATS
@@ -84,17 +85,21 @@ struct kmem_cache {
 	/* Used for retriving partial slabs etc */
 	slab_flags_t flags;
 	unsigned long min_partial;
+	//包括对象meta data的长度
 	unsigned int size;	/* The size of an object including meta data */
+	//对象的原始长度
 	unsigned int object_size;/* The size of an object without meta data */
 	unsigned int offset;	/* Free pointer offset. */
 #ifdef CONFIG_SLUB_CPU_PARTIAL
 	/* Number of per cpu partial objects to keep around */
 	unsigned int cpu_partial;
 #endif
+    //存放最优slab的阶数和对象数，低16位是对象数，高16位是slab的阶数
 	struct kmem_cache_order_objects oo;
 
 	/* Allocation and freeing of slabs */
 	struct kmem_cache_order_objects max;
+	//存放最小slab的阶数和对象数，格式和oo相同
 	struct kmem_cache_order_objects min;
 	gfp_t allocflags;	/* gfp flags to use on each alloc */
 	int refcount;		/* Refcount for slab cache destroy */

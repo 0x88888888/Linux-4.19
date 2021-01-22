@@ -1213,6 +1213,8 @@ void __init mem_init(void)
 
 	/* this will put all memory onto the freelists 
 	 * 建立buddy system
+	 * 
+	 * 在nobootmem.c中
 	 */
 	free_all_bootmem();
 	after_bootmem = 1;

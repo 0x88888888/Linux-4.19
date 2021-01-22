@@ -182,6 +182,7 @@ void __init setup_per_cpu_areas(void)
 	 * sparse unit mapping and vmalloc area isn't spacious enough
 	 * on 32bit.  Use page in that case.
 	 */
+//没定义	 
 #ifdef CONFIG_X86_32
 	if (pcpu_chosen_fc == PCPU_FC_AUTO && pcpu_need_numa())
 		pcpu_chosen_fc = PCPU_FC_PAGE;
@@ -199,6 +200,7 @@ void __init setup_per_cpu_areas(void)
 		 * PAGE_SIZE on 32bit as vmalloc space is highly contended
 		 * and large vmalloc area allocs can easily fail.
 		 */
+//有定义		 
 #ifdef CONFIG_X86_64
 		atom_size = PMD_SIZE;
 #else

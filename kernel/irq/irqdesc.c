@@ -532,6 +532,7 @@ int __init early_irq_init(void)
 		set_bit(i, allocated_irqs);
 		irq_insert_desc(i, desc);
 	}
+	//在arch/x86/kernel/apic/vector.c中
 	return arch_early_irq_init();
 }
 

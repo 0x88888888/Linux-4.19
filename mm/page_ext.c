@@ -59,12 +59,16 @@
  */
 
 static struct page_ext_operations *page_ext_ops[] = {
+
+//没有定义
 #ifdef CONFIG_DEBUG_PAGEALLOC
 	&debug_guardpage_ops,
 #endif
+//没有定义
 #ifdef CONFIG_PAGE_OWNER
 	&page_owner_ops,
 #endif
+//也没有定义
 #if defined(CONFIG_IDLE_PAGE_TRACKING) && !defined(CONFIG_64BIT)
 	&page_idle_ops,
 #endif
@@ -104,6 +108,7 @@ static bool __init invoke_need_callbacks(void)
 static void __init invoke_init_callbacks(void)
 {
 	int i;
+	//空数组
 	int entries = ARRAY_SIZE(page_ext_ops);
 
 	for (i = 0; i < entries; i++) {

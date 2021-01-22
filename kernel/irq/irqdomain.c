@@ -99,6 +99,11 @@ EXPORT_SYMBOL_GPL(__irq_domain_alloc_fwnode);
  * irq_domain_free_fwnode - Free a non-OF-backed fwnode_handle
  *
  * Free a fwnode_handle allocated with irq_domain_alloc_fwnode.
+ *
+ * start_kernel()  [init/main.c]
+ *  early_irq_init()
+ *   arch_early_irq_init()
+ *    irq_domain_free_fwnode()
  */
 void irq_domain_free_fwnode(struct fwnode_handle *fwnode)
 {
@@ -449,6 +454,11 @@ EXPORT_SYMBOL_GPL(irq_domain_check_msi_remap);
  * whenever NULL is passed to irq_create_mapping(). It makes life easier for
  * platforms that want to manipulate a few hard coded interrupt numbers that
  * aren't properly represented in the device-tree.
+ *
+ * start_kernel()  [init/main.c]
+ *  early_irq_init()
+ *   arch_early_irq_init()
+ *    irq_set_default_host(domain == x86_vector_domain)
  */
 void irq_set_default_host(struct irq_domain *domain)
 {

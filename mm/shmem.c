@@ -41,6 +41,7 @@
 
 static struct vfsmount *shm_mnt;
 
+//有定义
 #ifdef CONFIG_SHMEM
 /*
  * This virtual memory filesystem is heavily based on the ramfs. It
@@ -3706,6 +3707,11 @@ static struct file_system_type shmem_fs_type = {
 	.fs_flags	= FS_USERNS_MOUNT,
 };
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   shmem_init()
+ */ 
 int __init shmem_init(void)
 {
 	int error;
@@ -3745,6 +3751,7 @@ out2:
 	return error;
 }
 
+//都有设置
 #if defined(CONFIG_TRANSPARENT_HUGE_PAGECACHE) && defined(CONFIG_SYSFS)
 static ssize_t shmem_enabled_show(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
@@ -3833,6 +3840,7 @@ bool shmem_huge_enabled(struct vm_area_struct *vma)
 }
 #endif /* CONFIG_TRANSPARENT_HUGE_PAGECACHE */
 
+//CONFIG_SHMEM 有定义,都用上面的
 #else /* !CONFIG_SHMEM */
 
 /*

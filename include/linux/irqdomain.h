@@ -225,6 +225,12 @@ enum {
 	IRQCHIP_FWNODE_NAMED_ID,
 };
 
+/*
+ * start_kernel()  [init/main.c]
+ *  early_irq_init()
+ *   arch_early_irq_init()
+ *    fwnode_handle()
+ */
 static inline
 struct fwnode_handle *irq_domain_alloc_named_fwnode(const char *name)
 {
@@ -354,6 +360,12 @@ static inline struct irq_domain *irq_domain_create_linear(struct fwnode_handle *
 	return __irq_domain_add(fwnode, size, size, 0, ops, host_data);
 }
 
+/*
+ * start_kernel()	[init/main.c]
+ *  early_irq_init()
+ *   arch_early_irq_init()
+ *    irq_domain_create_tree()
+ */
 static inline struct irq_domain *irq_domain_create_tree(struct fwnode_handle *fwnode,
 					 const struct irq_domain_ops *ops,
 					 void *host_data)

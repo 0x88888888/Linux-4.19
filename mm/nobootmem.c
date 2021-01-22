@@ -96,11 +96,21 @@ void __init free_bootmem_late(unsigned long addr, unsigned long size)
 	}
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   mem_init()
+ *    free_all_bootmem() [nobootmem.c]
+ *     free_low_memory_core_early() [nobootmem.c]
+ *      __free_memory_core() [nobootmem.c]
+ *       __free_pages_memory()
+ */
 static void __init __free_pages_memory(unsigned long start, unsigned long end)
 {
 	int order;
 
 	while (start < end) {
+		//确定order
 		order = min(MAX_ORDER - 1UL, __ffs(start));
 
 		while (start + (1UL << order) > end)
@@ -112,6 +122,14 @@ static void __init __free_pages_memory(unsigned long start, unsigned long end)
 	}
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   mem_init()
+ *    free_all_bootmem() [nobootmem.c]
+ *     free_low_memory_core_early() [nobootmem.c]
+ *      __free_memory_core() [nobootmem.c]
+ */
 static unsigned long __init __free_memory_core(phys_addr_t start,
 				 phys_addr_t end)
 {
@@ -126,7 +144,14 @@ static unsigned long __init __free_memory_core(phys_addr_t start,
 
 	return end_pfn - start_pfn;
 }
-
+				 
+/*
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   mem_init()
+ *    free_all_bootmem() [nobootmem.c]
+ *     free_low_memory_core_early() [nobootmem.c]
+ */
 static unsigned long __init free_low_memory_core_early(void)
 {
 	unsigned long count = 0;
@@ -160,6 +185,13 @@ void reset_node_managed_pages(pg_data_t *pgdat)
 		z->managed_pages = 0;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   mem_init()
+ *    free_all_bootmem()
+ *     reset_all_zones_managed_pages() [nobootmem.c]
+ */
 void __init reset_all_zones_managed_pages(void)
 {
 	struct pglist_data *pgdat;
@@ -177,6 +209,11 @@ void __init reset_all_zones_managed_pages(void)
  * free_all_bootmem - release free pages to the buddy allocator
  *
  * Return: the number of pages actually released.
+ *
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   mem_init()
+ *    free_all_bootmem() [nobootmem.c]
  */
 unsigned long __init free_all_bootmem(void)
 {

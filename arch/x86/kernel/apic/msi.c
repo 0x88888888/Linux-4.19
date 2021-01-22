@@ -133,6 +133,12 @@ static struct msi_domain_info pci_msi_domain_info = {
 	.handler_name	= "edge",
 };
 
+/*
+ * start_kernel()  [init/main.c]
+ *  early_irq_init()
+ *   arch_early_irq_init()
+ *    arch_init_msi_domain( parent == x86_vector_domain)
+ */
 void __init arch_init_msi_domain(struct irq_domain *parent)
 {
 	struct fwnode_handle *fn;

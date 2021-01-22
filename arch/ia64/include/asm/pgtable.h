@@ -542,6 +542,7 @@ extern struct page *zero_page_memmap_ptr;
 })
 #endif
 
+//没有定义
 #  ifdef CONFIG_VIRTUAL_MEM_MAP
   /* arch mem_map init routine is needed due to holes in a virtual mem_map */
 #   define __HAVE_ARCH_MEMMAP_INIT

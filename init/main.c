@@ -400,6 +400,8 @@ static __initdata DECLARE_COMPLETION(kthreadd_done);
 /*
  * start_kernle() [init/main.c]
  *  rest_init()
+ *
+ * 这个函数创建kernel_init,kthreadd两个内核线程
  */
 static noinline void __ref rest_init(void)
 {
@@ -597,7 +599,8 @@ asmlinkage __visible void __init start_kernel(void)
 
 	//x64中为空函数
 	smp_setup_processor_id();
-	
+
+	//空函数
 	debug_objects_early_init();
 
     // kernel/cgroup/cgroup.c中
@@ -626,6 +629,8 @@ asmlinkage __visible void __init start_kernel(void)
 	/*
 	 * Set up the the initial canary and entropy after arch
 	 * and after adding latent and command line entropy.
+	 *
+	 * 空函数
 	 */
 	add_latent_entropy();
 	
@@ -636,8 +641,10 @@ asmlinkage __visible void __init start_kernel(void)
 	mm_init_cpumask(&init_mm);
 	//复制command_line到saved_command_line
 	setup_command_line(command_line);
-	
+
+	//空函数
 	setup_nr_cpu_ids();
+	
 	setup_per_cpu_areas();
 
 	//根据cpu id装载gdt
@@ -716,6 +723,8 @@ asmlinkage __visible void __init start_kernel(void)
 	/*
 	 * Set up housekeeping before setting up workqueues to allow the unbound
 	 * workqueue to take non-housekeeping into account.
+	 *
+	 * 在isolation.c中
 	 */
 	housekeeping_init();
 
@@ -726,6 +735,9 @@ asmlinkage __visible void __init start_kernel(void)
 	 */
 	workqueue_init_early();
 
+    /*
+     * 初始化rcu_bh_state, rcu_sched_state, rcu_gq_wq, rcu_par_gp_wq
+     */
 	rcu_init();
 
 	/* Trace events are available after this 
@@ -739,7 +751,10 @@ asmlinkage __visible void __init start_kernel(void)
 
     //空函数
 	context_tracking_init();
-	/* init some links before init_ISA_irqs() */
+	/* init some links before init_ISA_irqs() 
+	 * 在irqdesc.c中
+	 * 分配irq_desc对象,
+	 */
 	early_irq_init();
 
 	/* idt_setup_apic_and_irq_gates()中 设置中断处理函数，比如
@@ -751,8 +766,9 @@ asmlinkage __visible void __init start_kernel(void)
 	tick_init();
 	
 	rcu_init_nohz();
-	
+	//设置TIMER_SOFTIRQ 回调函数为run_timer_softirq
 	init_timers();
+	//设置HRTIMER_SOFTIRQ 回调函数为 hrtimer_run_softirq
 	hrtimers_init();
 
 	//初始化tasklet_vec,tasklet_hi_vec
@@ -816,13 +832,15 @@ asmlinkage __visible void __init start_kernel(void)
 	}
 #endif
 
+    //在page_ext.c中
 	page_ext_init();
 
     //空函数
 	kmemleak_init();
 	//空函数
 	debug_objects_mem_init();
-	
+
+	//设置zone->pageset
 	setup_per_cpu_pageset();
 	
 	numa_policy_init();
@@ -849,7 +867,9 @@ asmlinkage __visible void __init start_kernel(void)
     //空函数
 	thread_stack_cache_init();
 
+    //创建cred_jar
 	cred_init();
+	//初始化init_task.signal->rlim[]
 	fork_init();
 
 	/*
@@ -863,6 +883,7 @@ asmlinkage __visible void __init start_kernel(void)
 
 	//创建bh_cachep，用于分配buffer_head对象,挂载根文件系统rootfs_fs_type,设置当前进程的root目录
 	buffer_init();
+	//键盘
 	key_init();
 	security_init();
 
@@ -1151,6 +1172,7 @@ static void __init do_initcalls(void)
      *
      * 4. subsys_initcall(init_user_reserve)
      * 5. fs_initcall(inet_init)
+     * 6. __initcall(cpucache_init)
      * 
      */
 	for (level = 0; level < ARRAY_SIZE(initcall_levels) - 1; level++)
@@ -1169,7 +1191,9 @@ static void __init do_initcalls(void)
  */
 static void __init do_basic_setup(void)
 {
+    //设置top_cpuset
 	cpuset_init_smp();
+	
 	shmem_init();
 	
 	driver_init();
