@@ -979,7 +979,11 @@ struct task_struct {
 	u64				acct_timexpd;
 #endif
 #ifdef CONFIG_CPUSETS
-	/* Protected by ->alloc_lock: */
+	/* Protected by ->alloc_lock: 
+	 *
+	 * 在set_mems_allowed()中设置
+	 * 在cpuset_change_task_nodemask()中修改
+     */
 	nodemask_t			mems_allowed;
 	/* Seqence number to catch updates: */
 	seqcount_t			mems_allowed_seq;

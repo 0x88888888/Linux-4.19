@@ -1987,6 +1987,7 @@ void __init init_mm_internals(void)
 #endif
 }
 
+//有定义
 #if defined(CONFIG_DEBUG_FS) && defined(CONFIG_COMPACTION)
 
 /*

@@ -26,6 +26,7 @@ extern unsigned long max_pfn;
  */
 extern unsigned long long max_possible_pfn;
 
+//有定义CONFIG_NO_BOOTMEM
 #ifndef CONFIG_NO_BOOTMEM
 /**
  * struct bootmem_data - per-node information used by the bootmem allocator
@@ -288,6 +289,12 @@ static inline void * __init memblock_virt_alloc_raw(
 	return __alloc_bootmem_nopanic(size, align, BOOTMEM_LOW_LIMIT);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_per_cpu_areas()
+ *   pcpu_embed_first_chunk()
+ *    memblock_virt_alloc_nopanic()
+ */
 static inline void * __init memblock_virt_alloc_nopanic(
 					phys_addr_t size, phys_addr_t align)
 {

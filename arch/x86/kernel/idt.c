@@ -304,6 +304,10 @@ void __init idt_setup_early_pf(void)
 
 /**
  * idt_setup_ist_traps - Initialize the idt table with traps using IST
+ *
+ * start_kernel()  [init/main.c]
+ *  trap_init()
+ *   idt_setup_ist_traps()
  */
 void __init idt_setup_ist_traps(void)
 {

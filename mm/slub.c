@@ -4176,6 +4176,11 @@ static struct kmem_cache * __init bootstrap(struct kmem_cache *static_cache)
 	return s;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   kmem_cache_init()
+ */
 void __init kmem_cache_init(void)
 {
 	static __initdata struct kmem_cache boot_kmem_cache,

@@ -682,7 +682,9 @@ asmlinkage __visible void __init start_kernel(void)
 	
 	sort_main_extable();
 
-	//设置中断处理函数和内部异常处理函数
+	/* 在arch/x86/kernel/traps.c中
+	 * 设置中断处理函数和内部异常处理函数
+	 */
 	trap_init();
 
 	/*
@@ -1264,6 +1266,7 @@ static int try_to_run_init_process(const char *init_filename)
 
 static noinline void __init kernel_init_freeable(void);
 
+//有定义
 #if defined(CONFIG_STRICT_KERNEL_RWX) || defined(CONFIG_STRICT_MODULE_RWX)
 bool rodata_enabled __ro_after_init = true;
 static int __init set_debug_rodata(char *str)
@@ -1273,6 +1276,7 @@ static int __init set_debug_rodata(char *str)
 __setup("rodata=", set_debug_rodata);
 #endif
 
+//有定义
 #ifdef CONFIG_STRICT_KERNEL_RWX
 static void mark_readonly(void)
 {
@@ -1398,6 +1402,7 @@ static noinline void __init kernel_init_freeable(void)
 
 	init_mm_internals();
 
+    //调用__initcall0之前的 
 	do_pre_smp_initcalls();
 	//死锁检测
 	lockup_detector_init();

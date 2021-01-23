@@ -1617,6 +1617,8 @@ void __init __memblock_free_early(phys_addr_t base, phys_addr_t size)
  *      page_alloc_init_late()
  *       memblock_discard()
  *        __memblock_free_late()
+ *
+ * 释放到buddy system
  */
 void __init __memblock_free_late(phys_addr_t base, phys_addr_t size)
 {

@@ -532,6 +532,7 @@ struct zone {
 	bool			compact_blockskip_flush;
 #endif
 
+    //如果内存没有hole, contiguous==true
 	bool			contiguous;
 
 	ZONE_PADDING(_pad3_)

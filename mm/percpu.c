@@ -2219,6 +2219,7 @@ static int __init percpu_alloc_setup(char *str)
 	else if (!strcmp(str, "embed"))
 		pcpu_chosen_fc = PCPU_FC_EMBED;
 #endif
+//有配置
 #ifdef CONFIG_NEED_PER_CPU_PAGE_FIRST_CHUNK
 	else if (!strcmp(str, "page"))
 		pcpu_chosen_fc = PCPU_FC_PAGE;
@@ -2436,6 +2437,10 @@ static struct pcpu_alloc_info * __init pcpu_build_alloc_info(
  *
  * RETURNS:
  * 0 on success, -errno on failure.
+ *
+ * start_kernel()  [init/main.c]
+ *  setup_per_cpu_areas()
+ *   pcpu_embed_first_chunk()
  */
 int __init pcpu_embed_first_chunk(size_t reserved_size, size_t dyn_size,
 				  size_t atom_size,

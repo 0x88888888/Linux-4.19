@@ -1368,8 +1368,8 @@ static void __free_pages_ok(struct page *page, unsigned int order)
  *      page_alloc_init_late()
  *       memblock_discard()
  *        __memblock_free_late()
- *         __free_pages_bootmem()
- *          __free_pages_boot_core()
+ *         __free_pages_bootmem(order ==0)
+ *          __free_pages_boot_core(order ==0)
  *
  * start_kernel()  [init/main.c]
  *  mm_init()
@@ -1460,8 +1460,8 @@ meminit_pfn_in_nid(unsigned long pfn, int node,
  * start_kernel()  [init/main.c]
  *  mm_init()
  *   mem_init()
- *    free_all_bootmem()
- *     free_all_bootmem_core()
+ *    free_all_bootmem() [bootmem.c]
+ *     free_all_bootmem_core() [bootmem.c]
  *      __free_pages_bootmem( order ==0 或者order==)
  *
  * start_kernle() [init/main.c]
@@ -1471,7 +1471,7 @@ meminit_pfn_in_nid(unsigned long pfn, int node,
  *     kernel_init_freeable()
  *      page_alloc_init_late()
  *       memblock_discard()
- *        __memblock_free_late()
+ *        __memblock_free_late( )
  *         __free_pages_bootmem( order ==0)
  *
  * __free_pages_memory()
@@ -1512,6 +1512,8 @@ void __init __free_pages_bootmem(struct page *page, unsigned long pfn,
  * interleaving within a single pageblock. It is therefore sufficient to check
  * the first and last page of a pageblock and avoid checking each individual
  * page in a pageblock.
+ *
+ * 确定[start_pfn, end_pfn)是否是在同一个zone中
  */
 struct page *__pageblock_pfn_to_page(unsigned long start_pfn,
 				     unsigned long end_pfn, struct zone *zone)
@@ -1541,6 +1543,17 @@ struct page *__pageblock_pfn_to_page(unsigned long start_pfn,
 	return start_page;
 }
 
+ /* 
+  * start_kernle() [init/main.c]
+  *  rest_init()
+  *   ......
+  *    kernel_init()
+  * 	kernel_init_freeable()
+  * 	 page_alloc_init_late()
+  *       set_zone_contiguous()  
+  *
+  * 设置zone->contiguous == true
+  */
 void set_zone_contiguous(struct zone *zone)
 {
 	unsigned long block_start_pfn = zone->zone_start_pfn;
@@ -1553,6 +1566,7 @@ void set_zone_contiguous(struct zone *zone)
 
 		block_end_pfn = min(block_end_pfn, zone_end_pfn(zone));
 
+        // start_pfn 和 end_pfn必须要在同一个zone中啊
 		if (!__pageblock_pfn_to_page(block_start_pfn,
 					     block_end_pfn, zone))
 			return;
@@ -1567,6 +1581,7 @@ void clear_zone_contiguous(struct zone *zone)
 	zone->contiguous = false;
 }
 
+//没有定义
 #ifdef CONFIG_DEFERRED_STRUCT_PAGE_INIT
 static void __init deferred_free_range(unsigned long pfn,
 				       unsigned long nr_pages)
@@ -1879,11 +1894,13 @@ void __init page_alloc_init_late(void)
 {
 	struct zone *zone;
 
+//没有定义
 #ifdef CONFIG_DEFERRED_STRUCT_PAGE_INIT
 	int nid;
 
 	/* There will be num_node_state(N_MEMORY) threads */
 	atomic_set(&pgdat_init_n_undone, num_node_state(N_MEMORY));
+	
 	for_each_node_state(nid, N_MEMORY) {
 		kthread_run(deferred_init_memmap, NODE_DATA(nid), "pgdatinit%d", nid);
 	}
@@ -1908,6 +1925,7 @@ void __init page_alloc_init_late(void)
 	memblock_discard();
 #endif
 
+    //设置zone->contiguous == true
 	for_each_populated_zone(zone)
 		set_zone_contiguous(zone);
 }
@@ -6149,6 +6167,13 @@ static void pageset_set_batch(struct per_cpu_pageset *p, unsigned long batch)
 	pageset_update(&p->pcp, 6 * batch, max(1UL, 1 * batch));
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_per_cpu_pageset()
+ *   setup_zone_pageset()
+ *    zone_pageset_init()
+ *     pageset_init()
+ */
 static void pageset_init(struct per_cpu_pageset *p)
 {
 	struct per_cpu_pages *pcp;
@@ -6182,6 +6207,13 @@ static void pageset_set_high(struct per_cpu_pageset *p,
 	pageset_update(&p->pcp, high, batch);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *	setup_per_cpu_pageset()
+ *	 setup_zone_pageset()
+ *	  zone_pageset_init()
+ *     pageset_set_high_and_batch()
+ */
 static void pageset_set_high_and_batch(struct zone *zone,
 				       struct per_cpu_pageset *pcp)
 {
@@ -6193,6 +6225,12 @@ static void pageset_set_high_and_batch(struct zone *zone,
 		pageset_set_batch(pcp, zone_batchsize(zone));
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_per_cpu_pageset()
+ *   setup_zone_pageset()
+ *    zone_pageset_init()
+ */
 static void __meminit zone_pageset_init(struct zone *zone, int cpu)
 {
 	struct per_cpu_pageset *pcp = per_cpu_ptr(zone->pageset, cpu);
@@ -6201,6 +6239,11 @@ static void __meminit zone_pageset_init(struct zone *zone, int cpu)
 	pageset_set_high_and_batch(zone, pcp);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_per_cpu_pageset()
+ *   setup_zone_pageset()
+ */
 void __meminit setup_zone_pageset(struct zone *zone)
 {
 	int cpu;

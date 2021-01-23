@@ -113,6 +113,7 @@ static void __init __free_pages_memory(unsigned long start, unsigned long end)
 		//确定order
 		order = min(MAX_ORDER - 1UL, __ffs(start));
 
+	    //所以是从最高开始，尽量保持在高order了
 		while (start + (1UL << order) > end)
 			order--;
 
@@ -177,6 +178,14 @@ static unsigned long __init free_low_memory_core_early(void)
 
 static int reset_managed_pages_done __initdata;
 
+/*
+ * start_kernel()  [init/main.c]
+ *  mm_init()
+ *   mem_init()
+ *    free_all_bootmem() [nobootmem.c]
+ *     reset_all_zones_managed_pages() [nobootmem.c]
+ *      reset_node_managed_pages()
+ */
 void reset_node_managed_pages(pg_data_t *pgdat)
 {
 	struct zone *z;
@@ -189,7 +198,7 @@ void reset_node_managed_pages(pg_data_t *pgdat)
  * start_kernel()  [init/main.c]
  *  mm_init()
  *   mem_init()
- *    free_all_bootmem()
+ *    free_all_bootmem() [nobootmem.c]
  *     reset_all_zones_managed_pages() [nobootmem.c]
  */
 void __init reset_all_zones_managed_pages(void)
@@ -219,6 +228,7 @@ unsigned long __init free_all_bootmem(void)
 {
 	unsigned long pages;
 
+    //设置zone->managed_pages == 0
 	reset_all_zones_managed_pages();
 
 	pages = free_low_memory_core_early();

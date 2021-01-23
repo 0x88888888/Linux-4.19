@@ -973,6 +973,7 @@ void __init trap_init(void)
 
 	idt_setup_ist_traps();
 
+	//x86_init_noop(),空函数，什么都没做
 	x86_init.irqs.trap_init();
 
 	idt_setup_debugidt_traps();

@@ -1218,7 +1218,7 @@ void __init mem_init(void)
 	 */
 	free_all_bootmem();
 	after_bootmem = 1;
-	//x86_init_noop
+	//x86_init_noop(),什么都没有做
 	x86_init.hyper.init_after_bootmem();
 
 	/*

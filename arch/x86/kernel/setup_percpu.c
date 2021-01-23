@@ -166,6 +166,8 @@ static inline void setup_percpu_segment(int cpu)
 /*
  * start_kernel()  [init/main.c]
  *  setup_per_cpu_areas()
+ *
+ * buddy system 没有建立
  */
 void __init setup_per_cpu_areas(void)
 {
@@ -187,6 +189,7 @@ void __init setup_per_cpu_areas(void)
 	if (pcpu_chosen_fc == PCPU_FC_AUTO && pcpu_need_numa())
 		pcpu_chosen_fc = PCPU_FC_PAGE;
 #endif
+
 	rc = -EINVAL;
 	if (pcpu_chosen_fc != PCPU_FC_PAGE) {
 		const size_t dyn_size = PERCPU_MODULE_RESERVE +
@@ -202,10 +205,12 @@ void __init setup_per_cpu_areas(void)
 		 */
 //有定义		 
 #ifdef CONFIG_X86_64
-		atom_size = PMD_SIZE;
+        //走这里
+		atom_size = PMD_SIZE; //0x200000
 #else
 		atom_size = PAGE_SIZE;
 #endif
+        //这里会返回成功,rc == 0
 		rc = pcpu_embed_first_chunk(PERCPU_FIRST_CHUNK_RESERVE,
 					    dyn_size, atom_size,
 					    pcpu_cpu_distance,
@@ -214,7 +219,7 @@ void __init setup_per_cpu_areas(void)
 			pr_warning("%s allocator failed (%d), falling back to page size\n",
 				   pcpu_fc_names[pcpu_chosen_fc], rc);
 	}
-	if (rc < 0)
+	if (rc < 0) //分配失败，再次尝试
 		rc = pcpu_page_first_chunk(PERCPU_FIRST_CHUNK_RESERVE,
 					   pcpu_fc_alloc, pcpu_fc_free,
 					   pcpup_populate_pte);
@@ -223,10 +228,13 @@ void __init setup_per_cpu_areas(void)
 
 	/* alrighty, percpu areas up and running */
 	delta = (unsigned long)pcpu_base_addr - (unsigned long)__per_cpu_start;
+	//为每个cpu
 	for_each_possible_cpu(cpu) {
 		per_cpu_offset(cpu) = delta + pcpu_unit_offsets[cpu];
 		per_cpu(this_cpu_off, cpu) = per_cpu_offset(cpu);
 		per_cpu(cpu_number, cpu) = cpu;
+
+		//下面两个函数，在64位时，没有作用
 		setup_percpu_segment(cpu);
 		setup_stack_canary_segment(cpu);
 		/*
@@ -245,6 +253,7 @@ void __init setup_per_cpu_areas(void)
 			early_per_cpu_map(x86_cpu_to_acpiid, cpu);
 #endif
 
+//没有定义
 #ifdef CONFIG_X86_32
 		per_cpu(x86_cpu_to_logical_apicid, cpu) =
 			early_per_cpu_map(x86_cpu_to_logical_apicid, cpu);
@@ -273,7 +282,7 @@ void __init setup_per_cpu_areas(void)
 		 * Up to this point, the boot CPU has been using .init.data
 		 * area.  Reload any changed state for the boot CPU.
 		 *
-		 * 加载新的gdt
+		 * cpu==0时,加载新的gdt
 		 */
 		if (!cpu)
 			switch_to_new_gdt(cpu);
@@ -308,5 +317,6 @@ void __init setup_per_cpu_areas(void)
 	 * FIXME: Can the later sync in setup_cpu_entry_areas() replace
 	 * this call?
 	 */
+	 //64位时,空函数
 	sync_initial_page_table();
 }

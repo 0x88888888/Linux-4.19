@@ -211,8 +211,8 @@ void __init free_bootmem_late(unsigned long physaddr, unsigned long size)
  * start_kernel()  [init/main.c]
  *  mm_init()
  *   mem_init()
- *    free_all_bootmem()
- *     free_all_bootmem_core()
+ *    free_all_bootmem() [bootmem.c]
+ *     free_all_bootmem_core() [bootmem.c]
  */
 static unsigned long __init free_all_bootmem_core(bootmem_data_t *bdata)
 {
@@ -321,7 +321,7 @@ void __init reset_all_zones_managed_pages(void)
  * start_kernel()  [init/main.c]
  *  mm_init()
  *   mem_init()
- *    free_all_bootmem()
+ *    free_all_bootmem() [bootmem.c]
  */
 
 unsigned long __init free_all_bootmem(void)

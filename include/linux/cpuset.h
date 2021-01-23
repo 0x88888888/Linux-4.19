@@ -150,6 +150,21 @@ static inline bool read_mems_allowed_retry(unsigned int seq)
 	return read_seqcount_retry(&current->mems_allowed_seq, seq);
 }
 
+/*
+ * 
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      set_mems_allowed()
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ...
+ *    kthreadd()
+ *     set_mems_allowed()
+ */
 static inline void set_mems_allowed(nodemask_t nodemask)
 {
 	unsigned long flags;
