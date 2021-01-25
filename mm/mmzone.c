@@ -86,6 +86,22 @@ bool memmap_valid_within(unsigned long pfn,
 }
 #endif /* CONFIG_ARCH_HAS_HOLES_MEMORYMODEL */
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   paging_init()
+ *    zone_sizes_init()
+ *     free_area_init_nodes()
+ *      free_area_init_node()
+ *       free_area_init_core()
+ *        pgdat_init_internals()
+ *         lruvec_init()
+ *
+ * mem_cgroup_css_alloc()
+ *  mem_cgroup_alloc()
+ *   alloc_mem_cgroup_per_node_info()
+ *    lruvec_init()
+ */
 void lruvec_init(struct lruvec *lruvec)
 {
 	enum lru_list lru;

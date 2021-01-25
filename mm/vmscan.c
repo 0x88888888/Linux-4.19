@@ -1576,6 +1576,16 @@ unsigned long reclaim_clean_pages_from_list(struct zone *zone,
  * mode:	one of the LRU isolation modes defined above
  *
  * returns 0 on success, -ve errno on failure.
+ *
+ * shrink_active_list()
+ *  isolate_lru_pages(,dst==l_hold,mode == 0, lru==LRU_ACTIVE_ANON)
+ *   __isolate_lru_page( mode == 0)
+ *
+ * isolate_migratepages_range()
+ *  isolate_migratepages_block( isolate_mode==ISOLATE_UNEVICTABLE)
+ *   __isolate_lru_page(mode==ISOLATE_UNEVICTABLE )
+ * 
+ * 确定是否可以被reclaimed
  */
 int __isolate_lru_page(struct page *page, isolate_mode_t mode)
 {
@@ -1685,6 +1695,9 @@ static __always_inline void update_lru_sizes(struct lruvec *lruvec,
  * @lru:	LRU list id for isolating
  *
  * returns how many pages were moved onto *@dst.
+ *
+ * shrink_active_list()
+ *  isolate_lru_pages(,dst==l_hold, mode == 0, lru==LRU_ACTIVE_ANON)
  */
 static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
 		struct lruvec *lruvec, struct list_head *dst,
@@ -1703,6 +1716,7 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
 	for (total_scan = 0;
 	     scan < nr_to_scan && nr_taken < nr_to_scan && !list_empty(src);
 	     total_scan++) {
+	     
 		struct page *page;
 
 		page = lru_to_page(src);
@@ -1728,6 +1742,7 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
 			nr_pages = hpage_nr_pages(page);
 			nr_taken += nr_pages;
 			nr_zone_taken[page_zonenum(page)] += nr_pages;
+			//移动到l_hold链表中
 			list_move(&page->lru, dst);
 			break;
 
@@ -2120,16 +2135,24 @@ static unsigned move_active_pages_to_lru(struct lruvec *lruvec,
 	return nr_moved;
 }
 
- /*
-  * kswapd_run()
-  *  ...
-  *   kswapd()
-  *    balance_pgdat()
-  * 	age_active_anon()
-  *      shrink_active_list()
-  *
-  * 从active转移一部分到inactive
-  */
+/*
+ * kswapd_run()
+ *  ...
+ *   kswapd()
+ *    balance_pgdat()
+ * 	   age_active_anon()
+ *      shrink_active_list()
+ *
+ * kswapd()
+ *  balance_pgdat()
+ *   mem_cgroup_soft_limit_reclaim()
+ *    mem_cgroup_soft_reclaim()
+ *     mem_cgroup_shrink_node()
+ *      shrink_node_memcg()
+ *       shrink_active_list( lru==LRU_ACTIVE_ANON)
+ *
+ * 从active转移一部分到inactive
+ */
 static void shrink_active_list(unsigned long nr_to_scan,
 			       struct lruvec *lruvec,
 			       struct scan_control *sc,
@@ -2138,6 +2161,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
 	unsigned long nr_taken;
 	unsigned long nr_scanned;
 	unsigned long vm_flags;
+	//三个局部变量
 	LIST_HEAD(l_hold);	/* The pages which were snipped off */
 	LIST_HEAD(l_active);
 	LIST_HEAD(l_inactive);
@@ -2167,6 +2191,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
 
 	spin_unlock_irq(&pgdat->lru_lock);
 
+    //这个循环将l_hold中的page归位到l_active和l_inactive链表中
 	while (!list_empty(&l_hold)) {
 		
 		cond_resched();
@@ -2234,6 +2259,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
 	spin_unlock_irq(&pgdat->lru_lock);
 
 	mem_cgroup_uncharge_list(&l_hold);
+	//将依旧在l_hold中的page释放到zone->pageset->pcp中去
 	free_unref_page_list(&l_hold);
 	trace_mm_vmscan_lru_shrink_active(pgdat->node_id, nr_taken, nr_activate,
 			nr_deactivate, nr_rotated, sc->priority, file);
@@ -2556,6 +2582,13 @@ out:
 
 /*
  * This is a basic per-node page freer.  Used by both kswapd and direct reclaim.
+ *
+ * kswapd()
+ *  balance_pgdat()
+ *   mem_cgroup_soft_limit_reclaim()
+ *    mem_cgroup_soft_reclaim()
+ *     mem_cgroup_shrink_node()
+ *      shrink_node_memcg()
  */
 static void shrink_node_memcg(struct pglist_data *pgdat, struct mem_cgroup *memcg,
 			      struct scan_control *sc, unsigned long *lru_pages)
@@ -3377,6 +3410,13 @@ unsigned long try_to_free_pages(struct zonelist *zonelist, int order,
 
 #ifdef CONFIG_MEMCG
 
+/*
+ * kswapd()
+ *  balance_pgdat()
+ *   mem_cgroup_soft_limit_reclaim()
+ *    mem_cgroup_soft_reclaim()
+ *     mem_cgroup_shrink_node()
+ */
 unsigned long mem_cgroup_shrink_node(struct mem_cgroup *memcg,
 						gfp_t gfp_mask, bool noswap,
 						pg_data_t *pgdat,
@@ -3932,6 +3972,7 @@ static int kswapd(void *p)
 	 * trying to free the first piece of memory in the first place).
 	 */
 	tsk->flags |= PF_MEMALLOC | PF_SWAPWRITE | PF_KSWAPD;
+	//设置tsk->flags &= ~PF_NOFREEZE
 	set_freezable();
 
 	pgdat->kswapd_order = 0;
@@ -4297,6 +4338,8 @@ static int __node_reclaim(struct pglist_data *pgdat, gfp_t gfp_mask, unsigned in
  *   __alloc_pages_nodemask()
  *    get_page_from_freelist()
  *     node_reclaim()
+ *
+ * 回收内存
  */
 int node_reclaim(struct pglist_data *pgdat, gfp_t gfp_mask, unsigned int order)
 {

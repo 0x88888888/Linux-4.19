@@ -59,8 +59,17 @@ static inline void early_get_smp_config(void)
 	x86_init.mpparse.get_smp_config(1);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   find_smp_config()
+ */
 static inline void find_smp_config(void)
 {
+    /*
+     * default_find_smp_config() 在mpparse.c中
+     * 
+     */
 	x86_init.mpparse.find_smp_config();
 }
 

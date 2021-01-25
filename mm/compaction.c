@@ -687,6 +687,9 @@ static bool too_many_isolated(struct zone *zone)
  * The pages are isolated on cc->migratepages list (not required to be empty),
  * and cc->nr_migratepages is updated accordingly. The cc->migrate_pfn field
  * is neither read nor updated.
+ *
+ * isolate_migratepages_range()
+ *  isolate_migratepages_block( isolate_mode==ISOLATE_UNEVICTABLE)
  */
 static unsigned long
 isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
@@ -1533,6 +1536,11 @@ bool compaction_zonelist_suitable(struct alloc_context *ac, int order,
 	return false;
 }
 
+/*
+ * sysfs_compact_node()
+ *  compact_node()
+ *   compact_zone()
+ */
 static enum compact_result compact_zone(struct zone *zone, struct compact_control *cc)
 {
 	enum compact_result ret;
@@ -1811,7 +1819,11 @@ enum compact_result try_to_compact_pages(gfp_t gfp_mask, unsigned int order,
 }
 
 
-/* Compact all zones within a node */
+/* Compact all zones within a node 
+ *
+ * sysfs_compact_node()
+ *  compact_node()
+ */
 static void compact_node(int nid)
 {
 	pg_data_t *pgdat = NODE_DATA(nid);

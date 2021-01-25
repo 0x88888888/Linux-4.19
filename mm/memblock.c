@@ -91,12 +91,12 @@ static struct memblock_region memblock_physmem_init_regions[INIT_PHYSMEM_REGIONS
 struct memblock memblock __initdata_memblock = {
 	.memory.regions		= memblock_memory_init_regions,
 	.memory.cnt		= 1,	/* empty dummy entry */
-	.memory.max		= INIT_MEMBLOCK_REGIONS,
+	.memory.max		= INIT_MEMBLOCK_REGIONS, /* 128 */
 	.memory.name		= "memory",
 
 	.reserved.regions	= memblock_reserved_init_regions,
 	.reserved.cnt		= 1,	/* empty dummy entry */
-	.reserved.max		= INIT_MEMBLOCK_REGIONS,
+	.reserved.max		= INIT_MEMBLOCK_REGIONS, /* 128 */
 	.reserved.name		= "reserved",
 
 #ifdef CONFIG_HAVE_MEMBLOCK_PHYS_MAP
@@ -244,6 +244,13 @@ __memblock_find_range_top_down(phys_addr_t start, phys_addr_t end,
  *
  * Return:
  * Found address on success, 0 on failure.
+ *
+ * memblock_alloc()
+ *	memblock_alloc_base()
+ *	 __memblock_alloc_base()
+ *    memblock_alloc_base_nid()
+ *     memblock_alloc_range_nid()
+ *      memblock_find_in_range_node()
  */
 phys_addr_t __init_memblock memblock_find_in_range_node(phys_addr_t size,
 					phys_addr_t align, phys_addr_t start,
@@ -370,6 +377,7 @@ void __init memblock_discard(void)
 {
 	phys_addr_t addr, size;
 
+    //将memblock.reserved.regions释放到buddy system
 	if (memblock.reserved.regions != memblock_reserved_init_regions) {
 		addr = __pa(memblock.reserved.regions);
 		size = PAGE_ALIGN(sizeof(struct memblock_region) *
@@ -377,6 +385,7 @@ void __init memblock_discard(void)
 		__memblock_free_late(addr, size);
 	}
 
+    //将memblock.memory.regions释放到buddy system
 	if (memblock.memory.regions != memblock_memory_init_regions) {
 		addr = __pa(memblock.memory.regions);
 		size = PAGE_ALIGN(sizeof(struct memblock_region) *
@@ -596,6 +605,11 @@ static void __init_memblock memblock_insert_region(struct memblock_type *type,
  *
  * start_kernel()  [init/main.c]
  *  setup_arch()
+ *   memblock_reserve(base==0, size==PAGE_SIZE)
+ *    memblock_add_range(&memblock.reserved, base==0, size==PAGE_SIZE)
+ *
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
  *   e820__memblock_setup()
  *    memblock_add()
  *     memblock_add_range()
@@ -606,6 +620,7 @@ static void __init_memblock memblock_insert_region(struct memblock_type *type,
  *   e820__memblock_setup()
  *    memblock_reserve() 
  *     memblock_add_range()
+ *
  */
 int __init_memblock memblock_add_range(struct memblock_type *type,
 				phys_addr_t base, phys_addr_t size,
@@ -855,8 +870,17 @@ int __init_memblock memblock_free(phys_addr_t base, phys_addr_t size)
 /*
  * start_kernel()  [init/main.c]
  *  setup_arch()
+ *   memblock_reserve(base==0, size==PAGE_SIZE)
+ *
+ * start_kernel()  [init/main.c]
+ *  setup_arch() 
+ *   memblock_reserve(__pa_symbol(_text),(unsigned long)__bss_stop - (unsigned long)_text)
+ *
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
  *   e820__memblock_setup()
  *    memblock_reserve()
+ *
  */ 
 int __init_memblock memblock_reserve(phys_addr_t base, phys_addr_t size)
 {
@@ -1286,6 +1310,13 @@ int __init_memblock memblock_set_node(phys_addr_t base, phys_addr_t size,
 }
 #endif /* CONFIG_HAVE_MEMBLOCK_NODE_MAP */
 
+/*
+ * memblock_alloc()
+ *	memblock_alloc_base()
+ *	 __memblock_alloc_base()
+ *    memblock_alloc_base_nid()
+ *     memblock_alloc_range_nid()
+ */
 static phys_addr_t __init memblock_alloc_range_nid(phys_addr_t size,
 					phys_addr_t align, phys_addr_t start,
 					phys_addr_t end, int nid,
@@ -1317,6 +1348,12 @@ phys_addr_t __init memblock_alloc_range(phys_addr_t size, phys_addr_t align,
 					flags);
 }
 
+/*
+ * memblock_alloc()
+ *	memblock_alloc_base()
+ *	 __memblock_alloc_base()
+ *    memblock_alloc_base_nid()
+ */
 phys_addr_t __init memblock_alloc_base_nid(phys_addr_t size,
 					phys_addr_t align, phys_addr_t max_addr,
 					int nid, enum memblock_flags flags)
@@ -1340,12 +1377,21 @@ again:
 	return ret;
 }
 
+/*
+ * memblock_alloc()
+ *  memblock_alloc_base()
+ *   __memblock_alloc_base()
+ */
 phys_addr_t __init __memblock_alloc_base(phys_addr_t size, phys_addr_t align, phys_addr_t max_addr)
 {
 	return memblock_alloc_base_nid(size, align, max_addr, NUMA_NO_NODE,
 				       MEMBLOCK_NONE);
 }
 
+/*
+ * memblock_alloc()
+ *  memblock_alloc_base()
+ */
 phys_addr_t __init memblock_alloc_base(phys_addr_t size, phys_addr_t align, phys_addr_t max_addr)
 {
 	phys_addr_t alloc;
@@ -1785,11 +1831,13 @@ static int __init_memblock memblock_search(struct memblock_type *type, phys_addr
 	return -1;
 }
 
+//是否属于memblock.reserved
 bool __init memblock_is_reserved(phys_addr_t addr)
 {
 	return memblock_search(&memblock.reserved, addr) != -1;
 }
 
+//是否属于memblock.memory
 bool __init_memblock memblock_is_memory(phys_addr_t addr)
 {
 	return memblock_search(&memblock.memory, addr) != -1;
@@ -1935,6 +1983,7 @@ void __init_memblock __memblock_dump_all(void)
 
 	memblock_dump(&memblock.memory);
 	memblock_dump(&memblock.reserved);
+	
 #ifdef CONFIG_HAVE_MEMBLOCK_PHYS_MAP
 	memblock_dump(&memblock.physmem);
 #endif

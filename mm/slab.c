@@ -1937,6 +1937,7 @@ __kmem_cache_alias(const char *name, unsigned int size, unsigned int align,
 {
 	struct kmem_cache *cachep;
 
+    //查找兼容的kmem_cache对象
 	cachep = find_mergeable(size, align, flags, name, ctor);
 	if (cachep) { //调整cachep->object_size
 		cachep->refcount++;
@@ -3039,6 +3040,13 @@ static __always_inline int alloc_block(struct kmem_cache *cachep,
 	return batchcount;
 }
 
+/*
+ * kmem_cache_alloc()
+ *	slab_alloc()
+ *	 __do_cache_alloc()
+ *	  ____cache_alloc()
+ *     cache_alloc_refill()
+ */
 static void *cache_alloc_refill(struct kmem_cache *cachep, gfp_t flags)
 {
 	int batchcount;
@@ -3171,6 +3179,12 @@ static void *cache_alloc_debugcheck_after(struct kmem_cache *cachep,
 #define cache_alloc_debugcheck_after(a,b,objp,d) (objp)
 #endif
 
+/*
+ * kmem_cache_alloc()
+ *  slab_alloc()
+ *   __do_cache_alloc()
+ *    ____cache_alloc()
+ */
 static inline void *____cache_alloc(struct kmem_cache *cachep, gfp_t flags)
 {
 	void *objp;
@@ -3188,6 +3202,7 @@ static inline void *____cache_alloc(struct kmem_cache *cachep, gfp_t flags)
 	}
 
 	STATS_INC_ALLOCMISS(cachep);
+	//填上cachep->node[]->slabs_free
 	objp = cache_alloc_refill(cachep, flags);
 	/*
 	 * the 'ac' may be updated by cache_alloc_refill(),
@@ -3400,6 +3415,11 @@ slab_alloc_node(struct kmem_cache *cachep, gfp_t flags, int nodeid,
 	return ptr;
 }
 
+/*
+ * kmem_cache_alloc()
+ *  slab_alloc()
+ *   __do_cache_alloc()
+ */
 static __always_inline void *
 __do_cache_alloc(struct kmem_cache *cache, gfp_t flags)
 {
@@ -3432,6 +3452,10 @@ __do_cache_alloc(struct kmem_cache *cachep, gfp_t flags)
 
 #endif /* CONFIG_NUMA */
 
+/*
+ * kmem_cache_alloc()
+ *  slab_alloc()
+ */
 static __always_inline void *
 slab_alloc(struct kmem_cache *cachep, gfp_t flags, unsigned long caller)
 {

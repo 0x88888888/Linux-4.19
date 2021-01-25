@@ -194,6 +194,18 @@ EXPORT_SYMBOL_GPL(get_kernel_page);
  *    __lru_cache_add()
  *     __pagevec_lru_add()
  *      pagevec_lru_move_fn( move_fn == __pagevec_lru_add_fn)
+ *
+ * do_swap_page()
+ *  activate_page()
+ *   pagevec_lru_move_fn(move_fn == __activate_page)
+ *
+ * activate_page_drain()
+ *  pagevec_lru_move_fn(pvec == per_cpu(activate_page_pvecs), move_fn==__activate_page) 
+ *
+ * lru_add_drain()
+ *  lru_add_drain_cpu()
+ *   __pagevec_lru_add( pvec==per_cpu(lru_add_pvec) )
+ *    pagevec_lru_move_fn(pvec==per_cpu(lru_add_pvec), move_fn==__pagevec_lru_add_fn)
  */
 static void pagevec_lru_move_fn(struct pagevec *pvec,
 	void (*move_fn)(struct page *page, struct lruvec *lruvec, void *arg),
@@ -204,7 +216,9 @@ static void pagevec_lru_move_fn(struct pagevec *pvec,
 	struct lruvec *lruvec;
 	unsigned long flags = 0;
 
+    //遍历pvec->pages[]中的page对象
 	for (i = 0; i < pagevec_count(pvec); i++) {
+		
 		struct page *page = pvec->pages[i];
 		struct pglist_data *pagepgdat = page_pgdat(page);
 
@@ -216,11 +230,12 @@ static void pagevec_lru_move_fn(struct pagevec *pvec,
 		}
 
 		lruvec = mem_cgroup_page_lruvec(page, pgdat);
-		// __pagevec_lru_add_fn
+		// __pagevec_lru_add_fn,__activate_page
 		(*move_fn)(page, lruvec, arg);
 	}
 	if (pgdat)
 		spin_unlock_irqrestore(&pgdat->lru_lock, flags);
+	
 	release_pages(pvec->pages, pvec->nr);
 	pagevec_reinit(pvec);
 }
@@ -281,6 +296,16 @@ static void update_page_reclaim_stat(struct lruvec *lruvec,
 		reclaim_stat->recent_rotated[file]++;
 }
 
+/*
+ * do_swap_page()
+ *  activate_page()
+ *   pagevec_lru_move_fn(move_fn == __activate_page)
+ *    __activate_page()
+ *
+ * activate_page_drain()
+ *  pagevec_lru_move_fn(pvec == per_cpu(activate_page_pvecs), move_fn==__activate_page) 
+ *   __activate_page((pvec == per_cpu(activate_page_pvecs) )
+ */
 static void __activate_page(struct page *page, struct lruvec *lruvec,
 			    void *arg)
 {
@@ -290,7 +315,7 @@ static void __activate_page(struct page *page, struct lruvec *lruvec,
 
 		del_page_from_lru_list(page, lruvec, lru);
 		SetPageActive(page);
-		lru += LRU_ACTIVE;
+		lru += LRU_ACTIVE; //必然变成ACTIVE
 		add_page_to_lru_list(page, lruvec, lru);
 		trace_mm_lru_activate(page);
 
@@ -313,6 +338,10 @@ static bool need_activate_page_drain(int cpu)
 	return pagevec_count(&per_cpu(activate_page_pvecs, cpu)) != 0;
 }
 
+/*
+ * do_swap_page()
+ *  activate_page()
+ */
 void activate_page(struct page *page)
 {
 	page = compound_head(page);
@@ -617,6 +646,9 @@ static void lru_lazyfree_fn(struct page *page, struct lruvec *lruvec,
  * Drain pages out of the cpu's pagevecs.
  * Either "cpu" is the current CPU, and preemption has already been
  * disabled; or "cpu" is being hot-unplugged, and is already dead.
+ *
+ * lru_add_drain()
+ *  lru_add_drain_cpu()
  */
 void lru_add_drain_cpu(int cpu)
 {
@@ -975,6 +1007,10 @@ static void __pagevec_lru_add_fn(struct page *page, struct lruvec *lruvec,
  *   lru_cache_add()
  *    __lru_cache_add()
  *     __pagevec_lru_add()
+ *
+ * lru_add_drain()
+ *  lru_add_drain_cpu()
+ *   __pagevec_lru_add( per_cpu(lru_add_pvec) )
  */
 void __pagevec_lru_add(struct pagevec *pvec)
 {

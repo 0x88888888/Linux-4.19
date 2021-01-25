@@ -240,7 +240,12 @@ struct zone_reclaim_stat {
 };
 
 struct lruvec {
-	struct list_head		lists[NR_LRU_LISTS];
+	/*
+	 * LRU_INACTIVE_ANON, LRU_ACTIVE_ANON
+	 * LRU_INACTIVE_FILE, LRU_ACTIVE_FILE
+	 * LRU_UNEVICTIVE
+	 */
+	struct list_head		lists[NR_LRU_LISTS]; 
 	struct zone_reclaim_stat	reclaim_stat;
 	/* Evictions & activations on the inactive file list */
 	atomic_long_t			inactive_age;

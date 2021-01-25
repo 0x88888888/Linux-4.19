@@ -916,6 +916,7 @@ done_merging:
 		}
 	}
 
+    //归还到buddy system了
 	list_add(&page->lru, &zone->free_area[order].free_list[migratetype]);
 out:
 	zone->free_area[order].nr_free++;
@@ -1127,6 +1128,19 @@ static inline void prefetch_buddy(struct page *page)
  *
  * And clear the zone's pages_scanned counter, to hold off the "all pages are
  * pinned" detection logic.
+ *
+ * 将本cpu的 per-cpu pages释放到buddy allocator中去
+ *
+ * drain_local_pages_wq()
+ *  drain_local_pages()
+ *   drain_pages()
+ *    drain_pages_zone()
+ *     free_pcppages_bulk()
+ *
+ * __free_pages()
+ *  free_unref_page()
+ *   free_unref_page_commit()
+ *    free_pcppages_bulk()
  */
 static void free_pcppages_bulk(struct zone *zone, int count,
 					struct per_cpu_pages *pcp)
@@ -2766,6 +2780,13 @@ void drain_zone_pages(struct zone *zone, struct per_cpu_pages *pcp)
  * The processor must either be the current processor and the
  * thread pinned to the current processor or a processor that
  * is not online.
+ *
+ * 将本cpu的 per-cpu pages释放到buddy allocator中去
+ *
+ * drain_local_pages_wq()
+ *  drain_local_pages()
+ *   drain_pages()
+ *    drain_pages_zone()
  */
 static void drain_pages_zone(unsigned int cpu, struct zone *zone)
 {
@@ -2779,6 +2800,7 @@ static void drain_pages_zone(unsigned int cpu, struct zone *zone)
 	pcp = &pset->pcp;
 	if (pcp->count)
 		free_pcppages_bulk(zone, pcp->count, pcp);
+	
 	local_irq_restore(flags);
 }
 
@@ -2788,6 +2810,12 @@ static void drain_pages_zone(unsigned int cpu, struct zone *zone)
  * The processor must either be the current processor and the
  * thread pinned to the current processor or a processor that
  * is not online.
+ *
+ * 将本cpu的 per-cpu pages释放到buddy allocator中去
+ *
+ * drain_local_pages_wq()
+ *  drain_local_pages()
+ *   drain_pages()
  */
 static void drain_pages(unsigned int cpu)
 {
@@ -2803,6 +2831,11 @@ static void drain_pages(unsigned int cpu)
  *
  * The CPU has to be pinned. When zone parameter is non-NULL, spill just
  * the single zone's pages.
+ *
+ * 将本cpu的 per-cpu pages释放到buddy allocator中去
+ *
+ * drain_local_pages_wq()
+ *  drain_local_pages()
  */
 void drain_local_pages(struct zone *zone)
 {
@@ -2998,6 +3031,11 @@ static bool free_unref_page_prepare(struct page *page, unsigned long pfn)
 	return true;
 }
 
+/*
+ * __free_pages()
+ *  free_unref_page()
+ *   free_unref_page_commit()
+ */
 static void free_unref_page_commit(struct page *page, unsigned long pfn)
 {
 	struct zone *zone = page_zone(page);
@@ -3025,6 +3063,7 @@ static void free_unref_page_commit(struct page *page, unsigned long pfn)
 	pcp = &this_cpu_ptr(zone->pageset)->pcp;
 	list_add(&page->lru, &pcp->lists[migratetype]);
 	pcp->count++;
+	
 	if (pcp->count >= pcp->high) {
 		unsigned long batch = READ_ONCE(pcp->batch);
 		free_pcppages_bulk(zone, batch, pcp);
@@ -3386,12 +3425,16 @@ static inline bool should_fail_alloc_page(gfp_t gfp_mask, unsigned int order)
 #endif /* CONFIG_FAIL_PAGE_ALLOC */
 
 /*
+ * 如果有比mark 多的空闲page,就返回true
  * Return true if free base pages are above 'mark'. For high-order checks it
  * will return true of the order-0 watermark is reached and there is at least
  * one free page of a suitable size. Checking now avoids taking the zone lock
  * to check in the allocation paths if no pages are free.
  *
  * zone_watermark_fast()
+ *  __zone_watermark_ok()
+ *
+ * should_reclaim_retry()
  *  __zone_watermark_ok()
  */
 bool __zone_watermark_ok(struct zone *z, unsigned int order, unsigned long mark,
@@ -3604,12 +3647,14 @@ get_page_from_freelist(gfp_t gfp_mask, unsigned int order, int alloc_flags,
 			}
 		}
 
+        //zone中相应的water mark值
 		mark = zone->watermark[alloc_flags & ALLOC_WMARK_MASK];
 		//检查watermaker，如果申请的order小于watermarker，
 		if (!zone_watermark_fast(zone, order, mark,
 				       ac_classzone_idx(ac), alloc_flags)) {
 			int ret;
 
+//没有定义
 #ifdef CONFIG_DEFERRED_STRUCT_PAGE_INIT
 			/*
 			 * Watermark failed for this zone, but see if we can
@@ -4325,6 +4370,7 @@ should_reclaim_retry(gfp_t gfp_mask, unsigned order,
 					ac->nodemask) {
 		unsigned long available;
 		unsigned long reclaimable;
+		
 		unsigned long min_wmark = min_wmark_pages(zone);
 		bool wmark;
 
@@ -4337,6 +4383,7 @@ should_reclaim_retry(gfp_t gfp_mask, unsigned order,
 		 */
 		wmark = __zone_watermark_ok(zone, order, min_wmark,
 				ac_classzone_idx(ac), alloc_flags, available);
+		
 		trace_reclaim_retry_zone(z, order, reclaimable,
 				available, min_wmark, *no_progress_loops, wmark);
 		if (wmark) {
@@ -6787,6 +6834,16 @@ static void pgdat_init_kcompactd(struct pglist_data *pgdat)
 static void pgdat_init_kcompactd(struct pglist_data *pgdat) {}
 #endif
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   paging_init()
+ *    zone_sizes_init()
+ *     free_area_init_nodes()
+ *      free_area_init_node()
+ *       free_area_init_core()
+ *        pgdat_init_internals()
+ */
 static void __meminit pgdat_init_internals(struct pglist_data *pgdat)
 {
 	pgdat_resize_init(pgdat);

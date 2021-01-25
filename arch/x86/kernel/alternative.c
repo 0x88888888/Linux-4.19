@@ -195,6 +195,11 @@ const unsigned char * const *ideal_nops = p6_nops;
 const unsigned char * const *ideal_nops = intel_nops;
 #endif
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   arch_init_ideal_nops()
+ */
 void __init arch_init_ideal_nops(void)
 {
 	switch (boot_cpu_data.x86_vendor) {
