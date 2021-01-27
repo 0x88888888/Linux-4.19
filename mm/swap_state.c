@@ -329,6 +329,9 @@ static inline bool swap_use_vma_readahead(void)
  * unlocked and with its refcount incremented - we rely on the kernel
  * lock getting page table operations atomic even if we drop the page
  * lock before returning.
+ *
+ * do_swap_page()
+ *  lookup_swap_cache()
  */
 struct page *lookup_swap_cache(swp_entry_t entry, struct vm_area_struct *vma,
 			       unsigned long addr)

@@ -39,7 +39,25 @@ struct seq_file;
 /* define the enumeration of all cgroup subsystems */
 #define SUBSYS(_x) _x ## _cgrp_id,
 enum cgroup_subsys_id {
+//上面的SUBSYS宏很重要哦
 #include <linux/cgroup_subsys.h>
+/* 上面这个头文件展开如下了，表示支持的subsys类型
+ * cpuset_cgrp_id
+ * cpu_cgrp_id
+ * cpuacct_cgrp_id
+ * io_cgrp_id
+ * memory_cgrp_id
+ * devices_cgrp_id
+ * freezer_cgrp_id
+ * net_cls_cgrp_id
+ * perf_event_cgrp_id
+ * net_prio_cgrp_id
+ * hugetlb_cgrp_id
+ * pids_cgrp_id
+ * rdma_cgrp_id
+ * debug_cgrp_id
+ */
+ 
 	CGROUP_SUBSYS_COUNT,
 };
 #undef SUBSYS
@@ -177,6 +195,8 @@ struct cgroup_subsys_state {
  * object and speeds up fork()/exit(), since a single inc/dec and a
  * list_add()/del() can bump the reference count on the entire cgroup
  * set for a task.
+ *
+ * task_struct->cgroups成员
  */
 struct css_set {
 	/*
@@ -752,6 +772,7 @@ static inline void cgroup_threadgroup_change_end(struct task_struct *tsk) {}
 
 #endif	/* CONFIG_CGROUPS */
 
+// 有定义
 #ifdef CONFIG_SOCK_CGROUP_DATA
 
 /*

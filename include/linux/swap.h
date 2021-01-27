@@ -60,6 +60,7 @@ static inline int current_is_kswapd(void)
  * When a page is migrated from CPU to device, we set the CPU page table entry
  * to a special SWP_DEVICE_* entry.
  */
+//没有定义
 #ifdef CONFIG_DEVICE_PRIVATE
 #define SWP_DEVICE_NUM 2
 #define SWP_DEVICE_WRITE (MAX_SWAPFILES+SWP_HWPOISON_NUM+SWP_MIGRATION_NUM)
@@ -71,6 +72,7 @@ static inline int current_is_kswapd(void)
 /*
  * NUMA node memory migration support
  */
+//有定义 
 #ifdef CONFIG_MIGRATION
 #define SWP_MIGRATION_NUM 2
 #define SWP_MIGRATION_READ	(MAX_SWAPFILES + SWP_HWPOISON_NUM)
@@ -82,6 +84,7 @@ static inline int current_is_kswapd(void)
 /*
  * Handling of hardware poisoned pages with memory corruption.
  */
+//有定义 
 #ifdef CONFIG_MEMORY_FAILURE
 #define SWP_HWPOISON_NUM 1
 #define SWP_HWPOISON		MAX_SWAPFILES
@@ -89,9 +92,10 @@ static inline int current_is_kswapd(void)
 #define SWP_HWPOISON_NUM 0
 #endif
 
+//32-1==31个swap file对象
 #define MAX_SWAPFILES \
-	((1 << MAX_SWAPFILES_SHIFT) - SWP_DEVICE_NUM - \
-	SWP_MIGRATION_NUM - SWP_HWPOISON_NUM)
+	((1 << MAX_SWAPFILES_SHIFT /* 5 */) - SWP_DEVICE_NUM /*0*/ - \
+	SWP_MIGRATION_NUM /*2*/ - SWP_HWPOISON_NUM /*1*/)
 
 /*
  * Magic header for a swap area. The first part of the union is

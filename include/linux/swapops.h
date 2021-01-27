@@ -63,6 +63,11 @@ static inline int is_swap_pte(pte_t pte)
 /*
  * Convert the arch-dependent pte representation of a swp_entry_t into an
  * arch-independent swp_entry_t.
+ *
+ * do_swap_page()
+ *  pte_to_swp_entry()
+ * 
+ * 根据pte，得出swp_entry_t对象
  */
 static inline swp_entry_t pte_to_swp_entry(pte_t pte)
 {
@@ -70,7 +75,10 @@ static inline swp_entry_t pte_to_swp_entry(pte_t pte)
 
 	if (pte_swp_soft_dirty(pte))
 		pte = pte_swp_clear_soft_dirty(pte);
+	
 	arch_entry = __pte_to_swp_entry(pte);
+
+	//合成swp_entry_t对象
 	return swp_entry(__swp_type(arch_entry), __swp_offset(arch_entry));
 }
 
@@ -368,6 +376,7 @@ static inline void num_poisoned_pages_inc(void)
 }
 #endif
 
+// 有定义
 #if defined(CONFIG_MEMORY_FAILURE) || defined(CONFIG_MIGRATION)
 static inline int non_swap_entry(swp_entry_t entry)
 {

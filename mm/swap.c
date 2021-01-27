@@ -230,7 +230,10 @@ static void pagevec_lru_move_fn(struct pagevec *pvec,
 		}
 
 		lruvec = mem_cgroup_page_lruvec(page, pgdat);
-		// __pagevec_lru_add_fn,__activate_page
+		/*
+		 * __pagevec_lru_add_fn,
+		 * __activate_page
+		 */
 		(*move_fn)(page, lruvec, arg);
 	}
 	if (pgdat)
@@ -467,6 +470,8 @@ EXPORT_SYMBOL(mark_page_accessed);
  *  add_to_page_cache_lru()
  *   lru_cache_add()
  *    __lru_cache_add()
+ *
+ * 添加到lru_add_pvec
  */
 static void __lru_cache_add(struct page *page)
 {

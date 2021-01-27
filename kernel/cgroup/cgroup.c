@@ -127,6 +127,25 @@ static struct workqueue_struct *cgroup_destroy_wq;
 #define SUBSYS(_x) [_x ## _cgrp_id] = &_x ## _cgrp_subsys,
 struct cgroup_subsys *cgroup_subsys[] = {
 #include <linux/cgroup_subsys.h>
+/*
+ * 上面SUBSYS宏很重要,展开就是如下结果了
+ *
+ * cpuset_cgrp_subsys
+ * cpu_cgrp_subsys
+ * cpuacct_cgrp_subsys
+ * io_cgrp_subsys
+ * memory_cgrp_subsys
+ * devices_cgrp_subsys
+ * freezer_cgrp_subsys
+ * net_cls_cgrp_subsys
+ * perf_event_cgrp_subsys
+ * net_prio_cgrp_subsys
+ * hugetlb_cgrp_subsys
+ * pids_cgrp_subsys
+ * rdma_cgrp_subsys
+ * debug_cgrp_subsys
+ */
+
 };
 #undef SUBSYS
 
@@ -141,6 +160,22 @@ struct cgroup_subsys *cgroup_subsys[] = {
 #define SUBSYS(_x) [_x ## _cgrp_id] = #_x,
 static const char *cgroup_subsys_name[] = {
 #include <linux/cgroup_subsys.h>
+/* 展开如下
+ * "cpuset"
+ * "cpu"
+ * "cpuacct"
+ * "io"
+ * "memory"
+ * "devices"
+ * "freezer"
+ * "net_cls"
+ * "perf_event"
+ * "hugetlb"
+ * "net_prio"
+ * "pids"
+ * "debug"
+ * "rdma"
+ */
 };
 #undef SUBSYS
 
@@ -1907,6 +1942,9 @@ static void init_cgroup_housekeeping(struct cgroup *cgrp)
  * start_kernel()  [init/main.c]
  *  cgroup_init_early()
  *   init_cgroup_root()
+ *
+ * cgroup1_mount()
+ *  init_cgroup_root()
  */
 void init_cgroup_root(struct cgroup_root *root, struct cgroup_sb_opts *opts)
 {
@@ -1935,7 +1973,10 @@ void init_cgroup_root(struct cgroup_root *root, struct cgroup_sb_opts *opts)
 /*
  * start_kernel()  [init/main.c]
  *  cgroup_init()
- *   cgroup_setup_root()
+ *   cgroup_setup_root(root == cgrp_dfl_root)
+ *
+ * cgroup1_mount()
+ *  cgroup_setup_root()
  */
 int cgroup_setup_root(struct cgroup_root *root, u16 ss_mask, int ref_flags)
 {
@@ -5890,8 +5931,10 @@ EXPORT_SYMBOL_GPL(cgroup_get_from_fd);
  * sock->sk_cgrp_data handling.  For more info, see sock_cgroup_data
  * definition in cgroup-defs.h.
  */
+ //有定义
 #ifdef CONFIG_SOCK_CGROUP_DATA
 
+//有定义
 #if defined(CONFIG_CGROUP_NET_PRIO) || defined(CONFIG_CGROUP_NET_CLASSID)
 
 DEFINE_SPINLOCK(cgroup_sk_update_lock);

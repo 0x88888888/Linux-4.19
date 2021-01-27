@@ -2324,19 +2324,25 @@ EXPORT_SYMBOL_GPL(apply_to_page_range);
  * parts, do_swap_page must check under lock before unmapping the pte and
  * proceeding (but do_wp_page is only called after already making such a check;
  * and do_anonymous_page can safely check later on).
+ *
+ * do_swap_page()
+ *  pte_unmap_same()
  */
 static inline int pte_unmap_same(struct mm_struct *mm, pmd_t *pmd,
 				pte_t *page_table, pte_t orig_pte)
 {
 	int same = 1;
+//有定义	
 #if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 	if (sizeof(pte_t) > sizeof(unsigned long)) {
 		spinlock_t *ptl = pte_lockptr(mm, pmd);
 		spin_lock(ptl);
+	    //对比page_table和orig_pte是否是有相同的物理地址(即指向同一个物理page)
 		same = pte_same(*page_table, orig_pte);
 		spin_unlock(ptl);
 	}
 #endif
+    //64bit，什么都没做
 	pte_unmap(page_table);
 	return same;
 }
@@ -2928,10 +2934,12 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 	int exclusive = 0;
 	vm_fault_t ret = 0;
 
+    //如果vmf->pte和vmf->orig_pte不是指向同一个物理page frame,就返回了
 	if (!pte_unmap_same(vma->vm_mm, vmf->pmd, vmf->pte, vmf->orig_pte))
 		goto out;
 
 	entry = pte_to_swp_entry(vmf->orig_pte);
+	
 	if (unlikely(non_swap_entry(entry))) {
 		if (is_migration_entry(entry)) {
 			migration_entry_wait(vma->vm_mm, vmf->pmd,
@@ -2955,10 +2963,11 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 
 
 	delayacct_set_flag(DELAYACCT_PF_SWAPIN);
+	//在swapper_space中查找page
 	page = lookup_swap_cache(entry, vma, vmf->address);
 	swapcache = page;
 
-	if (!page) {
+	if (!page) { //没有找到
 		struct swap_info_struct *si = swp_swap_info(entry);
 
 		if (si->flags & SWP_SYNCHRONOUS_IO &&
@@ -2970,10 +2979,11 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 				__SetPageLocked(page);
 				__SetPageSwapBacked(page);
 				set_page_private(page, entry.val);
+				//添加到lru_add_pvec
 				lru_cache_add_anon(page);
 				swap_readpage(page, true);
 			}
-		} else {
+		} else { //去磁盘上读取
 			page = swapin_readahead(entry, GFP_HIGHUSER_MOVABLE,
 						vmf);
 			swapcache = page;
@@ -3084,7 +3094,8 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 	} else {
 		do_page_add_anon_rmap(page, vma, vmf->address, exclusive);
 		mem_cgroup_commit_charge(page, memcg, true, false);
-		
+
+		//移动到active_page_pvecs->lists[LRU_ACTIVE_**]上去
 		activate_page(page);
 	}
 
