@@ -133,6 +133,22 @@ struct cgroup_file {
  *
  * Fields marked with "PI:" are public and immutable and may be accessed
  * directly without synchronization.
+ *
+ * cgroup_subsys_state是
+ * cpuset_cgrp_subsys -> struct cgroup_subsys_state{}
+ * cpu_cgrp_subsys-> struct task_group{}
+ * cpuacct_cgrp_subsys -> struct cgroup_subsys_state{}
+ * io_cgrp_subsys-> struct cgroup_subsys_state{}
+ * memory_cgrp_subsys -> struct mem_cgroup{}
+ * devices_cgrp_subsys -> struct cgroup_subsys_state{}
+ * freezer_cgrp_subsys -> struct cgroup_subsys_state{}
+ * net_cls_cgrp_subsys ->  struct cgroup_subsys_state{}
+ * perf_event_cgrp_subsys -> struct cgroup_subsys_state{}
+ * net_prio_cgrp_subsys -> struct cgroup_subsys_state{}
+ * hugetlb_cgrp_subsys -> struct hugetlb_cgroup{}
+ * pids_cgrp_subsys -> struct cgroup_subsys_state{}
+ * rdma_cgrp_subsys -> struct cgroup_subsys_state{}
+ * debug_cgrp_subsys-> struct cgroup_subsys_state{}
  */
 struct cgroup_subsys_state {
 	/* PI: the cgroup that this css is attached to */
@@ -147,6 +163,8 @@ struct cgroup_subsys_state {
 	/* siblings list anchored at the parent's ->children 
 	 *
 	 * 负责将同一层级的cgroup连接成一颗cgroup树
+	 *
+	 * cgroup_subsys_state->sibling链接到 parent cgroup_subsys_state->children 
 	 */
 	struct list_head sibling;
 	struct list_head children;

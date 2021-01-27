@@ -2768,6 +2768,7 @@ struct task_struct *cgroup_procs_write_start(char *buf, bool threadgroup)
 		goto out_unlock_threadgroup;
 	}
 
+    //就是tsk->usage++
 	get_task_struct(tsk);
 	goto out_unlock_rcu;
 
