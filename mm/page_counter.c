@@ -95,6 +95,8 @@ void page_counter_charge(struct page_counter *counter, unsigned long nr_pages)
  *
  * Returns %true on success, or %false and @fail if the counter or one
  * of its ancestors has hit its configured limit.
+ *
+ *
  */
 bool page_counter_try_charge(struct page_counter *counter,
 			     unsigned long nr_pages,
@@ -117,9 +119,11 @@ bool page_counter_try_charge(struct page_counter *counter,
 		 * the limit.  When racing with page_counter_limit(),
 		 * we either see the new limit or the setter sees the
 		 * counter has changed and retries.
+		 *
+		 *  给parent上的usage上的加上去nr_pages
 		 */
 		new = atomic_long_add_return(nr_pages, &c->usage);
-		if (new > c->max) {
+		if (new > c->max) { //超过了限额了，就死了吧。
 			atomic_long_sub(nr_pages, &c->usage);
 			propagate_protected_usage(counter, new);
 			/*

@@ -802,6 +802,12 @@ static void memcg_check_events(struct mem_cgroup *memcg, struct page *page)
 	}
 }
 
+/*
+ * memcg_kmem_charge()
+ *  get_mem_cgroup_from_current()
+ *   get_mem_cgroup_from_mm()
+ *    mem_cgroup_from_task()
+ */
 struct mem_cgroup *mem_cgroup_from_task(struct task_struct *p)
 {
 	/*
@@ -823,6 +829,10 @@ EXPORT_SYMBOL(mem_cgroup_from_task);
  * Obtain a reference on mm->memcg and returns it if successful. Otherwise
  * root_mem_cgroup is returned. However if mem_cgroup is disabled, NULL is
  * returned.
+ *
+ * memcg_kmem_charge()
+ *  get_mem_cgroup_from_current()
+ *   get_mem_cgroup_from_mm()
  */
 struct mem_cgroup *get_mem_cgroup_from_mm(struct mm_struct *mm)
 {
@@ -875,6 +885,9 @@ EXPORT_SYMBOL(get_mem_cgroup_from_page);
 
 /**
  * If current->active_memcg is non-NULL, do not fallback to current->mm->memcg.
+ *
+ * memcg_kmem_charge()
+ *  get_mem_cgroup_from_current()
  */
 static __always_inline struct mem_cgroup *get_mem_cgroup_from_current(void)
 {
@@ -1370,6 +1383,16 @@ unsigned long mem_cgroup_get_max(struct mem_cgroup *memcg)
 	return max;
 }
 
+/*
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   __alloc_pages_nodemask()
+ *    memcg_kmem_charge()
+ *     memcg_kmem_charge_memcg()
+ *      try_charge()
+ *       mem_cgroup_oom()
+ *        mem_cgroup_out_of_memory()
+ */
 static bool mem_cgroup_out_of_memory(struct mem_cgroup *memcg, gfp_t gfp_mask,
 				     int order)
 {
@@ -1405,10 +1428,13 @@ static bool test_mem_cgroup_node_reclaimable(struct mem_cgroup *memcg,
 {
 	if (mem_cgroup_node_nr_lru_pages(memcg, nid, LRU_ALL_FILE))
 		return true;
+	
 	if (noswap || !total_swap_pages)
 		return false;
+	
 	if (mem_cgroup_node_nr_lru_pages(memcg, nid, LRU_ALL_ANON))
 		return true;
+	
 	return false;
 
 }
@@ -1670,6 +1696,15 @@ enum oom_status {
 	OOM_SKIPPED
 };
 
+/*
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   __alloc_pages_nodemask()
+ *    memcg_kmem_charge()
+ *     memcg_kmem_charge_memcg()
+ *      try_charge()
+ *       mem_cgroup_oom()
+ */
 static enum oom_status mem_cgroup_oom(struct mem_cgroup *memcg, gfp_t mask, int order)
 {
 	if (order > PAGE_ALLOC_COSTLY_ORDER)
@@ -2148,6 +2183,14 @@ void mem_cgroup_handle_over_high(void)
 	current->memcg_nr_pages_over_high = 0;
 }
 
+/*
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   __alloc_pages_nodemask()
+ *    memcg_kmem_charge()
+ *     memcg_kmem_charge_memcg()
+ *      try_charge()
+ */ 
 static int try_charge(struct mem_cgroup *memcg, gfp_t gfp_mask,
 		      unsigned int nr_pages)
 {
@@ -2169,10 +2212,13 @@ retry:
 
 	if (!do_memsw_account() ||
 	    page_counter_try_charge(&memcg->memsw, batch, &counter)) {
+	    //去看看，是否可以分配
 		if (page_counter_try_charge(&memcg->memory, batch, &counter))
 			goto done_restock;
+		
 		if (do_memsw_account())
 			page_counter_uncharge(&memcg->memsw, batch);
+		
 		mem_over_limit = mem_cgroup_from_counter(counter, memory);
 	} else {
 		mem_over_limit = mem_cgroup_from_counter(counter, memsw);
@@ -2200,18 +2246,22 @@ retry:
 	 * allocate memory. This might exceed the limits temporarily,
 	 * but we prefer facilitating memory reclaim and getting back
 	 * under the limit over triggering OOM kills in these cases.
+	 *
+	 * 已经正在回收内存了
 	 */
 	if (unlikely(current->flags & PF_MEMALLOC))
 		goto force;
-
+    //正在被oom
 	if (unlikely(task_in_memcg_oom(current)))
 		goto nomem;
 
 	if (!gfpflags_allow_blocking(gfp_mask))
 		goto nomem;
 
+    //通知出去
 	memcg_memory_event(mem_over_limit, MEMCG_MAX);
 
+    //释放一部分内存
 	nr_reclaimed = try_to_free_mem_cgroup_pages(mem_over_limit, nr_pages,
 						    gfp_mask, may_swap);
 
@@ -2256,6 +2306,7 @@ retry:
 	if (fatal_signal_pending(current))
 		goto force;
 
+    //oom了，通知出去
 	memcg_memory_event(mem_over_limit, MEMCG_OOM);
 
 	/*
@@ -2585,6 +2636,12 @@ void memcg_kmem_put_cache(struct kmem_cache *cachep)
  * @memcg: memory cgroup to charge
  *
  * Returns 0 on success, an error code on failure.
+ *
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   __alloc_pages_nodemask()
+ *    memcg_kmem_charge()
+ *     memcg_kmem_charge_memcg()
  */
 int memcg_kmem_charge_memcg(struct page *page, gfp_t gfp, int order,
 			    struct mem_cgroup *memcg)
@@ -2599,6 +2656,7 @@ int memcg_kmem_charge_memcg(struct page *page, gfp_t gfp, int order,
 
 	if (!cgroup_subsys_on_dfl(memory_cgrp_subsys) &&
 	    !page_counter_try_charge(&memcg->kmem, nr_pages, &counter)) {
+	    
 		cancel_charge(memcg, nr_pages);
 		return -ENOMEM;
 	}
@@ -2615,6 +2673,11 @@ int memcg_kmem_charge_memcg(struct page *page, gfp_t gfp, int order,
  * @order: allocation order
  *
  * Returns 0 on success, an error code on failure.
+ *
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   __alloc_pages_nodemask()
+ *    memcg_kmem_charge()
  */
 int memcg_kmem_charge(struct page *page, gfp_t gfp, int order)
 {
@@ -2625,6 +2688,7 @@ int memcg_kmem_charge(struct page *page, gfp_t gfp, int order)
 		return 0;
 
 	memcg = get_mem_cgroup_from_current();
+	//如果是root_mem_cgroup，就不受限制了
 	if (!mem_cgroup_is_root(memcg)) {
 		ret = memcg_kmem_charge_memcg(page, gfp, order, memcg);
 		if (!ret)

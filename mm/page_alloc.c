@@ -3940,6 +3940,7 @@ __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 		return NULL;
 
 	noreclaim_flag = memalloc_noreclaim_save();
+	//内存压缩
 	*compact_result = try_to_compact_pages(gfp_mask, order, alloc_flags, ac,
 									prio);
 	memalloc_noreclaim_restore(noreclaim_flag);
@@ -3953,6 +3954,7 @@ __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 	 */
 	count_vm_event(COMPACTSTALL);
 
+	//压缩过之后，重新尝试分配物理内存
 	page = get_page_from_freelist(gfp_mask, order, alloc_flags, ac);
 
 	if (page) {
@@ -4828,6 +4830,7 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order, int preferred_nid,
 
 	gfp_mask &= gfp_allowed_mask;
 	alloc_mask = gfp_mask;
+	//设置一个alloc_context出来
 	if (!prepare_alloc_pages(gfp_mask, order, preferred_nid, nodemask, &ac, &alloc_mask, &alloc_flags))
 		return NULL;
 
@@ -4859,6 +4862,7 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order, int preferred_nid,
 	page = __alloc_pages_slowpath(alloc_mask, order, &ac);
 
 out:
+	//cgroup的内存控制，如果不能分配了，就还会去啊
 	if (memcg_kmem_enabled() && (gfp_mask & __GFP_ACCOUNT) && page &&
 	    unlikely(memcg_kmem_charge(page, gfp_mask, order) != 0)) {
 		__free_pages(page, order);

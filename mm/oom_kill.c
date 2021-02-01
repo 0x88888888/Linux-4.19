@@ -1049,6 +1049,16 @@ EXPORT_SYMBOL_GPL(unregister_oom_notifier);
  * killing a random task (bad), letting the system crash (worse)
  * OR try to be smart about which process to kill. Note that we
  * don't have to be perfect here, we just have to be good.
+ *
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   __alloc_pages_nodemask()
+ *    memcg_kmem_charge()
+ *     memcg_kmem_charge_memcg()
+ *      try_charge()
+ *       mem_cgroup_oom()
+ *        mem_cgroup_out_of_memory()
+ *         out_of_memory()
  */
 bool out_of_memory(struct oom_control *oc)
 {
@@ -1119,6 +1129,7 @@ bool out_of_memory(struct oom_control *oc)
 	if (oc->chosen && oc->chosen != (void *)-1UL)
 		oom_kill_process(oc, !is_memcg_oom(oc) ? "Out of memory" :
 				 "Memory cgroup out of memory");
+	
 	return !!oc->chosen;
 }
 

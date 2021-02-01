@@ -2688,6 +2688,16 @@ static vm_fault_t wp_pfn_shared(struct vm_fault *vmf)
 	return VM_FAULT_WRITE;
 }
 
+/*
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_swap_page()
+ *       do_wp_page()
+ *        wp_page_shared()
+ */
 static vm_fault_t wp_page_shared(struct vm_fault *vmf)
 	__releases(vmf->ptl)
 {
@@ -2738,6 +2748,14 @@ static vm_fault_t wp_page_shared(struct vm_fault *vmf)
  * We enter with non-exclusive mmap_sem (to exclude vma changes,
  * but allow concurrent faults), with pte both mapped and locked.
  * We return with mmap_sem still held, but pte unmapped and unlocked.
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_swap_page()
+ *       do_wp_page()
  */
 static vm_fault_t do_wp_page(struct vm_fault *vmf)
 	__releases(vmf->ptl)
@@ -2765,7 +2783,7 @@ static vm_fault_t do_wp_page(struct vm_fault *vmf)
 	 * Take out anonymous pages first, anonymous shared vmas are
 	 * not dirty accountable.
 	 */
-	if (PageAnon(vmf->page) && !PageKsm(vmf->page)) {
+	if (PageAnon(vmf->page) && !PageKsm(vmf->page)) { //不是KSM的page，并且是anon的
 		int total_map_swapcount;
 		if (!trylock_page(vmf->page)) {
 			get_page(vmf->page);
@@ -2798,7 +2816,7 @@ static vm_fault_t do_wp_page(struct vm_fault *vmf)
 		}
 		unlock_page(vmf->page);
 	} else if (unlikely((vma->vm_flags & (VM_WRITE|VM_SHARED)) ==
-					(VM_WRITE|VM_SHARED))) {
+					(VM_WRITE|VM_SHARED))) { //KSM了
 		return wp_page_shared(vmf);
 	}
 
@@ -3273,12 +3291,25 @@ oom:
  * The mmap_sem must have been held on entry, and may have been
  * released depending on flags and vma->vm_ops->fault() return value.
  * See filemap_fault() and __lock_page_retry().
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_fault()
+ *       do_read_fault() 
+ *       do_shared_fault()
+ *       do_cow_fault()
+ *        __do_fault()
+ *
  */
 static vm_fault_t __do_fault(struct vm_fault *vmf)
 {
 	struct vm_area_struct *vma = vmf->vma;
 	vm_fault_t ret;
 
+    //ext4_file_vm_ops
 	ret = vma->vm_ops->fault(vmf);
 	if (unlikely(ret & (VM_FAULT_ERROR | VM_FAULT_NOPAGE | VM_FAULT_RETRY |
 			    VM_FAULT_DONE_COW)))
@@ -3529,6 +3560,25 @@ vm_fault_t alloc_set_pte(struct vm_fault *vmf, struct mem_cgroup *memcg,
  *
  * The function expects the page to be locked and on success it consumes a
  * reference of a page being mapped (for the PTE which maps it).
+ *
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_fault()
+ *       do_cow_fault()
+ *        finish_fault()
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_fault()
+ *       do_read_fault()
+ *        finish_fault()
  */
 vm_fault_t finish_fault(struct vm_fault *vmf)
 {
@@ -3537,9 +3587,9 @@ vm_fault_t finish_fault(struct vm_fault *vmf)
 
 	/* Did we COW the page? */
 	if ((vmf->flags & FAULT_FLAG_WRITE) &&
-	    !(vmf->vma->vm_flags & VM_SHARED))
-		page = vmf->cow_page;
-	else
+	    !(vmf->vma->vm_flags & VM_SHARED)) //非cow
+		page = vmf->cow_page; 
+	else //cow
 		page = vmf->page;
 
 	/*
@@ -3548,6 +3598,7 @@ vm_fault_t finish_fault(struct vm_fault *vmf)
 	 */
 	if (!(vmf->vma->vm_flags & VM_SHARED))
 		ret = check_stable_address_space(vmf->vma->vm_mm);
+	
 	if (!ret)
 		ret = alloc_set_pte(vmf, vmf->memcg, page);
 	if (vmf->pte)
@@ -3618,6 +3669,15 @@ late_initcall(fault_around_debugfs);
  * fault_around_bytes rounded down to the machine page size
  * (and therefore to page order).  This way it's easier to guarantee
  * that we don't cross page table boundaries.
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_fault()
+ *       do_read_fault()
+ *        do_fault_around()
  */
 static vm_fault_t do_fault_around(struct vm_fault *vmf)
 {
@@ -3675,6 +3735,15 @@ out:
 	return ret;
 }
 
+/*
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_fault()
+ *       do_read_fault()
+ */
 static vm_fault_t do_read_fault(struct vm_fault *vmf)
 {
 	struct vm_area_struct *vma = vmf->vma;
@@ -3684,6 +3753,8 @@ static vm_fault_t do_read_fault(struct vm_fault *vmf)
 	 * Let's call ->map_pages() first and use ->fault() as fallback
 	 * if page by the offset is not ready to be mapped (cold cache or
 	 * something).
+	 *
+	 * 假设为ext4文件系统,vm_ops==ext4_file_vm_ops
 	 */
 	if (vma->vm_ops->map_pages && fault_around_bytes >> PAGE_SHIFT > 1) {
 		ret = do_fault_around(vmf);
@@ -3702,6 +3773,15 @@ static vm_fault_t do_read_fault(struct vm_fault *vmf)
 	return ret;
 }
 
+/*
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_fault()
+ *       do_cow_fault()
+ */
 static vm_fault_t do_cow_fault(struct vm_fault *vmf)
 {
 	struct vm_area_struct *vma = vmf->vma;
@@ -3710,6 +3790,7 @@ static vm_fault_t do_cow_fault(struct vm_fault *vmf)
 	if (unlikely(anon_vma_prepare(vma)))
 		return VM_FAULT_OOM;
 
+    //新分配的page，用于cow
 	vmf->cow_page = alloc_page_vma(GFP_HIGHUSER_MOVABLE, vma, vmf->address);
 	if (!vmf->cow_page)
 		return VM_FAULT_OOM;
@@ -3725,10 +3806,11 @@ static vm_fault_t do_cow_fault(struct vm_fault *vmf)
 		goto uncharge_out;
 	if (ret & VM_FAULT_DONE_COW)
 		return ret;
-
+    //将刚刚读取来的内容复制到cow_page中过来
 	copy_user_highpage(vmf->cow_page, vmf->page, vmf->address, vma);
 	__SetPageUptodate(vmf->cow_page);
 
+    //
 	ret |= finish_fault(vmf);
 	unlock_page(vmf->page);
 	put_page(vmf->page);
@@ -3741,6 +3823,16 @@ uncharge_out:
 	return ret;
 }
 
+/*
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_fault()
+ *       do_shared_fault()
+ *
+ */
 static vm_fault_t do_shared_fault(struct vm_fault *vmf)
 {
 	struct vm_area_struct *vma = vmf->vma;
@@ -3753,6 +3845,8 @@ static vm_fault_t do_shared_fault(struct vm_fault *vmf)
 	/*
 	 * Check if the backing address space wants to know that the page is
 	 * about to become writable
+	 *
+	 * shared的page，变成可以write了
 	 */
 	if (vma->vm_ops->page_mkwrite) {
 		unlock_page(vmf->page);
@@ -4034,13 +4128,15 @@ static vm_fault_t handle_pte_fault(struct vm_fault *vmf)
 	if (!vmf->pte) {
 		if (vma_is_anonymous(vmf->vma)) //匿名映射
 			return do_anonymous_page(vmf); //anonymous mapping 的page
-		else//映射到文件?
+		else//映射到文件
 			return do_fault(vmf); //
 	}
 
+    //有pte，但是没有present,说明在swap区域了，要去read进来哦
 	if (!pte_present(vmf->orig_pte))
 		return do_swap_page(vmf);//anonymous page 被换出到外存上了，现在从swap area上读入
 
+    //不是本地node的内存
 	if (pte_protnone(vmf->orig_pte) && vma_is_accessible(vmf->vma))
 		return do_numa_page(vmf);
 
@@ -4050,12 +4146,14 @@ static vm_fault_t handle_pte_fault(struct vm_fault *vmf)
 	if (unlikely(!pte_same(*vmf->pte, entry)))
 		goto unlock;
 	
+	//write操作引起的异常
 	if (vmf->flags & FAULT_FLAG_WRITE) {
-		if (!pte_write(entry))
+		if (!pte_write(entry)) //
 			return do_wp_page(vmf); //copy on write了
 			
 		entry = pte_mkdirty(entry);
 	}
+	//给pte标记已经被访问过了
 	entry = pte_mkyoung(entry);
 	if (ptep_set_access_flags(vmf->vma, vmf->address, vmf->pte, entry,
 				vmf->flags & FAULT_FLAG_WRITE)) {
@@ -4187,12 +4285,14 @@ vm_fault_t handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
 
 	__set_current_state(TASK_RUNNING);
 
+    //整个系统和mem_cgroup的统计
 	count_vm_event(PGFAULT);
 	count_memcg_event_mm(vma->vm_mm, PGFAULT);
 
 	/* do counter updates before entering really critical section. */
 	check_sync_rss_stat(current);
 
+    //根据vma检查权限，是不是和访问方式有冲突
 	if (!arch_vma_access_permitted(vma, flags & FAULT_FLAG_WRITE,
 					    flags & FAULT_FLAG_INSTRUCTION,
 					    flags & FAULT_FLAG_REMOTE))
@@ -4202,7 +4302,7 @@ vm_fault_t handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
 	 * Enable the memcg OOM handling for faults triggered in user
 	 * space.  Kernel faults are handled more gracefully.
 	 */
-	if (flags & FAULT_FLAG_USER)
+	if (flags & FAULT_FLAG_USER) //标记发生用户态的缺页,可以发生oom
 		mem_cgroup_enter_user_fault();
 
 

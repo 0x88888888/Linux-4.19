@@ -538,6 +538,13 @@ EXPORT_SYMBOL(truncate_inode_pages_final);
  * invalidate_mapping_pages() will not block on IO activity. It will not
  * invalidate pages which are dirty, locked, under writeback or mapped into
  * pagetables.
+ *
+ *
+ * super_cache_scan()
+ *  prune_icache_sb()
+ *   ....
+ *    inode_lru_isolate()
+ *     invalidate_mapping_pages()
  */
 unsigned long invalidate_mapping_pages(struct address_space *mapping,
 		pgoff_t start, pgoff_t end)
@@ -598,6 +605,7 @@ unsigned long invalidate_mapping_pages(struct address_space *mapping,
 			 */
 			if (!ret)
 				deactivate_file_page(page);
+			
 			count += ret;
 		}
 		pagevec_remove_exceptionals(&pvec);

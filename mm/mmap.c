@@ -1376,6 +1376,10 @@ static inline bool file_mmap_ok(struct file *file, struct inode *inode,
 
 /*
  * The caller must hold down_write(&current->mm->mmap_sem).
+ *
+ * SYSCALL_DEFINE5(remap_file_pages) mmap.c中
+ *  do_mmap_pgoff()
+ *   do_mmap()
  */
 unsigned long do_mmap(struct file *file, unsigned long addr,
 			unsigned long len, unsigned long prot,
@@ -1423,6 +1427,8 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
 
 	/* Obtain the address to map to. we verify (or select) it and ensure
 	 * that it represents a valid section of the address space.
+	 *
+	 * 查找一个没有被映射的虚拟地址
 	 */
 	addr = get_unmapped_area(file, addr, len, pgoff, flags);
 	if (offset_in_page(addr))
@@ -1695,6 +1701,12 @@ static inline int accountable_mapping(struct file *file, vm_flags_t vm_flags)
 	return (vm_flags & (VM_NORESERVE | VM_SHARED | VM_WRITE)) == VM_WRITE;
 }
 
+/*
+ * SYSCALL_DEFINE5(remap_file_pages) mmap.c中
+ *  do_mmap_pgoff()
+ *   do_mmap()
+ *    mmap_region()
+ */
 unsigned long mmap_region(struct file *file, unsigned long addr,
 		unsigned long len, vm_flags_t vm_flags, unsigned long pgoff,
 		struct list_head *uf)
@@ -1722,7 +1734,7 @@ unsigned long mmap_region(struct file *file, unsigned long addr,
 
 	/* Clear old maps */
 	while (find_vma_links(mm, addr, addr + len, &prev, &rb_link,
-			      &rb_parent)) {
+			      &rb_parent)) { //如果addr已经在某个vma中了，会unmap掉，然后又到while条件去重新执行
 		if (do_munmap(mm, addr, len, uf))
 			return -ENOMEM;
 	}
@@ -1732,6 +1744,7 @@ unsigned long mmap_region(struct file *file, unsigned long addr,
 	 */
 	if (accountable_mapping(file, vm_flags)) {
 		charged = len >> PAGE_SHIFT;
+		//配额是否在安全的范围内
 		if (security_vm_enough_memory_mm(mm, charged))
 			return -ENOMEM;
 		vm_flags |= VM_ACCOUNT;
@@ -1749,6 +1762,8 @@ unsigned long mmap_region(struct file *file, unsigned long addr,
 	 * Determine the object being mapped and call the appropriate
 	 * specific mapper. the address has already been validated, but
 	 * not unmapped, but the maps are removed from the list.
+	 *
+	 * 分配vma对象
 	 */
 	vma = vm_area_alloc(mm);
 	if (!vma) {
@@ -1780,6 +1795,13 @@ unsigned long mmap_region(struct file *file, unsigned long addr,
 		 * new file must not have been exposed to user-space, yet.
 		 */
 		vma->vm_file = get_file(file);
+		/*
+		 * 调用file->f_op->mmap(),ext4_file_mmap(),，
+		 * 设置vma->vm_ops为ext4_dax_vm_ops或者ext4_file_vm_ops
+		 *
+		 * 在产生缺页中断时，会在do_read_fault()之后的调用路径调用ext4_file_vm_ops中相关指针函数
+		 *
+		 */
 		error = call_mmap(file, vma);
 		if (error)
 			goto unmap_and_free_vma;
@@ -2164,6 +2186,9 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
 }
 #endif
 
+/*
+ * 查找一个没有被映射的虚拟地址
+ */
 unsigned long
 get_unmapped_area(struct file *file, unsigned long addr, unsigned long len,
 		unsigned long pgoff, unsigned long flags)

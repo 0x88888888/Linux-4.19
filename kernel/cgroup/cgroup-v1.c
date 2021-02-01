@@ -48,6 +48,10 @@ bool cgroup1_ssid_disabled(int ssid)
  * cgroup_attach_task_all - attach task 'tsk' to all cgroups of task 'from'
  * @from: attach to all cgroups of a given task
  * @tsk: the task to be attached
+ *
+ * vhost_attach_cgroups()
+ *  vhost_attach_cgroups_work()
+ *   cgroup_attach_task_all()
  */
 int cgroup_attach_task_all(struct task_struct *from, struct task_struct *tsk)
 {

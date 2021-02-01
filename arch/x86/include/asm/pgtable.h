@@ -319,6 +319,10 @@ static inline pte_t pte_mkdirty(pte_t pte)
 	return pte_set_flags(pte, _PAGE_DIRTY | _PAGE_SOFT_DIRTY);
 }
 
+/*
+ * handle_pte_fault()
+ *  pte_mkyoung()
+ */
 static inline pte_t pte_mkyoung(pte_t pte)
 {
 	return pte_set_flags(pte, _PAGE_ACCESSED);

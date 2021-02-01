@@ -315,6 +315,15 @@ int security_settime64(const struct timespec64 *ts, const struct timezone *tz)
 	return call_int_hook(settime, 0, ts, tz);
 }
 
+/*
+ * mmap_region()
+ *  security_vm_enough_memory_mm()
+ *
+ * SYSCALL_DEFINE1(swapoff,....) 在swapfile.c中
+ *  security_vm_enough_memory_mm()
+ *
+ *
+ */
 int security_vm_enough_memory_mm(struct mm_struct *mm, long pages)
 {
 	struct security_hook_list *hp;

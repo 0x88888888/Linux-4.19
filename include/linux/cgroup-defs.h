@@ -654,6 +654,13 @@ struct cftype {
  */
 struct cgroup_subsys {
 	struct cgroup_subsys_state *(*css_alloc)(struct cgroup_subsys_state *parent_css);
+
+    /*
+     * start_kernel()  [init/main.c]
+     *  cgroup_init_early() 循环调用下面的函数
+     *   cgroup_init_subsys()
+     *    online_css()
+     */
 	int (*css_online)(struct cgroup_subsys_state *css);
 	void (*css_offline)(struct cgroup_subsys_state *css);
 	void (*css_released)(struct cgroup_subsys_state *css);
@@ -663,8 +670,26 @@ struct cgroup_subsys {
 	int (*css_extra_stat_show)(struct seq_file *seq,
 				   struct cgroup_subsys_state *css);
 
+    /*
+     * cgroup_migrate_execute()
+     *  can_attach()
+     */
 	int (*can_attach)(struct cgroup_taskset *tset);
 	void (*cancel_attach)(struct cgroup_taskset *tset);
+    /*
+     * cgroup_migrate_execute()
+     *  attach()
+     *
+     * cgroup_procs_write()
+     *  cgroup_attach_task()
+     *   cgroup_migrate()
+     *    cgroup_migrate_execute() 
+     *
+     * cgroup_threads_write()
+     *  cgroup_attach_task()
+     *   cgroup_migrate()
+     *    cgroup_migrate_execute()     
+     */	
 	void (*attach)(struct cgroup_taskset *tset);
 	void (*post_attach)(void);
 	int (*can_fork)(struct task_struct *task);

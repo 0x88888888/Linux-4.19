@@ -642,6 +642,12 @@ EXPORT_SYMBOL_GPL(vm_memory_committed);
  *
  * Note this is a helper function intended to be used by LSMs which
  * wish to use this logic.
+ *
+ * mmap_region()
+ *  security_vm_enough_memory_mm()
+ *   __vm_enough_memory()
+ *
+ * 检查是否会over  commit 物理page
  */
 int __vm_enough_memory(struct mm_struct *mm, long pages, int cap_sys_admin)
 {

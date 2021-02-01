@@ -1350,13 +1350,17 @@ retry:
 		might_sleep();
 	}
 
+    //发生缺页异常的地址，查找vma
 	vma = find_vma(mm, address);
 	if (unlikely(!vma)) {
 		bad_area(regs, error_code, address);
 		return;
 	}
+	//普通的缺页异常
 	if (likely(vma->vm_start <= address))
 		goto good_area;
+
+	//检查是不是stack缺页异常了
 	if (unlikely(!(vma->vm_flags & VM_GROWSDOWN))) {
 		bad_area(regs, error_code, address);
 		return;
@@ -1373,6 +1377,7 @@ retry:
 			return;
 		}
 	}
+	//如果stack缺页异常，扩张stack就可以了
 	if (unlikely(expand_stack(vma, address))) {
 		bad_area(regs, error_code, address);
 		return;

@@ -2271,6 +2271,13 @@ EXPORT_SYMBOL_GPL(task_cgroup_path);
  * becomes noop if @task doesn't need to be migrated.  @task's css_set
  * should have been added as a migration source and @task->cg_list will be
  * moved from the css_set's tasks list to mg_tasks one.
+ *
+ * vhost_attach_cgroups()
+ *  vhost_attach_cgroups_work()
+ *   cgroup_attach_task_all()
+ *    cgroup_attach_task() 
+ *     cgroup_migrate()
+ *      cgroup_migrate_add_task()
  */
 static void cgroup_migrate_add_task(struct task_struct *task,
 				    struct cgroup_mgctx *mgctx)
@@ -2372,6 +2379,26 @@ struct task_struct *cgroup_taskset_next(struct cgroup_taskset *tset,
  * This function fails iff one of the ->can_attach callbacks fails and
  * guarantees that either all or none of the tasks in @mgctx are migrated.
  * @mgctx is consumed regardless of success.
+ *
+ * vhost_attach_cgroups()
+ *  vhost_attach_cgroups_work()
+ *   cgroup_attach_task_all()
+ *    cgroup_attach_task() 
+ *     cgroup_migrate() 
+ *      cgroup_migrate_execute()
+ *
+ * cgroup_update_dfl_csses()
+ *  cgroup_migrate_execute()
+ *
+ * cgroup_procs_write()
+ *  cgroup_attach_task()
+ *   cgroup_migrate()
+ *    cgroup_migrate_execute()
+ *
+ * cgroup_threads_write()
+ *  cgroup_attach_task()
+ *   cgroup_migrate()
+ *    cgroup_migrate_execute()
  */
 static int cgroup_migrate_execute(struct cgroup_mgctx *mgctx)
 {
@@ -2663,6 +2690,20 @@ err:
  * failure, when migrating multiple targets, the success or failure can be
  * decided for all targets by invoking group_migrate_prepare_dst() before
  * actually starting migrating.
+ *
+ * vhost_attach_cgroups()
+ *  vhost_attach_cgroups_work()
+ *   cgroup_attach_task_all()
+ *    cgroup_attach_task() 
+ *     cgroup_migrate()
+ *
+ * cgroup_procs_write()
+ *  cgroup_attach_task()
+ *   cgroup_migrate()
+ *
+ * cgroup_threads_write()
+ *  cgroup_attach_task()
+ *   cgroup_migrate()
  */
 int cgroup_migrate(struct task_struct *leader, bool threadgroup,
 		   struct cgroup_mgctx *mgctx)
@@ -2695,6 +2736,19 @@ int cgroup_migrate(struct task_struct *leader, bool threadgroup,
  * @threadgroup: attach the whole threadgroup?
  *
  * Call holding cgroup_mutex and cgroup_threadgroup_rwsem.
+ *
+ * vhost_attach_cgroups()
+ *  vhost_attach_cgroups_work()
+ *   cgroup_attach_task_all()
+ *    cgroup_attach_task()
+ *
+ * cgroup_procs_write()
+ *  cgroup_attach_task()
+ *
+ * cgroup_threads_write()
+ *  cgroup_attach_task()
+ *
+ * __cgroup1_procs_write()
  */
 int cgroup_attach_task(struct cgroup *dst_cgrp, struct task_struct *leader,
 		       bool threadgroup)
@@ -4802,7 +4856,13 @@ static void init_and_link_css(struct cgroup_subsys_state *css,
 	BUG_ON(cgroup_css(cgrp, ss));
 }
 
-/* invoke ->css_online() on a new CSS and mark it online if successful */
+/* invoke ->css_online() on a new CSS and mark it online if successful
+ *
+ * start_kernel()  [init/main.c]
+ *  cgroup_init_early() 循环调用下面的函数
+ *   cgroup_init_subsys()
+ *    online_css()
+ */
 static int online_css(struct cgroup_subsys_state *css)
 {
 	struct cgroup_subsys *ss = css->ss;
@@ -5281,7 +5341,7 @@ static struct kernfs_syscall_ops cgroup_kf_syscall_ops = {
 
 /*
  * start_kernel()  [init/main.c]
- *  cgroup_init_early()
+ *  cgroup_init_early() 循环调用下面的函数
  *   cgroup_init_subsys()
  */
 static void __init cgroup_init_subsys(struct cgroup_subsys *ss, bool early)
@@ -5375,7 +5435,7 @@ int __init cgroup_init_early(void)
 		if (!ss->legacy_name)
 			ss->legacy_name = cgroup_subsys_name[i];
 
-		if (ss->early_init)
+		if (ss->early_init) //循环调用
 			cgroup_init_subsys(ss, true);
 	}
 	

@@ -704,6 +704,12 @@ int invalidate_inodes(struct super_block *sb, bool kill_dirty)
  * the fact we are doing lazy LRU updates to minimise lock contention so the
  * LRU does not have strict ordering. Hence we don't want to reclaim inodes
  * with this flag set because they are the inodes that are out of order.
+ *
+ * 
+ * super_cache_scan()
+ *  prune_icache_sb()
+ *   ....
+ *    inode_lru_isolate()
  */
 static enum lru_status inode_lru_isolate(struct list_head *item,
 		struct list_lru_one *lru, spinlock_t *lru_lock, void *arg)
@@ -743,6 +749,7 @@ static enum lru_status inode_lru_isolate(struct list_head *item,
 		spin_unlock(lru_lock);
 		if (remove_inode_buffers(inode)) {
 			unsigned long reap;
+			
 			reap = invalidate_mapping_pages(&inode->i_data, 0, -1);
 			if (current_is_kswapd())
 				__count_vm_events(KSWAPD_INODESTEAL, reap);
@@ -770,6 +777,9 @@ static enum lru_status inode_lru_isolate(struct list_head *item,
  * This is called from the superblock shrinker function with a number of inodes
  * to trim from the LRU. Inodes to be freed are moved to a temporary list and
  * then are freed outside inode_lock by dispose_list().
+ *
+ * super_cache_scan()
+ *  prune_icache_sb()
  */
 long prune_icache_sb(struct super_block *sb, struct shrink_control *sc)
 {

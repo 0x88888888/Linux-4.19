@@ -6250,6 +6250,17 @@ out:
 	return ret;
 }
 
+/*
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_fault()
+ *       do_read_fault()
+ *        __do_fault()
+ *         ext4_filemap_fault()
+ */
 int ext4_filemap_fault(struct vm_fault *vmf)
 {
 	struct inode *inode = file_inode(vmf->vma->vm_file);

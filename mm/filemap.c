@@ -1223,6 +1223,9 @@ EXPORT_SYMBOL(unlock_page);
 /**
  * end_page_writeback - end writeback against a page
  * @page: the page
+ *
+ * swap_writepage()
+ *  end_page_writeback()
  */
 void end_page_writeback(struct page *page)
 {
@@ -2502,6 +2505,18 @@ static void do_async_mmap_readahead(struct vm_area_struct *vma,
  * has not been released.
  *
  * We never return with VM_FAULT_RETRY and a bit from VM_FAULT_ERROR set.
+ *
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_fault()
+ *       do_read_fault()
+ *        __do_fault()
+ *         ext4_filemap_fault()
+ *          filemap_fault()
  */
 vm_fault_t filemap_fault(struct vm_fault *vmf)
 {
@@ -2521,16 +2536,22 @@ vm_fault_t filemap_fault(struct vm_fault *vmf)
 
 	/*
 	 * Do we have something in the page cache already?
+	 *
+	 * 在page cache中是否可以找到
 	 */
 	page = find_get_page(mapping, offset);
-	if (likely(page) && !(vmf->flags & FAULT_FLAG_TRIED)) {
+	if (likely(page) && !(vmf->flags & FAULT_FLAG_TRIED)) { //在page cache中找到
 		/*
 		 * We found the page, so try async readahead before
 		 * waiting for the lock.
+		 *
+		 * 异步预读了
 		 */
 		do_async_mmap_readahead(vmf->vma, ra, file, page, offset);
-	} else if (!page) {
-		/* No page in the page cache at all */
+	} else if (!page) { //page cache中没有找到
+		/* No page in the page cache at all 
+		 * 需要去磁盘同步读了
+	     */
 		do_sync_mmap_readahead(vmf->vma, ra, file, offset);
 		count_vm_event(PGMAJFAULT);
 		count_memcg_event_mm(vmf->vma->vm_mm, PGMAJFAULT);

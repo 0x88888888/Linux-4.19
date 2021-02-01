@@ -243,6 +243,12 @@ static void pagevec_lru_move_fn(struct pagevec *pvec,
 	pagevec_reinit(pvec);
 }
 
+/*
+ * lru_add_drain_cpu()
+ *  pagevec_move_tail(pvec == lru_rotate_pvecs)
+ *   ...
+ *    pagevec_move_tail_fn()
+ */ 
 static void pagevec_move_tail_fn(struct page *page, struct lruvec *lruvec,
 				 void *arg)
 {
@@ -259,6 +265,9 @@ static void pagevec_move_tail_fn(struct page *page, struct lruvec *lruvec,
 /*
  * pagevec_move_tail() must be called with IRQ disabled.
  * Otherwise this may cause nasty races.
+ *
+ * lru_add_drain_cpu()
+ *  pagevec_move_tail(pvec == lru_rotate_pvecs)
  */
 static void pagevec_move_tail(struct pagevec *pvec)
 {
@@ -272,6 +281,12 @@ static void pagevec_move_tail(struct pagevec *pvec)
  * Writeback is about to end against a page which has been marked for immediate
  * reclaim.  If it still appears to be reclaimable, move it to the tail of the
  * inactive list.
+ *
+ * swap_writepage()
+ *  end_page_writeback()
+ *   rotate_reclaimable_page()
+ *
+ * 将page加入到lru_rotate_pvecs中去
  */
 void rotate_reclaimable_page(struct page *page)
 {
@@ -308,6 +323,12 @@ static void update_page_reclaim_stat(struct lruvec *lruvec,
  * activate_page_drain()
  *  pagevec_lru_move_fn(pvec == per_cpu(activate_page_pvecs), move_fn==__activate_page) 
  *   __activate_page((pvec == per_cpu(activate_page_pvecs) )
+ *
+ * lru_add_drain()
+ *  lru_add_drain_cpu()
+ *   activate_page_drain()
+ *    ...
+ *     __activate_page(lruvec == activate_page_pvecs) 
  */
 static void __activate_page(struct page *page, struct lruvec *lruvec,
 			    void *arg)
@@ -328,6 +349,11 @@ static void __activate_page(struct page *page, struct lruvec *lruvec,
 }
 
 #ifdef CONFIG_SMP
+/*
+ * lru_add_drain()
+ *  lru_add_drain_cpu()
+ *   activate_page_drain()
+ */
 static void activate_page_drain(int cpu)
 {
 	struct pagevec *pvec = &per_cpu(activate_page_pvecs, cpu);
@@ -344,6 +370,8 @@ static bool need_activate_page_drain(int cpu)
 /*
  * do_swap_page()
  *  activate_page()
+ *
+ * 将page加入到activate_page_pvecs中去
  */
 void activate_page(struct page *page)
 {
@@ -354,6 +382,7 @@ void activate_page(struct page *page)
 		get_page(page);
 		if (!pagevec_add(pvec, page) || PageCompound(page))
 			pagevec_lru_move_fn(pvec, __activate_page, NULL);
+		
 		put_cpu_var(activate_page_pvecs);
 	}
 }
@@ -382,6 +411,8 @@ void activate_page(struct page *page)
 /*
  * mark_page_accessed()
  *  __lru_cache_activate_page()
+ *
+ * 如果page在lru_add_pvec中，就设置为PG_active了
  */
 static void __lru_cache_activate_page(struct page *page)
 {
@@ -574,6 +605,19 @@ void lru_cache_add_active_or_unevictable(struct page *page,
  * In 4, why it moves inactive's head, the VM expects the page would
  * be write it out by flusher threads as this is much more effective
  * than the single-page writeout from reclaim.
+ *
+ * super_cache_scan()
+ *  prune_icache_sb()
+ *   ....
+ *    inode_lru_isolate()
+ *     invalidate_mapping_pages()
+ *      deactivate_file_page()
+ *       lru_deactivate_file_fn(lruvec == lru_deactivate_file_pvecs)
+ *
+ * lru_add_drain()
+ *  lru_add_drain_cpu()
+ *   ...
+ *    lru_deactivate_file_fn(pvec==lru_deactivate_file_pvecs)
  */
 static void lru_deactivate_file_fn(struct page *page, struct lruvec *lruvec,
 			      void *arg)
@@ -593,11 +637,13 @@ static void lru_deactivate_file_fn(struct page *page, struct lruvec *lruvec,
 
 	active = PageActive(page);
 	file = page_is_file_cache(page);
+	//只能是LRU_INACTIVE_FILE或者LRU_INACTIVE_ANON
 	lru = page_lru_base_type(page);
 
 	del_page_from_lru_list(page, lruvec, lru + active);
 	ClearPageActive(page);
 	ClearPageReferenced(page);
+	//添加到lurvec->lists[lru]中去
 	add_page_to_lru_list(page, lruvec, lru);
 
 	if (PageWriteback(page) || PageDirty(page)) {
@@ -621,7 +667,12 @@ static void lru_deactivate_file_fn(struct page *page, struct lruvec *lruvec,
 	update_page_reclaim_stat(lruvec, file, 0);
 }
 
-
+/*
+ * lru_add_drain()
+ *  lru_add_drain_cpu()
+ *   ...
+ *    lru_lazyfree_fn( lruvec == lru_lazyfree_pvecs)
+ */
 static void lru_lazyfree_fn(struct page *page, struct lruvec *lruvec,
 			    void *arg)
 {
@@ -659,28 +710,28 @@ void lru_add_drain_cpu(int cpu)
 {
 	struct pagevec *pvec = &per_cpu(lru_add_pvec, cpu);
 
-	if (pagevec_count(pvec))
+	if (pagevec_count(pvec)) //添加到pvec->lists[page->lru]或者LRU+UNEVICTABLE中去
 		__pagevec_lru_add(pvec);
 
-	pvec = &per_cpu(lru_rotate_pvecs, cpu);
+	pvec = &per_cpu(lru_rotate_pvecs, cpu); 
 	if (pagevec_count(pvec)) {
 		unsigned long flags;
 
 		/* No harm done if a racing interrupt already did this */
 		local_irq_save(flags);
-		pagevec_move_tail(pvec);
+		pagevec_move_tail(pvec); //pvec->pages[]中的page，全部头尾置换
 		local_irq_restore(flags);
 	}
 
 	pvec = &per_cpu(lru_deactivate_file_pvecs, cpu);
-	if (pagevec_count(pvec))
+	if (pagevec_count(pvec)) //把lru_deactivate_file_pvecs中的page，设置INACTIVE
 		pagevec_lru_move_fn(pvec, lru_deactivate_file_fn, NULL);
 
-	pvec = &per_cpu(lru_lazyfree_pvecs, cpu);
+	pvec = &per_cpu(lru_lazyfree_pvecs, cpu); //转成LRU_INACTIVE_FILE
 	if (pagevec_count(pvec))
 		pagevec_lru_move_fn(pvec, lru_lazyfree_fn, NULL);
 
-	activate_page_drain(cpu);
+	activate_page_drain(cpu);//操作active_page_pvecs,设置ACTIVE状态
 }
 
 /**
@@ -690,6 +741,15 @@ void lru_add_drain_cpu(int cpu)
  * This function hints the VM that @page is a good reclaim candidate,
  * for example if its invalidation fails due to the page being dirty
  * or under writeback.
+ *
+ * super_cache_scan()
+ *  prune_icache_sb()
+ *   ....
+ *    inode_lru_isolate()
+ *     invalidate_mapping_pages()
+ *      deactivate_file_page()
+ *
+ * 将page加入到lru_deactivate_file_pvecs中去
  */
 void deactivate_file_page(struct page *page)
 {
@@ -715,6 +775,8 @@ void deactivate_file_page(struct page *page)
  *
  * mark_page_lazyfree() moves @page to the inactive file list.
  * This is done to accelerate the reclaim of @page.
+ *
+ * 将page加入到lru_lazyfree_pvecs中去
  */
 void mark_page_lazyfree(struct page *page)
 {
@@ -729,12 +791,49 @@ void mark_page_lazyfree(struct page *page)
 	}
 }
 
+/*
+ * 
+ * 将  lru_add_pvec
+ * lru_rotate_pvecs
+ * lru_deactivate_file_pvecs
+ * lru_lazyfree_pvecs
+ * active_page_pvecs 中的page设置成相应的ACTIVE或者INACTIVE之类的状态
+ *
+ * lru_add_drain_all()
+ *  ...
+ *   lru_add_drain_per_cpu()
+ *    lru_add_drain()
+ *
+ * follow_trans_huge_pmd()
+ * follow_page_pte()
+ * split_huge_page_to_list()
+ * force_swapin_readahead()
+ * force_shm_swapin_readahead()
+ * zap_page_range()
+ * zap_page_range_single()
+ * migrate_prep_local()
+ * migrate_vma_prepare()
+ * unmap_region()
+ * exit_mmap()
+ * lru_add_drain_per_cpu()
+ * __pagevec_release()
+ * free_pages_and_swap_cache()
+ * swap_vma_readahead()
+ * shrink_inactive_list()
+ * shrink_active_list()
+ *  lru_add_drain()
+ */
 void lru_add_drain(void)
 {
 	lru_add_drain_cpu(get_cpu());
 	put_cpu();
 }
 
+/*
+ * lru_add_drain_all()
+ *  ...
+ *   lru_add_drain_per_cpu()
+ */
 static void lru_add_drain_per_cpu(struct work_struct *dummy)
 {
 	lru_add_drain();
@@ -945,6 +1044,12 @@ void lru_add_page_tail(struct page *page, struct page *page_tail,
  *     __pagevec_lru_add()
  *      pagevec_lru_move_fn( move_fn == __pagevec_lru_add_fn)
  *       __pagevec_lru_add_fn()
+ *
+ * lru_add_drain()
+ *  lru_add_drain_cpu()
+ *   __pagevec_lru_add( lurvec== per_cpu(lru_add_pvec) )
+ *
+ * 将page添加到lruvec->lists[lru]中去
  */
 static void __pagevec_lru_add_fn(struct page *page, struct lruvec *lruvec,
 				 void *arg)

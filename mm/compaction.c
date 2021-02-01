@@ -1223,6 +1223,13 @@ int sysctl_compact_unevictable_allowed __read_mostly = 1;
  * Isolate all pages that can be migrated from the first suitable block,
  * starting at the block pointed to by the migrate scanner pfn within
  * compact_control.
+ *
+ * __alloc_pages_slowpath()
+ *  __alloc_pages_direct_compact()
+ *   try_to_compact_pages()
+ *    compact_zone_order()
+ *     compact_zone()
+ *      isolate_migratepages()
  */
 static isolate_migrate_t isolate_migratepages(struct zone *zone,
 					struct compact_control *cc)
@@ -1540,6 +1547,12 @@ bool compaction_zonelist_suitable(struct alloc_context *ac, int order,
  * sysfs_compact_node()
  *  compact_node()
  *   compact_zone()
+ *
+ * __alloc_pages_slowpath()
+ *  __alloc_pages_direct_compact()
+ *   try_to_compact_pages()
+ *    compact_zone_order()
+ *     compact_zone()
  */
 static enum compact_result compact_zone(struct zone *zone, struct compact_control *cc)
 {
@@ -1618,6 +1631,7 @@ static enum compact_result compact_zone(struct zone *zone, struct compact_contro
 			;
 		}
 
+        //开始migrate了
 		err = migrate_pages(&cc->migratepages, compaction_alloc,
 				compaction_free, (unsigned long)cc, cc->mode,
 				MR_COMPACTION);
@@ -1705,6 +1719,12 @@ out:
 	return ret;
 }
 
+/*
+ * __alloc_pages_slowpath()
+ *  __alloc_pages_direct_compact()
+ *   try_to_compact_pages()
+ *    compact_zone_order()
+ */
 static enum compact_result compact_zone_order(struct zone *zone, int order,
 		gfp_t gfp_mask, enum compact_priority prio,
 		unsigned int alloc_flags, int classzone_idx)
@@ -1749,6 +1769,10 @@ int sysctl_extfrag_threshold = 500;
  * @prio: Determines how hard direct compaction should try to succeed
  *
  * This is the main entry point for direct page compaction.
+ *
+ * __alloc_pages_slowpath()
+ *  __alloc_pages_direct_compact()
+ *   try_to_compact_pages()
  */
 enum compact_result try_to_compact_pages(gfp_t gfp_mask, unsigned int order,
 		unsigned int alloc_flags, const struct alloc_context *ac,
@@ -1768,7 +1792,10 @@ enum compact_result try_to_compact_pages(gfp_t gfp_mask, unsigned int order,
 
 	trace_mm_compaction_try_to_compact_pages(order, gfp_mask, prio);
 
-	/* Compact each zone in the list */
+	/* Compact each zone in the list 
+	 *
+	 * 给每个zone 进行compact
+	 */
 	for_each_zone_zonelist_nodemask(zone, z, ac->zonelist, ac->high_zoneidx,
 								ac->nodemask) {
 		enum compact_result status;

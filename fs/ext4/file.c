@@ -357,6 +357,12 @@ static const struct vm_operations_struct ext4_file_vm_ops = {
 	.page_mkwrite   = ext4_page_mkwrite,
 };
 
+/*
+ * do_mmap_pgoff()
+ *  do_mmap()
+ *   mmap_region()
+ *    ext4_file_mmap()
+ */
 static int ext4_file_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct inode *inode = file->f_mapping->host;

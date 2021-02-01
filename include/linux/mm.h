@@ -2314,6 +2314,10 @@ extern unsigned long do_mmap(struct file *file, unsigned long addr,
 extern int do_munmap(struct mm_struct *, unsigned long, size_t,
 		     struct list_head *uf);
 
+/*
+ * SYSCALL_DEFINE5(remap_file_pages) mmap.c中
+ *  do_mmap_pgoff()
+ */
 static inline unsigned long
 do_mmap_pgoff(struct file *file, unsigned long addr,
 	unsigned long len, unsigned long prot, unsigned long flags,

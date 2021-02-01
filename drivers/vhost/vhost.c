@@ -462,6 +462,10 @@ struct vhost_attach_cgroups_struct {
 	int ret;
 };
 
+/*
+ * vhost_attach_cgroups()
+ *  vhost_attach_cgroups_work()
+ */
 static void vhost_attach_cgroups_work(struct vhost_work *work)
 {
 	struct vhost_attach_cgroups_struct *s;

@@ -401,6 +401,13 @@ struct mem_cgroup *get_mem_cgroup_from_mm(struct mm_struct *mm);
 
 struct mem_cgroup *get_mem_cgroup_from_page(struct page *page);
 
+/*
+ * memcg_kmem_charge()
+ *  get_mem_cgroup_from_current()
+ *   get_mem_cgroup_from_mm()
+ *    mem_cgroup_from_task()
+ *     mem_cgroup_from_css()
+ */
 static inline
 struct mem_cgroup *mem_cgroup_from_css(struct cgroup_subsys_state *css){
 	return css ? container_of(css, struct mem_cgroup, css) : NULL;

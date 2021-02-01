@@ -223,6 +223,11 @@ static inline void zero_user(struct page *page,
 
 #ifndef __HAVE_ARCH_COPY_USER_HIGHPAGE
 
+/*
+ * 1. 用内核的kmap区域映射，先把两个page都映射在内核的虚拟地址中，
+ * 2. 然后复制内容
+ * 3. 然后把两个kmap区域都kunmap掉
+ */
 static inline void copy_user_highpage(struct page *to, struct page *from,
 	unsigned long vaddr, struct vm_area_struct *vma)
 {
