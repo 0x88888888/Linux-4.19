@@ -124,6 +124,39 @@ static inline void anon_vma_free(struct anon_vma *anon_vma)
 	kmem_cache_free(anon_vma_cachep, anon_vma);
 }
 
+/*
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_anonymous_page()
+ *       anon_vma_prepare()
+ *        __anon_vma_prepare()
+ *         anon_vma_chain_alloc()
+ *
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
+ *    copy_mm()
+ *     dup_mm()
+ *      dup_mmap() 
+ *       anon_vma_fork()
+ *        anon_vma_clone() 这里必定会调用anon_vma_chain_alloc
+ *         anon_vma_chain_alloc()
+ *
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
+ *    copy_mm()
+ *     dup_mm()
+ *      dup_mmap() 
+ *       anon_vma_fork()
+ *        anon_vma_chain_alloc()
+ *
+ * 只会在fork和page fault时调用你这个函数，分配anon_vma_chain对象
+ */
 static inline struct anon_vma_chain *anon_vma_chain_alloc(gfp_t gfp)
 {
 	return kmem_cache_alloc(anon_vma_chain_cachep, gfp);
@@ -242,7 +275,7 @@ int __anon_vma_prepare(struct vm_area_struct *vma)
 	anon_vma_lock_write(anon_vma);
 	/* page_table_lock to protect against threads */
 	spin_lock(&mm->page_table_lock);
-	if (likely(!vma->anon_vma)) {
+	if (likely(!vma->anon_vma)) {//还没有给vma设置anon_vma
 		vma->anon_vma = anon_vma;
 		/*
 		 *  vma->anon_vma_chain 链接 avc->same_vma
@@ -329,7 +362,7 @@ int anon_vma_clone(struct vm_area_struct *dst, struct vm_area_struct *src)
 	struct anon_vma_chain *avc, *pavc;// parent anon_vma_chain
 	struct anon_vma *root = NULL;
 
-    //遍历src->anon_vma_chain上的anon_vma_chain，然后用链表建立anon_vma_chain的层级关系,以此anon_vma_chain->save_vma
+    //遍历src->anon_vma_chain上的anon_vma_chain，得到pavc对象，然后用链表建立anon_vma_chain的层级关系,以此anon_vma_chain->save_vma
 	list_for_each_entry_reverse(pavc, &src->anon_vma_chain, same_vma) {
 	
 		struct anon_vma *anon_vma;
@@ -345,7 +378,8 @@ int anon_vma_clone(struct vm_area_struct *dst, struct vm_area_struct *src)
 			if (!avc)
 				goto enomem_failure;
 		}
-		
+
+		//pavc 的anon
 		anon_vma = pavc->anon_vma;
 		root = lock_anon_vma_root(root, anon_vma);
 
@@ -413,11 +447,12 @@ int anon_vma_fork(struct vm_area_struct *vma, struct vm_area_struct *pvma)
 	 * First, attach the new VMA to the parent VMA's anon_vmas,
 	 * so rmap can find non-COWed pages in child processes.
 	 *
-	 * 这个调用很重要
+	 * 这个调用很重要,构建vma和pmva之间的链接
 	 */
 	error = anon_vma_clone(vma, pvma);
 	if (error)
 		return error;
+	//与pvma的关系构建完毕，下面构建本层的vma,avc,anon_vma的关系
 
 	/* An existing anon_vma has been reused, all done then. */
 	if (vma->anon_vma)

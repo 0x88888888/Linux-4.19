@@ -83,6 +83,8 @@ struct anon_vma {
  *
  * 只在匿名映射page是有用这个数据结构
  *
+ * 在anon_vma_chain_alloc()中分配这个对象
+ *
  * anon_vma_chain会同时插入到vm_area_struct->same_vma链表
  * 和anon_vma->rb_root树 上去
  */

@@ -1251,7 +1251,7 @@ __do_page_fault(struct pt_regs *regs, unsigned long error_code,
 	 * (error_code & 4) == 0, and that the fault was not a
 	 * protection error (error_code & 9) == 0.
 	 */
-	if (unlikely(fault_in_kernel_space(address))) {
+	if (unlikely(fault_in_kernel_space(address))) { //内核引发的page fault，只能是vmalloc分配的哪些虚拟内存了
 		if (!(error_code & (X86_PF_RSVD | X86_PF_USER | X86_PF_PROT))) {
 			if (vmalloc_fault(address) >= 0)
 				return;

@@ -318,6 +318,15 @@ struct vm_area_struct *vm_area_alloc(struct mm_struct *mm)
 	return vma;
 }
 
+/*
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
+ *    copy_mm()
+ *     dup_mm()
+ *      dup_mmap()
+ *       vm_area_dup()
+ */
 struct vm_area_struct *vm_area_dup(struct vm_area_struct *orig)
 {
 	struct vm_area_struct *new = kmem_cache_alloc(vm_area_cachep, GFP_KERNEL);
@@ -497,7 +506,7 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 			charge = len;
 		}
 
-		//创建vma，复制mpnt 这个vma中的内容
+		//创建vma，复制mpnt 这个vma中的内容, *tmp == mpnt
 		// vma->anon_vma_chain指向vma->anon_vma_chain自己
 		//
 		tmp = vm_area_dup(mpnt);
@@ -973,6 +982,14 @@ static void mm_init_uprobes_state(struct mm_struct *mm)
 #endif
 }
 
+/*
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
+ *    copy_mm()
+ *     dup_mm()
+ *      mm_init()
+ */
 static struct mm_struct *mm_init(struct mm_struct *mm, struct task_struct *p,
 	struct user_namespace *user_ns)
 {
@@ -1324,6 +1341,7 @@ static struct mm_struct *dup_mm(struct task_struct *tsk)
 	if (!mm)
 		goto fail_nomem;
 
+    //mm_struct结构复制过来
 	memcpy(mm, oldmm, sizeof(*mm));
 
 	if (!mm_init(mm, tsk, mm->user_ns))
@@ -1752,7 +1770,8 @@ static __latent_entropy struct task_struct *copy_process(
 				current->nsproxy->pid_ns_for_children))
 			return ERR_PTR(-EINVAL);
 	}
-
+    //前面检查一些相互矛盾的flags设置
+     
 	/*
 	 * Force any signals received before this point to be delivered
 	 * before the fork happens.  Collect up signals sent to multiple
@@ -1766,12 +1785,14 @@ static __latent_entropy struct task_struct *copy_process(
 	if (!(clone_flags & CLONE_THREAD))
 		hlist_add_head(&delayed.node, &current->signal->multiprocess);
 	recalc_sigpending();
+	
 	spin_unlock_irq(&current->sighand->siglock);
 	retval = -ERESTARTNOINTR;
 	if (signal_pending(current))
 		goto fork_out;
 
 	retval = -ENOMEM;
+	//复制task_struct信息，设置stack信息
 	p = dup_task_struct(current, node);
 	if (!p)
 		goto fork_out;
@@ -1833,8 +1854,10 @@ static __latent_entropy struct task_struct *copy_process(
 #ifdef CONFIG_ARCH_HAS_SCALED_CPUTIME
 	p->utimescaled = p->stimescaled = 0;
 #endif
+
 	prev_cputime_init(&p->prev_cputime);
 
+//虚拟化时的统计信息
 #ifdef CONFIG_VIRT_CPU_ACCOUNTING_GEN
 	seqcount_init(&p->vtime.seqcount);
 	p->vtime.starttime = 0;
@@ -1904,6 +1927,7 @@ static __latent_entropy struct task_struct *copy_process(
 #endif
 
 	/* Perform scheduler related setup. Assign this task to a CPU. */
+    //调度设置
 	retval = sched_fork(clone_flags, p);
 	if (retval)
 		goto bad_fork_cleanup_policy;

@@ -2210,6 +2210,12 @@ int wake_up_state(struct task_struct *p, unsigned int state)
  * p is forked by current.
  *
  * __sched_fork() is basic setup used by init_idle() too:
+ *
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
+ *    sched_fork()
+ *     __sched_fork()
  */
 static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
 {
@@ -2364,6 +2370,11 @@ static inline void init_schedstats(void) {}
 
 /*
  * fork()/clone()-time setup:
+ *
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
+ *    sched_fork()
  */
 int sched_fork(unsigned long clone_flags, struct task_struct *p)
 {
@@ -2403,6 +2414,7 @@ int sched_fork(unsigned long clone_flags, struct task_struct *p)
 		p->sched_reset_on_fork = 0;
 	}
 
+    //设置sched_class
 	if (dl_prio(p->prio))
 		return -EAGAIN;
 	else if (rt_prio(p->prio))
@@ -2425,8 +2437,11 @@ int sched_fork(unsigned long clone_flags, struct task_struct *p)
 	 * so use __set_task_cpu().
 	 */
 	__set_task_cpu(p, smp_processor_id());
+
+	//fair_sched_class->task_fork == task_fork_fair
 	if (p->sched_class->task_fork)
 		p->sched_class->task_fork(p);
+	
 	raw_spin_unlock_irqrestore(&p->pi_lock, flags);
 
 #ifdef CONFIG_SCHED_INFO

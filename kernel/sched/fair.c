@@ -9695,6 +9695,12 @@ static void task_tick_fair(struct rq *rq, struct task_struct *curr, int queued)
  * called on fork with the child task as argument from the parent's context
  *  - child not yet on the tasklist
  *  - preemption disabled
+ *
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
+ *    sched_fork()
+ *     task_fork_fair()
  */
 static void task_fork_fair(struct task_struct *p)
 {

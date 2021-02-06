@@ -1256,6 +1256,11 @@ static int anon_vma_compatible(struct vm_area_struct *a, struct vm_area_struct *
  *  __anon_vma_prepare() 
  *   find_mergeable_anon_vma()
  *    reusable_anon_vma()
+ *
+ * 查找是否可以重用vma
+ *
+ * 可以reuse的条件是地址连续，vma的属性相同，policy兼容
+ *
  */
 static struct anon_vma *reusable_anon_vma(struct vm_area_struct *old, struct vm_area_struct *a, struct vm_area_struct *b)
 {
@@ -1287,15 +1292,16 @@ struct anon_vma *find_mergeable_anon_vma(struct vm_area_struct *vma)
 	struct anon_vma *anon_vma;
 	struct vm_area_struct *near;
 
-	near = vma->vm_next;
+	near = vma->vm_next; //near就是后继了
 	if (!near)
 		goto try_prev;
 
+    //先茶垢后继的vma是否可以reuse
 	anon_vma = reusable_anon_vma(near, vma, near);
 	if (anon_vma)
 		return anon_vma;
-try_prev:
-	near = vma->vm_prev;
+try_prev: //然后查看prev的是否reuse
+	near = vma->vm_prev;//这里的near就是prev了
 	if (!near)
 		goto none;
 

@@ -225,6 +225,8 @@ static inline void list_rotate_left(struct list_head *head)
 /**
  * list_is_singular - tests whether a list has just one entry.
  * @head: the list to test.
+ *
+ * 只有一个节点
  */
 static inline int list_is_singular(const struct list_head *head)
 {
