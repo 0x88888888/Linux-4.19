@@ -1314,6 +1314,7 @@ __do_page_fault(struct pt_regs *regs, unsigned long error_code,
 
 	if (error_code & X86_PF_WRITE)
 		flags |= FAULT_FLAG_WRITE;
+	
 	if (error_code & X86_PF_INSTR)
 		flags |= FAULT_FLAG_INSTRUCTION;
 

@@ -75,6 +75,21 @@
 static struct kmem_cache *anon_vma_cachep;
 static struct kmem_cache *anon_vma_chain_cachep;
 
+/*
+ * 
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
+ *    copy_mm()
+ *     dup_mm()
+ *      dup_mmap() 循环调用anon_vma_fork()
+ *       anon_vma_fork()
+ *        anon_vma_alloc()
+ *
+ * __anon_vma_prepare()
+ *  anon_vma_alloc()
+ *
+ */
 static inline struct anon_vma *anon_vma_alloc(void)
 {
 	struct anon_vma *anon_vma;
@@ -350,7 +365,7 @@ static inline void unlock_anon_vma_root(struct anon_vma *root)
  *   copy_process()
  *    copy_mm()
  *     dup_mm()
- *      dup_mmap() 
+ *      dup_mmap() 循环调用anon_vma_fork()
  *       anon_vma_fork()
  *        anon_vma_clone()
  *
@@ -383,7 +398,14 @@ int anon_vma_clone(struct vm_area_struct *dst, struct vm_area_struct *src)
 		anon_vma = pavc->anon_vma;
 		root = lock_anon_vma_root(root, anon_vma);
 
-		//建立vma,avc,anon_vma三者之间的关系
+		/*
+		 *
+		 * 建立vma,avc,anon_vma三者之间的关系
+		 *  dst->anon_vma_chain链接到avc->same_vma,可以通过子vma找到父vma
+		 *  avc插入到anon_vma->rb_root，可以通过父vma，找到子vma
+		 *
+		 * 
+		 */
 		anon_vma_chain_link(dst, avc, anon_vma);
 
 		/*
@@ -427,7 +449,7 @@ int anon_vma_clone(struct vm_area_struct *dst, struct vm_area_struct *src)
  *   copy_process()
  *    copy_mm()
  *     dup_mm()
- *      dup_mmap() 
+ *      dup_mmap() 循环调用anon_vma_fork()
  *       anon_vma_fork()
  */
 int anon_vma_fork(struct vm_area_struct *vma, struct vm_area_struct *pvma)

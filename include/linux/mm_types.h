@@ -301,7 +301,10 @@ struct vm_userfaultfd_ctx {};
  * space that has a special rule for the page-fault handlers (ie a shared
  * library, the executable area etc).
  *
- * 在vm_area_alloc()中分配
+ * 通过do_brk_flags()和mmap_region()调用vm_area_alloc()来分配vma
+ * 这两个函数也不会个新分配的vma设置anon_vma 
+ * 也就是说在vma刚生成的时候是不会有anon_vma和它关联的，
+ * 在缺页中断do_page_fault和fork两个过程中,会为vma->anon_vma == NULL的vma建立anon_vma
  */
 struct vm_area_struct {
 	/* The first cache line has the info for VMA tree walking. */
@@ -354,7 +357,7 @@ struct vm_area_struct {
 
 	/* Function pointers to deal with this struct.
      *
-	 * 为NULL，则说明为anonymous映射了
+	 * 为NULL，则说明为anonymous映射了，从vma_set_anonymous()可知
 	 */
 	const struct vm_operations_struct *vm_ops;
 

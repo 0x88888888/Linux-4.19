@@ -308,6 +308,11 @@ static struct kmem_cache *vm_area_cachep;
 /* SLAB cache for mm_struct structures (tsk->mm) */
 static struct kmem_cache *mm_cachep;
 
+/*
+ *
+ * 通过do_brk_flags()和mmap_region()来分配vma
+ * 这两个函数也不会个新分配的vma设置anon_vma
+ */
 struct vm_area_struct *vm_area_alloc(struct mm_struct *mm)
 {
 	struct vm_area_struct *vma;
@@ -332,6 +337,7 @@ struct vm_area_struct *vm_area_dup(struct vm_area_struct *orig)
 	struct vm_area_struct *new = kmem_cache_alloc(vm_area_cachep, GFP_KERNEL);
 
 	if (new) {
+		//浅copy,如果orig 有anon_vma,那父子指向同一个anon_vma对象了
 		*new = *orig;
 		INIT_LIST_HEAD(&new->anon_vma_chain);
 	}
@@ -506,9 +512,10 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 			charge = len;
 		}
 
-		//创建vma，复制mpnt 这个vma中的内容, *tmp == mpnt
-		// vma->anon_vma_chain指向vma->anon_vma_chain自己
-		//
+		/*创建vma，复制mpnt 这个vma中的内容, *tmp == mpnt
+		 * vma->anon_vma_chain指向vma->anon_vma_chain自己
+		 * dup之后,和parent vma指向同一个anon_vma对象
+		 */
 		tmp = vm_area_dup(mpnt);
 		if (!tmp)
 			goto fail_nomem;
@@ -532,7 +539,7 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 			if (anon_vma_prepare(tmp))
 				goto fail_nomem_anon_vma_fork;
 			
-		} else if (anon_vma_fork(tmp, mpnt))  //这个调用很重要，一般走到这里，上面的if不走
+		} else if (anon_vma_fork(tmp, mpnt))  //这个调用很重要，一般走到这里，上面的if不走,会给新的vma分配anon_vma对象
 			goto fail_nomem_anon_vma_fork;
 
 			

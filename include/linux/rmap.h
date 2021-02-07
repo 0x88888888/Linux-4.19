@@ -171,13 +171,6 @@ int anon_vma_clone(struct vm_area_struct *, struct vm_area_struct *);
 int anon_vma_fork(struct vm_area_struct *, struct vm_area_struct *);
 
 /*
- * do_page_fault()
- *  __do_page_fault()
- *   handle_mm_fault()
- *    __handle_mm_fault()
- *     handle_pte_fault()
- *      do_anonymous_page()
- *       anon_vma_prepare()
  *
  * do_fork()
  *  _do_fork()
@@ -196,11 +189,32 @@ int anon_vma_fork(struct vm_area_struct *, struct vm_area_struct *);
  *    hugetlb_no_page()
  *     anon_vma_prepare()
  *
- * wp_page_copy()
- *  anon_vma_prepare()
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_swap_page()
+ *       do_wp_page()
+ *        wp_page_copy()
+ *         anon_vma_prepare()
  *
- * do_cow_fault()
- *  anon_vma_prepare()
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_fault()
+ *       do_cow_fault()
+ *        anon_vma_prepare()
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_anonymous_page()
+ *       anon_vma_prepare()
  *
  * 给vma分配anon_vma和anon_vma_chain
  *

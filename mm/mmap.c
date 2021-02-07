@@ -1769,7 +1769,7 @@ unsigned long mmap_region(struct file *file, unsigned long addr,
 	 * specific mapper. the address has already been validated, but
 	 * not unmapped, but the maps are removed from the list.
 	 *
-	 * 分配vma对象
+	 * 分配vma对象,此时没有设置anon_vma
 	 */
 	vma = vm_area_alloc(mm);
 	if (!vma) {

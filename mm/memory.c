@@ -2500,6 +2500,15 @@ static inline void wp_page_reuse(struct vm_fault *vmf)
  *   relevant references. This includes dropping the reference the page-table
  *   held to the old page, as well as updating the rmap.
  * - In any case, unlock the PTL and drop the reference we took to the old page.
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_swap_page()
+ *       do_wp_page()
+ *        wp_page_copy()
  */
 static vm_fault_t wp_page_copy(struct vm_fault *vmf)
 {
@@ -3213,6 +3222,7 @@ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 				vmf->address, &vmf->ptl);
 		if (!pte_none(*vmf->pte))
 			goto unlock;
+		
 		ret = check_stable_address_space(vma->vm_mm);
 		if (ret)
 			goto unlock;
@@ -3229,6 +3239,7 @@ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 	 */
 	if (unlikely(anon_vma_prepare(vma)))
 		goto oom;
+	
 	page = alloc_zeroed_user_highpage_movable(vma, vmf->address);
 	if (!page)
 		goto oom;
@@ -3787,6 +3798,7 @@ static vm_fault_t do_cow_fault(struct vm_fault *vmf)
 	struct vm_area_struct *vma = vmf->vma;
 	vm_fault_t ret;
 
+    //分配avc，建立vma,avc,anon三者的关系
 	if (unlikely(anon_vma_prepare(vma)))
 		return VM_FAULT_OOM;
 
@@ -3810,7 +3822,7 @@ static vm_fault_t do_cow_fault(struct vm_fault *vmf)
 	copy_user_highpage(vmf->cow_page, vmf->page, vmf->address, vma);
 	__SetPageUptodate(vmf->cow_page);
 
-    //
+    //建立page和pte的关系
 	ret |= finish_fault(vmf);
 	unlock_page(vmf->page);
 	put_page(vmf->page);
@@ -4235,6 +4247,7 @@ static vm_fault_t __handle_mm_fault(struct vm_area_struct *vma,
 	vmf.pmd = pmd_alloc(mm, vmf.pud, address);
 	if (!vmf.pmd)
 		return VM_FAULT_OOM;
+	
 	if (pmd_none(*vmf.pmd) && transparent_hugepage_enabled(vma)) {
 		ret = create_huge_pmd(&vmf);
 		if (!(ret & VM_FAULT_FALLBACK))
