@@ -1125,6 +1125,16 @@ static void page_check_dirty_writeback(struct page *page,
 
 /*
  * shrink_page_list() returns the number of reclaimed pages
+ *
+ * kswapd()
+ *  balance_pgdat()
+ *   mem_cgroup_soft_limit_reclaim()
+ *    mem_cgroup_soft_reclaim()
+ *     mem_cgroup_shrink_node()
+ *      shrink_node_memcg()
+ *       shrink_list(lru == LRU_INACTIVE_ANON, LRU_ACTIVE_ANON, LRU_INACTIVE_FILE, LRU_ACTIVE_FILE)
+ *        shrink_inactive_list(lru == LRU_INACTIVE_ANON, LRU_INACTIVE_FILE)
+ *         shrink_page_list() 
  */
 static unsigned long shrink_page_list(struct list_head *page_list,
 				      struct pglist_data *pgdat,
@@ -1349,12 +1359,15 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 		/*
 		 * The page is mapped into the page tables of one or more
 		 * processes. Try to unmap it here.
+		 *
+		 * 页面已经被map了,用户态
 		 */
 		if (page_mapped(page)) {
 			enum ttu_flags flags = ttu_flags | TTU_BATCH_FLUSH;
 
 			if (unlikely(PageTransHuge(page)))
 				flags |= TTU_SPLIT_HUGE_PMD;
+			
 			if (!try_to_unmap(page, flags)) {
 				nr_unmap_fail++;
 				goto activate_locked;

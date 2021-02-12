@@ -2820,6 +2820,7 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len,
 		while (tmp && tmp->vm_start < end) {
 			if (tmp->vm_flags & VM_LOCKED) {
 				mm->locked_vm -= vma_pages(tmp);
+				//释放掉一部分
 				munlock_vma_pages_all(tmp);
 			}
 			tmp = tmp->vm_next;
@@ -3201,6 +3202,8 @@ int insert_vm_struct(struct mm_struct *mm, struct vm_area_struct *vma)
 /*
  * Copy the vma structure to a new location in the same mm,
  * prior to moving page table entries, to effect an mremap move.
+ *
+ * 
  */
 struct vm_area_struct *copy_vma(struct vm_area_struct **vmap,
 	unsigned long addr, unsigned long len, pgoff_t pgoff,
@@ -3258,8 +3261,10 @@ struct vm_area_struct *copy_vma(struct vm_area_struct **vmap,
 		new_vma->vm_pgoff = pgoff;
 		if (vma_dup_policy(vma, new_vma))
 			goto out_free_vma;
+		
 		if (anon_vma_clone(new_vma, vma))
 			goto out_free_mempol;
+		
 		if (new_vma->vm_file)
 			get_file(new_vma->vm_file);
 		if (new_vma->vm_ops && new_vma->vm_ops->open)

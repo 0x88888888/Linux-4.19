@@ -127,6 +127,12 @@ static bool __munlock_isolate_lru_page(struct page *page, bool getpage)
  *
  * Page must be locked. This is a wrapper for try_to_munlock()
  * and putback_lru_page() with munlock accounting.
+ *
+ * do_munmap()
+ *  munlock_vma_pages_all()
+ *   munlock_vma_pages_range()
+ *    munlock_vma_page() 是PageTransHuge 类型
+ *     __munlock_isolated_page()
  */
 static void __munlock_isolated_page(struct page *page)
 {
@@ -178,6 +184,11 @@ static void __munlock_isolation_failed(struct page *page)
  * So we clear the PageMlocked as we might not get another chance.  If we
  * can't isolate the page, we leave it for putback_lru_page() and vmscan
  * [page_referenced()/try_to_unmap()] to deal with.
+ *
+ * do_munmap()
+ *  munlock_vma_pages_all()
+ *   munlock_vma_pages_range() 
+ *    munlock_vma_page() 是PageTransHuge 类型
  */
 unsigned int munlock_vma_page(struct page *page)
 {
@@ -206,7 +217,9 @@ unsigned int munlock_vma_page(struct page *page)
 	__mod_zone_page_state(zone, NR_MLOCK, -nr_pages);
 
 	if (__munlock_isolate_lru_page(page, true)) {
+		
 		spin_unlock_irq(zone_lru_lock(zone));
+		
 		__munlock_isolated_page(page);
 		goto out;
 	}
@@ -286,6 +299,11 @@ static void __putback_lru_fast(struct pagevec *pvec, int pgrescued)
  * succeeded.
  *
  * Note that the pagevec may be modified during the process.
+ *
+ * do_munmap()
+ *  munlock_vma_pages_all()
+ *   munlock_vma_pages_range()
+ *    __munlock_pagevec()
  */
 static void __munlock_pagevec(struct pagevec *pvec, struct zone *zone)
 {
@@ -441,6 +459,10 @@ static unsigned long __munlock_pagevec_fill(struct pagevec *pvec,
  * still on lru.  In unmap path, pages might be scanned by reclaim
  * and re-mlocked by try_to_{munlock|unmap} before we unmap and
  * free them.  This will result in freeing mlocked pages.
+ *
+ * do_munmap()
+ *  munlock_vma_pages_all()
+ *   munlock_vma_pages_range()
  */
 void munlock_vma_pages_range(struct vm_area_struct *vma,
 			     unsigned long start, unsigned long end)
@@ -465,6 +487,7 @@ void munlock_vma_pages_range(struct vm_area_struct *vma,
 		page = follow_page(vma, start, FOLL_GET | FOLL_DUMP);
 
 		if (page && !IS_ERR(page)) {
+			
 			if (PageTransTail(page)) {
 				VM_BUG_ON_PAGE(PageMlocked(page), page);
 				put_page(page); /* follow_page_mask() */
@@ -475,6 +498,8 @@ void munlock_vma_pages_range(struct vm_area_struct *vma,
 				 * have gotten split before reaching
 				 * munlock_vma_page(), so we need to compute
 				 * the page_mask here instead.
+				 *
+				 * 释放
 				 */
 				page_mask = munlock_vma_page(page);
 				unlock_page(page);
@@ -496,6 +521,7 @@ void munlock_vma_pages_range(struct vm_area_struct *vma,
 				 */
 				start = __munlock_pagevec_fill(&pvec, vma,
 						zone, start, end);
+				//释放pvec中的page
 				__munlock_pagevec(&pvec, zone);
 				goto next;
 			}

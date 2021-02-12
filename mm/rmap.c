@@ -366,10 +366,10 @@ static inline void unlock_anon_vma_root(struct anon_vma *root)
  *    copy_mm()
  *     dup_mm()
  *      dup_mmap() 循环调用anon_vma_fork()
- *       anon_vma_fork()
+ *       anon_vma_fork() ，在anon_vma_fork()中 会创建anon_vma
  *        anon_vma_clone()
  *
- * 这个很重要啊
+ * 这个很重要啊,这个函数不会给dst创建新的anon_vma
  * 
  */
 int anon_vma_clone(struct vm_area_struct *dst, struct vm_area_struct *src)
@@ -459,6 +459,7 @@ int anon_vma_fork(struct vm_area_struct *vma, struct vm_area_struct *pvma)
 	int error;
 
 	/* Don't bother if the parent process has no anon_vma here. */
+	//如果pvma还没有anon_vma，就直接跳过了
 	if (!pvma->anon_vma)
 		return 0;
 
@@ -1469,6 +1470,31 @@ static void page_remove_anon_compound_rmap(struct page *page)
  * @compound:	uncharge the page as compound or small page
  *
  * The caller needs to hold the pte lock.
+ *
+ * kswapd()
+ *  balance_pgdat()
+ *   mem_cgroup_soft_limit_reclaim()
+ *    mem_cgroup_soft_reclaim()
+ *     mem_cgroup_shrink_node()
+ *      shrink_node_memcg()
+ *       shrink_list(lru == LRU_INACTIVE_ANON, LRU_ACTIVE_ANON, LRU_INACTIVE_FILE, LRU_ACTIVE_FILE)
+ *        shrink_inactive_list(lru == LRU_INACTIVE_ANON, LRU_INACTIVE_FILE)
+ *         shrink_page_list() 
+ *          try_to_unmap()
+ *           rmap_walk(rwc->rmap_one == try_to_unmap_one)
+ *            rmap_walk_anon(rwc->rmap_one == try_to_unmap_one, locked ==false)
+ *             try_to_unmap_one()
+ *              page_remove_rmap()
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_swap_page()
+ *       do_wp_page()
+ *        wp_page_copy()
+ *         page_remove_rmap(compound==false)
  */
 void page_remove_rmap(struct page *page, bool compound)
 {
@@ -1481,6 +1507,8 @@ void page_remove_rmap(struct page *page, bool compound)
 	/* page still mapped by someone else? */
 	if (!atomic_add_negative(-1, &page->_mapcount))
 		return;
+
+	//走到这里，说明是一个普通的anon映射页面
 
 	/*
 	 * We use the irq-unsafe __{inc|mod}_zone_page_stat because
@@ -1509,11 +1537,26 @@ void page_remove_rmap(struct page *page, bool compound)
 /*
  * @arg: enum ttu_flags will be passed to this argument
  *
- * rmap_walk_anon()
- *  try_to_unmap_one()
+ * kswapd()
+ *  balance_pgdat()
+ *   mem_cgroup_soft_limit_reclaim()
+ *    mem_cgroup_soft_reclaim()
+ *     mem_cgroup_shrink_node()
+ *      shrink_node_memcg()
+ *       shrink_list(lru == LRU_INACTIVE_ANON, LRU_ACTIVE_ANON, LRU_INACTIVE_FILE, LRU_ACTIVE_FILE)
+ *        shrink_inactive_list(lru == LRU_INACTIVE_ANON, LRU_INACTIVE_FILE)
+ *         shrink_page_list() 
+ *          try_to_unmap()
+ *           rmap_walk(rwc->rmap_one == try_to_unmap_one)
+ *            rmap_walk_anon(rwc->rmap_one == try_to_unmap_one, locked ==false)
+ *             try_to_unmap_one()
+ *
+ *           rmap_walk( rwc->rmap_one== try_to_unmap_one )
+ *            rmap_walk_file(rwc->rmap_one== try_to_unmap_one)
+ *             try_to_unmap_one()
  */
 static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
-		     unsigned long address, void *arg)
+		     unsigned long address, void *arg /* ttu_flags 枚举 */)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	struct page_vma_mapped_walk pvmw = {
@@ -1521,6 +1564,7 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 		.vma = vma,
 		.address = address,
 	};
+		
 	pte_t pteval;
 	struct page *subpage;
 	bool ret = true;
@@ -1559,6 +1603,8 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 	mmu_notifier_invalidate_range_start(vma->vm_mm, start, end);
 
 	while (page_vma_mapped_walk(&pvmw)) {
+
+//有定义
 #ifdef CONFIG_ARCH_ENABLE_THP_MIGRATION
 		/* PMD-mapped THP migration entry */
 		if (!pvmw.pte && (flags & TTU_MIGRATION)) {
@@ -1642,10 +1688,13 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 			swp_pte = swp_entry_to_pte(entry);
 			if (pte_soft_dirty(pteval))
 				swp_pte = pte_swp_mksoft_dirty(swp_pte);
+			
 			set_pte_at(mm, pvmw.address, pvmw.pte, swp_pte);
 			/*
 			 * No need to invalidate here it will synchronize on
 			 * against the special swap migration pte.
+			 *
+			 * 将page table entry 设置为swp entry之后，就可以释放page了
 			 */
 			goto discard;
 		}
@@ -1731,15 +1780,17 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 			 */
 			entry = make_migration_entry(subpage,
 					pte_write(pteval));
+			
 			swp_pte = swp_entry_to_pte(entry);
 			if (pte_soft_dirty(pteval))
 				swp_pte = pte_swp_mksoft_dirty(swp_pte);
+			
 			set_pte_at(mm, address, pvmw.pte, swp_pte);
 			/*
 			 * No need to invalidate here it will synchronize on
 			 * against the special swap migration pte.
 			 */
-		} else if (PageAnon(page)) {
+		} else if (PageAnon(page)) { //匿名映射，就走这里了
 			swp_entry_t entry = { .val = page_private(subpage) };
 			pte_t swp_pte;
 			/*
@@ -1758,6 +1809,7 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 
 			/* MADV_FREE page check */
 			if (!PageSwapBacked(page)) {
+				
 				if (!PageDirty(page)) {
 					/* Invalidate as we cleared the pte */
 					mmu_notifier_invalidate_range(mm,
@@ -1783,23 +1835,31 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 				page_vma_mapped_walk_done(&pvmw);
 				break;
 			}
+
+			//空函数
 			if (arch_unmap_one(mm, vma, address, pteval) < 0) {
 				set_pte_at(mm, address, pvmw.pte, pteval);
 				ret = false;
 				page_vma_mapped_walk_done(&pvmw);
 				break;
 			}
+
+			//这里什么意思
 			if (list_empty(&mm->mmlist)) {
 				spin_lock(&mmlist_lock);
+				
 				if (list_empty(&mm->mmlist))
 					list_add(&mm->mmlist, &init_mm.mmlist);
+				
 				spin_unlock(&mmlist_lock);
 			}
 			dec_mm_counter(mm, MM_ANONPAGES);
 			inc_mm_counter(mm, MM_SWAPENTS);
+			//
 			swp_pte = swp_entry_to_pte(entry);
 			if (pte_soft_dirty(pteval))
 				swp_pte = pte_swp_mksoft_dirty(swp_pte);
+			
 			set_pte_at(mm, address, pvmw.pte, swp_pte);
 			/* Invalidate as we cleared the pte */
 			mmu_notifier_invalidate_range(mm, address,
@@ -1833,6 +1893,7 @@ discard:
 		 * See Documentation/vm/mmu_notifier.rst
 		 */
 		page_remove_rmap(subpage, PageHuge(page));
+		//释放page到boddy system
 		put_page(page);
 	}
 
@@ -1874,6 +1935,17 @@ static int page_mapcount_is_zero(struct page *page)
  * page, used in the pageout path.  Caller must hold the page lock.
  *
  * If unmap is successful, return true. Otherwise, false.
+ *
+ * kswapd()
+ *  balance_pgdat()
+ *   mem_cgroup_soft_limit_reclaim()
+ *    mem_cgroup_soft_reclaim()
+ *     mem_cgroup_shrink_node()
+ *      shrink_node_memcg()
+ *       shrink_list(lru == LRU_INACTIVE_ANON, LRU_ACTIVE_ANON, LRU_INACTIVE_FILE, LRU_ACTIVE_FILE)
+ *        shrink_inactive_list(lru == LRU_INACTIVE_ANON, LRU_INACTIVE_FILE)
+ *         shrink_page_list() 
+ *          try_to_unmap()
  */
 bool try_to_unmap(struct page *page, enum ttu_flags flags)
 {
@@ -1916,6 +1988,13 @@ static int page_not_mapped(struct page *page)
  * Called from munlock code.  Checks all of the VMAs mapping the page
  * to make sure nobody else has this page mlocked. The page will be
  * returned with PG_mlocked cleared if no other vmas have it mlocked.
+ *
+ * do_munmap()
+ *  munlock_vma_pages_all()
+ *   munlock_vma_pages_range()
+ *    munlock_vma_page()  是PageTransHuge 类型
+ *     __munlock_isolated_page()
+ *      try_to_munlock()
  */
 
 void try_to_munlock(struct page *page)
@@ -1979,8 +2058,18 @@ static struct anon_vma *rmap_walk_anon_lock(struct page *page,
  * vm_flags for that VMA.  That should be OK, because that vma shouldn't be
  * LOCKED.
  *
- * try_to_unmap()
- *  rmap_walk_anon()
+ * kswapd()
+ *  balance_pgdat()
+ *   mem_cgroup_soft_limit_reclaim()
+ *    mem_cgroup_soft_reclaim()
+ *     mem_cgroup_shrink_node()
+ *      shrink_node_memcg()
+ *       shrink_list(lru == LRU_INACTIVE_ANON, LRU_ACTIVE_ANON, LRU_INACTIVE_FILE, LRU_ACTIVE_FILE)
+ *        shrink_inactive_list(lru == LRU_INACTIVE_ANON, LRU_INACTIVE_FILE)
+ *         shrink_page_list() 
+ *          try_to_unmap()
+ *           rmap_walk(rwc->rmap_one == try_to_unmap_one)
+ *            rmap_walk_anon(rwc->rmap_one == try_to_unmap_one, locked ==false)
  */
 static void rmap_walk_anon(struct page *page, struct rmap_walk_control *rwc,
 		bool locked)
@@ -1994,7 +2083,8 @@ static void rmap_walk_anon(struct page *page, struct rmap_walk_control *rwc,
 		anon_vma = page_anon_vma(page);
 		/* anon_vma disappear under us? */
 		VM_BUG_ON_PAGE(!anon_vma, page);
-	} else {
+	} else { 
+		//lock住page，并且返回相应的anon_vma
 		anon_vma = rmap_walk_anon_lock(page, rwc);
 	}
 	
@@ -2041,8 +2131,8 @@ static void rmap_walk_anon(struct page *page, struct rmap_walk_control *rwc,
  * vm_flags for that VMA.  That should be OK, because that vma shouldn't be
  * LOCKED.
  *
- * rmap_walk()
- *  rmap_walk_file()
+ * rmap_walk( rwc->rmap_one== try_to_unmap_one )
+ *  rmap_walk_file(rwc->rmap_one== try_to_unmap_one)
  */
 static void rmap_walk_file(struct page *page, struct rmap_walk_control *rwc,
 		bool locked)
@@ -2089,7 +2179,25 @@ done:
 }
 
 /*
- * try_to_unmap()
+ * kswapd()
+ *  balance_pgdat()
+ *   mem_cgroup_soft_limit_reclaim()
+ *    mem_cgroup_soft_reclaim()
+ *     mem_cgroup_shrink_node()
+ *      shrink_node_memcg()
+ *       shrink_list(lru == LRU_INACTIVE_ANON, LRU_ACTIVE_ANON, LRU_INACTIVE_FILE, LRU_ACTIVE_FILE)
+ *        shrink_inactive_list(lru == LRU_INACTIVE_ANON, LRU_INACTIVE_FILE)
+ *         shrink_page_list() 
+ *          try_to_unmap()
+ *           rmap_walk(rwc->rmap_one == try_to_unmap_one)
+ *
+ * do_munmap()
+ *  munlock_vma_pages_all()
+ *   munlock_vma_pages_range()
+ *    munlock_vma_page()  是PageTransHuge 类型
+ *     __munlock_isolated_page()
+ *      try_to_munlock()
+ *       rmap_walk(rwc->rmap_one== try_to_unmap_one)
  */
 void rmap_walk(struct page *page, struct rmap_walk_control *rwc)
 {

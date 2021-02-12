@@ -389,6 +389,13 @@ enum page_entry_size {
  * These are the virtual MM functions - opening of an area, closing and
  * unmapping it (needed to keep files on disk up-to-date etc), pointer
  * to the functions called when a no-page or a wp-page exception occurs.
+ *
+ * packet_mmap_ops, aio_ring_vm_ops, perf_mmap_vmops
+ * dax_vm_ops, ext4_dax_vm_ops, ext4_file_vm_ops
+ * kernfs_vm_ops, generic_file_vm_opsm, vm_ops
+ * hugetlb_vm_ops, kvm_vcpu_vm_ops, mmap_mem_ops
+ * dummy_vm_ops, special_mapping_vmops, legacy_special_mapping_vmops
+ * shm_vm_ops,  global_mmio_vmops
  */
 struct vm_operations_struct {
 	void (*open)(struct vm_area_struct * area);

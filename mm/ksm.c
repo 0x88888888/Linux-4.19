@@ -2576,6 +2576,20 @@ struct page *ksm_might_need_to_copy(struct page *page,
 	return new_page;
 }
 
+/*
+ * kswapd()
+ *  balance_pgdat()
+ *   mem_cgroup_soft_limit_reclaim()
+ *    mem_cgroup_soft_reclaim()
+ *     mem_cgroup_shrink_node()
+ *      shrink_node_memcg()
+ *       shrink_list(lru == LRU_INACTIVE_ANON, LRU_ACTIVE_ANON, LRU_INACTIVE_FILE, LRU_ACTIVE_FILE)
+ *        shrink_inactive_list(lru == LRU_INACTIVE_ANON, LRU_INACTIVE_FILE)
+ *         shrink_page_list() 
+ *          try_to_unmap()
+ *           rmap_walk(rwc->rmap_one == try_to_unmap_one)
+ *            rmap_walk_ksm(rwc->rmap_one == try_to_unmap_one)
+ */
 void rmap_walk_ksm(struct page *page, struct rmap_walk_control *rwc)
 {
 	struct stable_node *stable_node;
@@ -2595,12 +2609,14 @@ void rmap_walk_ksm(struct page *page, struct rmap_walk_control *rwc)
 		return;
 again:
 	hlist_for_each_entry(rmap_item, &stable_node->hlist, hlist) {
+		
 		struct anon_vma *anon_vma = rmap_item->anon_vma;
 		struct anon_vma_chain *vmac;
 		struct vm_area_struct *vma;
 
 		cond_resched();
 		anon_vma_lock_read(anon_vma);
+		
 		anon_vma_interval_tree_foreach(vmac, &anon_vma->rb_root,
 					       0, ULONG_MAX) {
 			unsigned long addr;
@@ -2640,6 +2656,7 @@ again:
 		goto again;
 }
 
+// 有定义
 #ifdef CONFIG_MIGRATION
 void ksm_migrate_page(struct page *newpage, struct page *oldpage)
 {
