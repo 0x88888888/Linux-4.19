@@ -351,7 +351,17 @@ struct cfs_bandwidth {
 #endif
 };
 
-/* Task group related information */
+/* Task group related information 
+ * 组调度
+ * 1.在创建组调度tg时,tg为每个cpu同时创建组调度内部使用的cfs_rq就绪队列。
+ * 2.组调度作为一个调度实体加入到系统的CFS就绪队列rq->cfs_rq中。
+ * 3.进程加入到一个task_group后，就脱离了系统的CFS就绪队列，并且加入到组调度
+ *   里的CFS就绪队列tg->cfs_rq[]中。
+ * 4.在选择下一个进程时，从系统的CFS就绪队列开始，如果选中的调度实体是组调度tg,
+ *   那么还需要遍历tg中的就绪队列，从中选择一个进程来运行
+ *
+ * 看sched_create_group
+ */
 struct task_group {
 	struct cgroup_subsys_state css;
 

@@ -1635,6 +1635,15 @@ static struct sched_domain *build_sched_domain(struct sched_domain_topology_leve
 /*
  * Build sched domains for a given set of CPUs and attach the sched domains
  * to the individual CPUs
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      sched_init_smp()
+ *       sched_init_domains()
+ *        build_sched_domains()
  */
 static int
 build_sched_domains(const struct cpumask *cpu_map, struct sched_domain_attr *attr)
@@ -1771,6 +1780,14 @@ void free_sched_domains(cpumask_var_t doms[], unsigned int ndoms)
  * Set up scheduler domains and groups. Callers must hold the hotplug lock.
  * For now this just excludes isolated CPUs, but could be used to
  * exclude other special cases in the future.
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      sched_init_smp()
+ *       sched_init_domains()
  */
 int sched_init_domains(const struct cpumask *cpu_map)
 {
@@ -1786,6 +1803,7 @@ int sched_init_domains(const struct cpumask *cpu_map)
 	if (!doms_cur)
 		doms_cur = &fallback_doms;
 	cpumask_and(doms_cur[0], cpu_map, housekeeping_cpumask(HK_FLAG_DOMAIN));
+	
 	err = build_sched_domains(doms_cur[0], NULL);
 	register_sched_domain_sysctl();
 

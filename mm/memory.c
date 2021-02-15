@@ -314,6 +314,7 @@ bool __tlb_remove_page_size(struct mmu_gather *tlb, struct page *page, int page_
 
 #endif /* HAVE_GENERIC_MMU_GATHER */
 
+//有定义
 #ifdef CONFIG_HAVE_RCU_TABLE_FREE
 
 /*
@@ -612,6 +613,11 @@ void free_pgd_range(struct mmu_gather *tlb,
 	} while (pgd++, addr = next, addr != end);
 }
 
+/*
+ * do_munmap()
+ *  unmap_region()
+ *   free_pgtables()
+ */
 void free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *vma,
 		unsigned long floor, unsigned long ceiling)
 {
@@ -904,7 +910,9 @@ out:
 	return pfn_to_page(pfn);
 }
 
+//有定义
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
+
 struct page *vm_normal_page_pmd(struct vm_area_struct *vma, unsigned long addr,
 				pmd_t pmd)
 {
@@ -1043,6 +1051,7 @@ copy_one_pte(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 	 */
 	if (vm_flags & VM_SHARED)
 		pte = pte_mkclean(pte);
+	
 	pte = pte_mkold(pte);
 
 	page = vm_normal_page(vma, addr, pte);
@@ -1503,6 +1512,15 @@ static inline unsigned long zap_p4d_range(struct mmu_gather *tlb,
 	return addr;
 }
 
+/*
+ * do_munmap()
+ *	unmap_region()
+ *	 unmap_vmas()
+ *	  unmap_single_vma()
+ *     unmap_page_range()
+ *
+ * 清空相应的page table entry
+ */
 void unmap_page_range(struct mmu_gather *tlb,
 			     struct vm_area_struct *vma,
 			     unsigned long addr, unsigned long end,
@@ -1512,6 +1530,7 @@ void unmap_page_range(struct mmu_gather *tlb,
 	unsigned long next;
 
 	BUG_ON(addr >= end);
+	//空函数
 	tlb_start_vma(tlb, vma);
 	pgd = pgd_offset(vma->vm_mm, addr);
 	do {
@@ -1520,10 +1539,16 @@ void unmap_page_range(struct mmu_gather *tlb,
 			continue;
 		next = zap_p4d_range(tlb, vma, pgd, addr, next, details);
 	} while (pgd++, addr = next, addr != end);
+	
 	tlb_end_vma(tlb, vma);
 }
 
-
+/*
+ * do_munmap()
+ *  unmap_region()
+ *   unmap_vmas()
+ *    unmap_single_vma()
+ */
 static void unmap_single_vma(struct mmu_gather *tlb,
 		struct vm_area_struct *vma, unsigned long start_addr,
 		unsigned long end_addr,
@@ -1562,7 +1587,7 @@ static void unmap_single_vma(struct mmu_gather *tlb,
 				__unmap_hugepage_range_final(tlb, vma, start, end, NULL);
 				i_mmap_unlock_write(vma->vm_file->f_mapping);
 			}
-		} else
+		} else 
 			unmap_page_range(tlb, vma, start, end, details);
 	}
 }
@@ -1584,6 +1609,10 @@ static void unmap_single_vma(struct mmu_gather *tlb,
  * range after unmap_vmas() returns.  So the only responsibility here is to
  * ensure that any thus-far unmapped pages are flushed before unmap_vmas()
  * drops the lock and schedules.
+ *
+ * do_munmap()
+ *  unmap_region()
+ *   unmap_vmas()
  */
 void unmap_vmas(struct mmu_gather *tlb,
 		struct vm_area_struct *vma, unsigned long start_addr,
@@ -1594,6 +1623,7 @@ void unmap_vmas(struct mmu_gather *tlb,
 	mmu_notifier_invalidate_range_start(mm, start_addr, end_addr);
 	for ( ; vma && vma->vm_start < end_addr; vma = vma->vm_next)
 		unmap_single_vma(tlb, vma, start_addr, end_addr, NULL);
+	
 	mmu_notifier_invalidate_range_end(mm, start_addr, end_addr);
 }
 

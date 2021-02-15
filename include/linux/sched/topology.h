@@ -183,6 +183,9 @@ struct sd_data {
 	struct sched_group_capacity **__percpu sgc;
 };
 
+/*
+ * x86_topology,default_topology
+ */
 struct sched_domain_topology_level {
 	sched_domain_mask_f mask;
 	sched_domain_flags_f sd_flags;

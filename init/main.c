@@ -1141,6 +1141,12 @@ static char *initcall_level_names[] __initdata = {
 	"late",
 };
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    do_initcall_level()
+ */
 static void __init do_initcall_level(int level)
 {
 	initcall_entry_t *fn;
@@ -1171,9 +1177,14 @@ static void __init do_initcalls(void)
      *
      * 1. core_initcall(sock_init)
      * 1. core_initcall(cgroup_wq_init)
+     * 1. core_initcall(init_zero_pfn)
      *
      * 4. subsys_initcall(init_user_reserve)
+     * 4. subsys_initcall(mem_cgroup_init)
+     * 4. subsys_initcall(mem_cgroup_swap_init)
+     *
      * 5. fs_initcall(inet_init)
+     * 
      * 6. __initcall(cpucache_init)
      * 6. __initcall(memblock_init_debugfs)
      * 

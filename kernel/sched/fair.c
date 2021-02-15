@@ -4892,6 +4892,15 @@ static enum hrtimer_restart sched_cfs_period_timer(struct hrtimer *timer)
 	return idle ? HRTIMER_NORESTART : HRTIMER_RESTART;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  cgroup_init_early() 循环调用下面的函数
+ *   cgroup_init_subsys()
+ *    cpu_cgroup_css_alloc()
+ *     sched_create_group()
+ *      alloc_fair_sched_group()
+ *       init_cfs_bandwidth()
+ */
 void init_cfs_bandwidth(struct cfs_bandwidth *cfs_b)
 {
 	raw_spin_lock_init(&cfs_b->lock);
@@ -9969,6 +9978,14 @@ void free_fair_sched_group(struct task_group *tg)
 	kfree(tg->se);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  cgroup_init_early() 循环调用下面的函数
+ *   cgroup_init_subsys()
+ *    cpu_cgroup_css_alloc()
+ *     sched_create_group()
+ *      alloc_fair_sched_group()
+ */
 int alloc_fair_sched_group(struct task_group *tg, struct task_group *parent)
 {
 	struct sched_entity *se;
@@ -10053,6 +10070,15 @@ void unregister_fair_sched_group(struct task_group *tg)
 	}
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  cgroup_init_early() 循环调用下面的函数
+ *   cgroup_init_subsys()
+ *    cpu_cgroup_css_alloc()
+ *     sched_create_group()
+ *      alloc_fair_sched_group() 循环调用init_tg_cfs_entry
+ *       init_tg_cfs_entry()
+ */
 void init_tg_cfs_entry(struct task_group *tg, struct cfs_rq *cfs_rq,
 			struct sched_entity *se, int cpu,
 			struct sched_entity *parent)

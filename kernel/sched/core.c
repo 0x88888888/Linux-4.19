@@ -6012,12 +6012,14 @@ void __init sched_init_smp(void)
 	 * happen.
 	 */
 	mutex_lock(&sched_domains_mutex);
+	//构建CPU拓扑关系
 	sched_init_domains(cpu_active_mask);
 	mutex_unlock(&sched_domains_mutex);
 
 	/* Move init over to a non-isolated CPU */
 	if (set_cpus_allowed_ptr(current, housekeeping_cpumask(HK_FLAG_DOMAIN)) < 0)
 		BUG();
+	
 	sched_init_granularity();
 
 	init_sched_rt_class();
@@ -6419,7 +6421,14 @@ static void sched_free_group(struct task_group *tg)
 	kmem_cache_free(task_group_cache, tg);
 }
 
-/* allocate runqueue etc for a new task group */
+/* allocate runqueue etc for a new task group
+ *
+ * start_kernel()  [init/main.c]
+ *  cgroup_init_early() 循环调用下面的函数
+ *   cgroup_init_subsys()
+ *    cpu_cgroup_css_alloc()
+ *     sched_create_group()
+ */
 struct task_group *sched_create_group(struct task_group *parent)
 {
 	struct task_group *tg;
@@ -6485,6 +6494,15 @@ void sched_offline_group(struct task_group *tg)
 	spin_unlock_irqrestore(&task_group_lock, flags);
 }
 
+/*
+ * cgroup_procs_write()
+ *  cgroup_attach_task()
+ *   cgroup_migrate()
+ *    cgroup_migrate_execute()
+ *     cpu_cgroup_attach()
+ *      sched_move_task()
+ *       sched_change_group()
+ */
 static void sched_change_group(struct task_struct *tsk, int type)
 {
 	struct task_group *tg;
@@ -6513,6 +6531,13 @@ static void sched_change_group(struct task_struct *tsk, int type)
  * The caller of this function should have put the task in its new group by
  * now. This function just updates tsk->se.cfs_rq and tsk->se.parent to reflect
  * its new group.
+ *
+ * cgroup_procs_write()
+ *  cgroup_attach_task()
+ *   cgroup_migrate()
+ *    cgroup_migrate_execute()
+ *     cpu_cgroup_attach()
+ *      sched_move_task()
  */
 void sched_move_task(struct task_struct *tsk)
 {
@@ -6529,6 +6554,7 @@ void sched_move_task(struct task_struct *tsk)
 
 	if (queued)
 		dequeue_task(rq, tsk, queue_flags);
+	
 	if (running)
 		put_prev_task(rq, tsk);
 
@@ -6547,6 +6573,12 @@ static inline struct task_group *css_tg(struct cgroup_subsys_state *css)
 	return css ? container_of(css, struct task_group, css) : NULL;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  cgroup_init_early() 循环调用下面的函数
+ *   cgroup_init_subsys()
+ *    cpu_cgroup_css_alloc()
+ */
 static struct cgroup_subsys_state *
 cpu_cgroup_css_alloc(struct cgroup_subsys_state *parent_css)
 {
@@ -6645,6 +6677,13 @@ static int cpu_cgroup_can_attach(struct cgroup_taskset *tset)
 	return ret;
 }
 
+/*
+ * cgroup_procs_write()
+ *  cgroup_attach_task()
+ *   cgroup_migrate()
+ *    cgroup_migrate_execute()
+ *     cpu_cgroup_attach()
+ */
 static void cpu_cgroup_attach(struct cgroup_taskset *tset)
 {
 	struct task_struct *task;

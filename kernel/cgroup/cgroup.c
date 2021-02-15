@@ -3061,6 +3061,9 @@ static bool css_visible(struct cgroup_subsys_state *css)
  * Returns 0 on success, -errno on failure.  On failure, csses which have
  * been processed already aren't cleaned up.  The caller is responsible for
  * cleaning up with cgroup_apply_control_disable().
+ *
+ * cgroup_mkdir()
+ *  cgroup_apply_control_enable()
  */
 static int cgroup_apply_control_enable(struct cgroup *cgrp)
 {
@@ -4910,6 +4913,10 @@ static void offline_css(struct cgroup_subsys_state *css)
  * Create a new css associated with @cgrp - @ss pair.  On success, the new
  * css is online and installed in @cgrp.  This function doesn't create the
  * interface files.  Returns 0 on success, -errno on failure.
+ *
+ * cgroup_mkdir()
+ *  cgroup_apply_control_enable()
+ *   css_create()
  */
 static struct cgroup_subsys_state *css_create(struct cgroup *cgrp,
 					      struct cgroup_subsys *ss)
@@ -4970,6 +4977,9 @@ err_free_css:
  * The returned cgroup is fully initialized including its control mask, but
  * it isn't associated with its kernfs_node and doesn't have the control
  * mask applied.
+ *
+ * cgroup_mkdir()
+ *  cgroup_create()
  */
 static struct cgroup *cgroup_create(struct cgroup *parent)
 {
@@ -5357,6 +5367,9 @@ static void __init cgroup_init_subsys(struct cgroup_subsys *ss, bool early)
 
 	/* Create the root cgroup state for this subsystem */
 	ss->root = &cgrp_dfl_root;
+	/*
+	 * cpu_cgroup_css_alloc()
+	 */
 	css = ss->css_alloc(cgroup_css(&cgrp_dfl_root.cgrp, ss));
 	/* We don't handle early failures gracefully */
 	BUG_ON(IS_ERR(css));

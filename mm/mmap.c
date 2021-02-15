@@ -2609,6 +2609,9 @@ static void remove_vma_list(struct mm_struct *mm, struct vm_area_struct *vma)
  * Get rid of page table information in the indicated region.
  *
  * Called with the mm semaphore held.
+ *
+ * do_munmap()
+ *  unmap_region()
  */
 static void unmap_region(struct mm_struct *mm,
 		struct vm_area_struct *vma, struct vm_area_struct *prev,
@@ -2620,7 +2623,9 @@ static void unmap_region(struct mm_struct *mm,
 	lru_add_drain();
 	tlb_gather_mmu(&tlb, mm, start, end);
 	update_hiwater_rss(mm);
+	
 	unmap_vmas(&tlb, vma, start, end);
+	
 	free_pgtables(&tlb, vma, prev ? prev->vm_end : FIRST_USER_ADDRESS,
 				 next ? next->vm_start : USER_PGTABLES_CEILING);
 	tlb_finish_mmu(&tlb, start, end);
@@ -2713,6 +2718,7 @@ int __split_vma(struct mm_struct *mm, struct vm_area_struct *vma,
 		new->vm_ops->close(new);
 	if (new->vm_file)
 		fput(new->vm_file);
+	
 	unlink_anon_vmas(new);
  out_free_mpol:
 	mpol_put(vma_policy(new));
@@ -2817,6 +2823,7 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len,
 	 */
 	if (mm->locked_vm) {
 		struct vm_area_struct *tmp = vma;
+		
 		while (tmp && tmp->vm_start < end) {
 			if (tmp->vm_flags & VM_LOCKED) {
 				mm->locked_vm -= vma_pages(tmp);
@@ -2825,6 +2832,7 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len,
 			}
 			tmp = tmp->vm_next;
 		}
+		
 	}
 
 	/*

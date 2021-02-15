@@ -822,10 +822,15 @@ void mark_page_lazyfree(struct page *page)
  * shrink_inactive_list()
  * shrink_active_list()
  *  lru_add_drain()
+ *
+ * 将lru_add_pvec,lru_rotate_pavecs,
+ * lru_deactivate_file_pvecs,lru_lazyfree_pvecs中
+ * 的page放到lru_vec[]相应的链表中去(lru_vec来自pgdat->lru_vec,或者cmem_cgroup  )
  */
 void lru_add_drain(void)
 {
 	lru_add_drain_cpu(get_cpu());
+	//开启preempt
 	put_cpu();
 }
 

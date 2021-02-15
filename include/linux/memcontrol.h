@@ -463,13 +463,18 @@ static inline struct mem_cgroup *parent_mem_cgroup(struct mem_cgroup *memcg)
 	return mem_cgroup_from_counter(memcg->memory.parent, memory);
 }
 
+/* 
+ * 判断memcg是否是root的descendant
+ */ 
 static inline bool mem_cgroup_is_descendant(struct mem_cgroup *memcg,
 			      struct mem_cgroup *root)
 {
 	if (root == memcg)
 		return true;
+	
 	if (!root->use_hierarchy)
 		return false;
+	
 	return cgroup_is_descendant(memcg->css.cgroup, root->css.cgroup);
 }
 

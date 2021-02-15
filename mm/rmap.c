@@ -369,6 +369,9 @@ static inline void unlock_anon_vma_root(struct anon_vma *root)
  *       anon_vma_fork() ，在anon_vma_fork()中 会创建anon_vma
  *        anon_vma_clone()
  *
+ * __split_vma()
+ *  anon_vma_clone()
+ *
  * 这个很重要啊,这个函数不会给dst创建新的anon_vma
  * 
  */
@@ -523,6 +526,12 @@ int anon_vma_fork(struct vm_area_struct *vma, struct vm_area_struct *pvma)
 	return -ENOMEM;
 }
 
+/*
+ * free_pgtables()
+ *  unlink_anon_vmas()
+ *
+ * 
+ */
 void unlink_anon_vmas(struct vm_area_struct *vma)
 {
 	struct anon_vma_chain *avc, *next;

@@ -261,6 +261,7 @@ struct cgroup_subsys_state *vmpressure_to_css(struct vmpressure *vmpr)
 	return &container_of(vmpr, struct mem_cgroup, vmpressure)->css;
 }
 
+//有定义
 #ifdef CONFIG_MEMCG_KMEM
 /*
  * This will be the memcg's index in each cache's ->memcg_params.memcg_caches.
@@ -1109,6 +1110,8 @@ int mem_cgroup_scan_tasks(struct mem_cgroup *memcg,
  * This function is only safe when following the LRU page isolation
  * and putback protocol: the LRU lock must be held, and the page must
  * either be PageLRU() or the caller must have isolated/allocated it.
+ *
+ * 得到pgdat->lruvec或者page->mem_cgroup->nodeinfo[nid]->lruvec 或者root_mem_cgroup->nodeinfo[nid]->lruvec
  */
 struct lruvec *mem_cgroup_page_lruvec(struct page *page, struct pglist_data *pgdat)
 {
@@ -1202,6 +1205,9 @@ bool task_in_mem_cgroup(struct task_struct *task, struct mem_cgroup *memcg)
 		css_get(&task_memcg->css);
 		rcu_read_unlock();
 	}
+	/* 
+	 * 判断task_memcg是否是memcg的descendant
+	 */ 
 	ret = mem_cgroup_is_descendant(task_memcg, memcg);
 	css_put(&task_memcg->css);
 	return ret;
@@ -1213,6 +1219,8 @@ bool task_in_mem_cgroup(struct task_struct *task, struct mem_cgroup *memcg)
  *
  * Returns the maximum amount of memory @mem can be charged with, in
  * pages.
+ *
+ * 
  */
 static unsigned long mem_cgroup_margin(struct mem_cgroup *memcg)
 {
@@ -1226,8 +1234,10 @@ static unsigned long mem_cgroup_margin(struct mem_cgroup *memcg)
 		margin = limit - count;
 
 	if (do_memsw_account()) {
+		
 		count = page_counter_read(&memcg->memsw);
 		limit = READ_ONCE(memcg->memsw.max);
+	
 		if (count <= limit)
 			margin = min(margin, limit - count);
 		else
@@ -1454,6 +1464,7 @@ static void mem_cgroup_may_update_nodemask(struct mem_cgroup *memcg)
 	 */
 	if (!atomic_read(&memcg->numainfo_events))
 		return;
+	
 	if (atomic_inc_return(&memcg->numainfo_updating) > 1)
 		return;
 
@@ -1555,11 +1566,14 @@ static int mem_cgroup_soft_reclaim(struct mem_cgroup *root_memcg,
 			}
 			continue;
 		}
+		
 		total += mem_cgroup_shrink_node(victim, gfp_mask, false,
 					pgdat, &nr_scanned);
+		
 		*total_scanned += nr_scanned;
 		if (!soft_limit_excess(root_memcg))
 			break;
+		
 	}
 	mem_cgroup_iter_break(root_memcg, victim);
 	return total;
@@ -1624,6 +1638,7 @@ static void mem_cgroup_oom_unlock(struct mem_cgroup *memcg)
 	mutex_release(&memcg_oom_lock_dep_map, 1, _RET_IP_);
 	for_each_mem_cgroup_tree(iter, memcg)
 		iter->oom_lock = false;
+	
 	spin_unlock(&memcg_oom_lock);
 }
 
@@ -1632,8 +1647,10 @@ static void mem_cgroup_mark_under_oom(struct mem_cgroup *memcg)
 	struct mem_cgroup *iter;
 
 	spin_lock(&memcg_oom_lock);
+	
 	for_each_mem_cgroup_tree(iter, memcg)
 		iter->under_oom++;
+	
 	spin_unlock(&memcg_oom_lock);
 }
 
@@ -1672,6 +1689,7 @@ static int memcg_oom_wake_function(wait_queue_entry_t *wait,
 	if (!mem_cgroup_is_descendant(wake_memcg, oom_wait_memcg) &&
 	    !mem_cgroup_is_descendant(oom_wait_memcg, wake_memcg))
 		return 0;
+	
 	return autoremove_wake_function(wait, mode, sync, arg);
 }
 
@@ -2415,6 +2433,9 @@ static void unlock_page_lru(struct page *page, int isolated)
 	spin_unlock_irq(zone_lru_lock(zone));
 }
 
+/*
+ * 设置page->mem_cgroup == memcg
+ */
 static void commit_charge(struct page *page, struct mem_cgroup *memcg,
 			  bool lrucare)
 {
@@ -6058,6 +6079,7 @@ void mem_cgroup_commit_charge(struct page *page, struct mem_cgroup *memcg,
 	local_irq_enable();
 
 	if (do_memsw_account() && PageSwapCache(page)) {
+		
 		swp_entry_t entry = { .val = page_private(page) };
 		/*
 		 * The swap entry might not get freed for a long time,
@@ -6304,6 +6326,9 @@ void mem_cgroup_migrate(struct page *oldpage, struct page *newpage)
 DEFINE_STATIC_KEY_FALSE(memcg_sockets_enabled_key);
 EXPORT_SYMBOL(memcg_sockets_enabled_key);
 
+/*
+ * 确定sk的mem_cgroup对象
+ */
 void mem_cgroup_sk_alloc(struct sock *sk)
 {
 	struct mem_cgroup *memcg;
@@ -6331,6 +6356,7 @@ void mem_cgroup_sk_alloc(struct sock *sk)
 		goto out;
 	if (!cgroup_subsys_on_dfl(memory_cgrp_subsys) && !memcg->tcpmem_active)
 		goto out;
+	
 	if (css_tryget_online(&memcg->css))
 		sk->sk_memcg = memcg;
 out:
@@ -6420,11 +6446,17 @@ __setup("cgroup.memory=", cgroup_memory);
  * context because of lock dependencies (cgroup_lock -> cpu hotplug) but
  * basically everything that doesn't depend on a specific mem_cgroup structure
  * should be initialized from here.
+ *
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    mem_cgroup_init()
  */
 static int __init mem_cgroup_init(void)
 {
 	int cpu, node;
 
+//有定义
 #ifdef CONFIG_MEMCG_KMEM
 	/*
 	 * Kmem cache creation is mostly done with the slab_mutex held,
@@ -6459,6 +6491,7 @@ static int __init mem_cgroup_init(void)
 }
 subsys_initcall(mem_cgroup_init);
 
+//有定义
 #ifdef CONFIG_MEMCG_SWAP
 static struct mem_cgroup *mem_cgroup_id_get_online(struct mem_cgroup *memcg)
 {
@@ -6475,6 +6508,7 @@ static struct mem_cgroup *mem_cgroup_id_get_online(struct mem_cgroup *memcg)
 		if (!memcg)
 			memcg = root_mem_cgroup;
 	}
+	
 	return memcg;
 }
 

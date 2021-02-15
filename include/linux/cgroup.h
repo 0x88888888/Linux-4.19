@@ -472,6 +472,8 @@ static inline struct css_set *task_css_set(struct task_struct *task)
  * @subsys_id: the target subsystem ID
  *
  * See task_css_check().
+ *
+ * 返回task->cgroups->subsys[subsys_id]
  */
 static inline struct cgroup_subsys_state *task_css(struct task_struct *task,
 						   int subsys_id)
@@ -546,6 +548,11 @@ static inline struct cgroup *cgroup_parent(struct cgroup *cgrp)
  * Test whether @cgrp is a descendant of @ancestor.  It also returns %true
  * if @cgrp == @ancestor.  This function is safe to call as long as @cgrp
  * and @ancestor are accessible.
+ *
+ * mem_cgroup_is_descendant()
+ *  cgroup_is_descendant()
+ *
+ * cgrp是否是ancestor的descendant
  */
 static inline bool cgroup_is_descendant(struct cgroup *cgrp,
 					struct cgroup *ancestor)
@@ -565,6 +572,8 @@ static inline bool cgroup_is_descendant(struct cgroup *cgrp,
  * @ancestor_level.
  *
  * This function is safe to call as long as @cgrp is accessible.
+ *
+ * 查找cgrp的第ancestor_level的ancestor
  */
 static inline struct cgroup *cgroup_ancestor(struct cgroup *cgrp,
 					     int ancestor_level)
@@ -576,7 +585,7 @@ static inline struct cgroup *cgroup_ancestor(struct cgroup *cgrp,
 
 	for (ptr = cgrp;
 	     ptr && ptr->level > ancestor_level;
-	     ptr = cgroup_parent(ptr))
+	     ptr = cgroup_parent(ptr)) //一直往parent翻
 		;
 
 	if (ptr && ptr->level == ancestor_level)
@@ -722,6 +731,7 @@ static inline void cgroup_path_from_kernfs_id(const union kernfs_node_id *id,
 	char *buf, size_t buflen) {}
 #endif /* !CONFIG_CGROUPS */
 
+//有定义
 #ifdef CONFIG_CGROUPS
 /*
  * cgroup scalable recursive statistics.
