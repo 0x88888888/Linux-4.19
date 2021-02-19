@@ -470,6 +470,8 @@ static void __lru_cache_activate_page(struct page *page)
 void mark_page_accessed(struct page *page)
 {
 	page = compound_head(page);
+
+	//PG_active ==0 ,PG_referenced== 1
 	if (!PageActive(page) && !PageUnevictable(page) &&
 			PageReferenced(page)) {
 
@@ -478,9 +480,11 @@ void mark_page_accessed(struct page *page)
 		 * activate_page_pvecs. Otherwise, assume the page is on a
 		 * pagevec, mark it active and it'll be moved to the active
 		 * LRU on the next drain.
+		 *
+		 * 
 		 */
 		if (PageLRU(page))
-			activate_page(page); 
+			activate_page(page); //设置PG_active == 1,移动到lru_vec->list[***_ACTIVE]中去
 		else
 			__lru_cache_activate_page(page);//设置PG_active标记
 		

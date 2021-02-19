@@ -1448,6 +1448,7 @@ retry:
 out:
 	if (nr_succeeded)
 		count_vm_events(PGMIGRATE_SUCCESS, nr_succeeded);
+	
 	if (nr_failed)
 		count_vm_events(PGMIGRATE_FAIL, nr_failed);
 	trace_mm_migrate_pages(nr_succeeded, nr_failed, mode, reason);

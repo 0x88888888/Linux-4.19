@@ -117,6 +117,8 @@
  * @mm_list: link into the mm_slots list, rooted in ksm_mm_head
  * @rmap_list: head for this mm_slot's singly-linked list of rmap_items
  * @mm: the mm that this information is valid for
+ *
+ * 链接到ksm_mm_head
  */
 struct mm_slot {
 	struct hlist_node link;
@@ -235,6 +237,7 @@ static DEFINE_HASHTABLE(mm_slots_hash, MM_SLOTS_HASH_BITS);
 static struct mm_slot ksm_mm_head = {
 	.mm_list = LIST_HEAD_INIT(ksm_mm_head.mm_list),
 };
+	
 static struct ksm_scan ksm_scan = {
 	.mm_slot = &ksm_mm_head,
 };

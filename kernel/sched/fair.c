@@ -8562,6 +8562,10 @@ static int should_we_balance(struct lb_env *env)
 /*
  * Check this_cpu to ensure it is balanced within domain. Attempt to move
  * tasks if there is an imbalance.
+ *
+ * run_rebalance_domains()
+ *  rebalance_domains()
+ *   load_balance()
  */
 static int load_balance(int this_cpu, struct rq *this_rq,
 			struct sched_domain *sd, enum cpu_idle_type idle,
@@ -8962,6 +8966,9 @@ void update_max_interval(void)
  * and initiates a balancing operation if so.
  *
  * Balancing parameters are set up in init_sched_domains.
+ *
+ * run_rebalance_domains()
+ *  rebalance_domains()
  */
 static void rebalance_domains(struct rq *rq, enum cpu_idle_type idle)
 {
@@ -8976,6 +8983,7 @@ static void rebalance_domains(struct rq *rq, enum cpu_idle_type idle)
 	u64 max_cost = 0;
 
 	rcu_read_lock();
+	
 	for_each_domain(cpu, sd) {
 		/*
 		 * Decay the newidle max times here because this is a regular
@@ -9614,6 +9622,8 @@ out:
 /*
  * run_rebalance_domains is triggered when needed from the scheduler tick.
  * Also triggered for nohz idle balancing (with nohz_balancing_kick set).
+ *
+ *
  */
 static __latent_entropy void run_rebalance_domains(struct softirq_action *h)
 {
@@ -9634,6 +9644,7 @@ static __latent_entropy void run_rebalance_domains(struct softirq_action *h)
 
 	/* normal load balance */
 	update_blocked_averages(this_rq->cpu);
+	
 	rebalance_domains(this_rq, idle);
 }
 
