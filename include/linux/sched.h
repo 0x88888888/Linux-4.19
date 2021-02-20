@@ -458,15 +458,16 @@ struct sched_statistics {
  */
 struct sched_entity {
 	/* For load-balancing: */
-	struct load_weight		load;
-	unsigned long			runnable_weight;
+	struct load_weight		load;//将优先级转化出的权重
+	unsigned long			runnable_weight;//可运行状态下的权重
 	struct rb_node			run_node;
 	struct list_head		group_node;
-	unsigned int			on_rq;
+	unsigned int			on_rq;//是否已经在就绪队列里面了
 
 	u64				exec_start;
 	u64				sum_exec_runtime;
-	u64				vruntime;
+	
+	u64				vruntime;//在update_curr()中更新
 	u64				prev_sum_exec_runtime;
 
 	u64				nr_migrations;
@@ -489,6 +490,8 @@ struct sched_entity {
 	 *
 	 * Put into separate cache line so it does not
 	 * collide with read-mostly values above.
+	 *
+	 * CPU负载均衡时使用
 	 */
 	struct sched_avg		avg;
 #endif

@@ -488,12 +488,12 @@ struct cfs_bandwidth { };
 
 /* CFS-related fields in a runqueue */
 struct cfs_rq {
-	struct load_weight	load;
-	unsigned long		runnable_weight;
+	struct load_weight	load;//就绪队列所有进程的权重
+	unsigned long		runnable_weight;//就绪队列里所有进程总的runnable的权重
 	unsigned int		nr_running;
 	unsigned int		h_nr_running;
 
-	u64			exec_clock;
+	u64			exec_clock;//队列总的执行时间
 	u64			min_vruntime;
 #ifndef CONFIG_64BIT
 	u64			min_vruntime_copy;
@@ -1513,6 +1513,10 @@ extern const u32		sched_prio_to_wmult[40];
 
 #define RETRY_TASK		((void *)-1UL)
 
+/*
+ * 调度策略
+ * stop_sched_class, dl_sched_class, rt_sched_class, fair_sched_class, idle_sched_class
+ */
 struct sched_class {
 	const struct sched_class *next;
 
@@ -1537,6 +1541,9 @@ struct sched_class {
 	void (*put_prev_task)(struct rq *rq, struct task_struct *p);
 
 #ifdef CONFIG_SMP
+    /*
+     * 为task_struct选择最优的一个cpu
+     */
 	int  (*select_task_rq)(struct task_struct *p, int task_cpu, int sd_flag, int flags);
 	void (*migrate_task_rq)(struct task_struct *p, int new_cpu);
 

@@ -493,9 +493,19 @@ static inline int entity_before(struct sched_entity *a,
 	return (s64)(a->vruntime - b->vruntime) < 0;
 }
 
+/*
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
+ *    sched_fork()
+ *     task_fork_fair()
+ *      update_curr()
+ *       update_min_vruntime()
+ */
 static void update_min_vruntime(struct cfs_rq *cfs_rq)
 {
 	struct sched_entity *curr = cfs_rq->curr;
+	
 	struct rb_node *leftmost = rb_first_cached(&cfs_rq->tasks_timeline);
 
 	u64 vruntime = cfs_rq->min_vruntime;
@@ -507,6 +517,7 @@ static void update_min_vruntime(struct cfs_rq *cfs_rq)
 			curr = NULL;
 	}
 
+    //从leftmost节点上获取vruntime
 	if (leftmost) { /* non-empty tree */
 		struct sched_entity *se;
 		se = rb_entry(leftmost, struct sched_entity, run_node);
@@ -640,13 +651,16 @@ static inline u64 calc_delta_fair(u64 delta, struct sched_entity *se)
  * this period because otherwise the slices get too small.
  *
  * p = (nr <= nl) ? l : l*nr/nl
+ *
+ * cfs就绪队列中nr_running个可运行进程，理想中总的需要运行的时间
+ * 即调度周期
  */
 static u64 __sched_period(unsigned long nr_running)
 {
-	if (unlikely(nr_running > sched_nr_latency))
+	if (unlikely(nr_running > sched_nr_latency /*8*/))
 		return nr_running * sysctl_sched_min_granularity;
 	else
-		return sysctl_sched_latency;
+		return sysctl_sched_latency;//6毫秒
 }
 
 /*
@@ -798,16 +812,25 @@ static void update_tg_load_avg(struct cfs_rq *cfs_rq, int force)
 
 /*
  * Update the current task's runtime statistics.
+ *
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
+ *    sched_fork()
+ *     task_fork_fair()
+ *      update_curr()
  */
 static void update_curr(struct cfs_rq *cfs_rq)
 {
 	struct sched_entity *curr = cfs_rq->curr;
+	//当前时间
 	u64 now = rq_clock_task(rq_of(cfs_rq));
 	u64 delta_exec;
 
 	if (unlikely(!curr))
 		return;
 
+    //当前进程执行了多少时间了
 	delta_exec = now - curr->exec_start;
 	if (unlikely((s64)delta_exec <= 0))
 		return;
@@ -817,11 +840,14 @@ static void update_curr(struct cfs_rq *cfs_rq)
 	schedstat_set(curr->statistics.exec_max,
 		      max(delta_exec, curr->statistics.exec_max));
 
+    //记录执行sum runtime
 	curr->sum_exec_runtime += delta_exec;
 	schedstat_add(cfs_rq->exec_clock, delta_exec);
 
+    //更新当前进程的vruntime
 	curr->vruntime += calc_delta_fair(delta_exec, curr);
-	update_min_vruntime(cfs_rq);
+	
+	update_min_vruntime(cfs_rq);//更新cfs_rq->min_vruntime
 
 	if (entity_is_task(curr)) {
 		struct task_struct *curtask = task_of(curr);
@@ -3768,6 +3794,14 @@ static void check_spread(struct cfs_rq *cfs_rq, struct sched_entity *se)
 #endif
 }
 
+/*
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
+ *    sched_fork()
+ *     task_fork_fair()
+ *      place_entity(,initial==1)
+ */
 static void
 place_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int initial)
 {
@@ -3778,6 +3812,8 @@ place_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int initial)
 	 * however the extra weight of the new task will slow them down a
 	 * little, place the new task so that it fits in the slot that
 	 * stays open at the end.
+	 *
+	 * 对子进程做相应的惩罚
 	 */
 	if (initial && sched_feat(START_DEBIT))
 		vruntime += sched_vslice(cfs_rq, se);
@@ -3851,8 +3887,14 @@ static inline void check_schedstat_required(void)
  *
  * this way we don't have the most up-to-date min_vruntime on the originating
  * CPU and an up-to-date min_vruntime on the destination CPU.
+ *
+ *
+ * wake_up_new_task()
+ *  activate_task()
+ *   enqueue_task()
+ *    enqueue_task_fair()
+ *     enqueue_entity()
  */
-
 static void
 enqueue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 {
@@ -5105,6 +5147,11 @@ static inline void hrtick_update(struct rq *rq)
  * The enqueue_task method is called before nr_running is
  * increased. Here we update the fair scheduling stats and
  * then put the task into the rbtree:
+ *
+ * wake_up_new_task()
+ *  activate_task()
+ *   enqueue_task()
+ *    enqueue_task_fair()
  */
 static void
 enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
@@ -5132,6 +5179,7 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 		if (se->on_rq)
 			break;
 		cfs_rq = cfs_rq_of(se);
+		
 		enqueue_entity(cfs_rq, se, flags);
 
 		/*
@@ -6335,6 +6383,10 @@ static int wake_cap(struct task_struct *p, int cpu, int prev_cpu)
  * Returns the target CPU number.
  *
  * preempt must be disabled.
+ *
+ * wake_up_new_task()
+ *  select_task_rq()
+ *   select_task_rq_fair()
  */
 static int
 select_task_rq_fair(struct task_struct *p, int prev_cpu, int sd_flag, int wake_flags)
@@ -9738,6 +9790,7 @@ static void task_fork_fair(struct task_struct *p)
 		update_curr(cfs_rq);
 		se->vruntime = curr->vruntime;
 	}
+	//设置se->vruntime
 	place_entity(cfs_rq, se, 1);
 
 	if (sysctl_sched_child_runs_first && curr && entity_before(curr, se)) {
@@ -9749,6 +9802,7 @@ static void task_fork_fair(struct task_struct *p)
 		resched_curr(rq);
 	}
 
+    //相当于提高se的权重？不过这时se还没有加到调度队列里面
 	se->vruntime -= cfs_rq->min_vruntime;
 	rq_unlock(rq, &rf);
 }
