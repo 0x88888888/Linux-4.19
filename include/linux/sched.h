@@ -69,7 +69,7 @@ struct task_group;
 /* Used in tsk->state: */
 #define TASK_RUNNING			0x0000
 #define TASK_INTERRUPTIBLE		0x0001
-#define TASK_UNINTERRUPTIBLE		0x0002
+#define TASK_UNINTERRUPTIBLE	0x0002
 #define __TASK_STOPPED			0x0004
 #define __TASK_TRACED			0x0008
 /* Used in tsk->exit_state: */
@@ -79,11 +79,11 @@ struct task_group;
 /* Used in tsk->state again: */
 #define TASK_PARKED			0x0040
 #define TASK_DEAD			0x0080
-#define TASK_WAKEKILL			0x0100
+#define TASK_WAKEKILL		0x0100
 #define TASK_WAKING			0x0200
 #define TASK_NOLOAD			0x0400
 #define TASK_NEW			0x0800
-#define TASK_STATE_MAX			0x1000
+#define TASK_STATE_MAX		0x1000
 
 /* Convenience macros for the sake of set_current_state: */
 #define TASK_KILLABLE			(TASK_WAKEKILL | TASK_UNINTERRUPTIBLE)
@@ -394,6 +394,8 @@ struct util_est {
  *
  * Then it is the load_weight's responsibility to consider overflow
  * issues.
+ *
+ * 跟踪进程和就绪队列中进程的负载
  */
 struct sched_avg {
 	u64				last_update_time;
@@ -401,8 +403,16 @@ struct sched_avg {
 	u64				runnable_load_sum;
 	u32				util_sum;
 	u32				period_contrib;
+	//进程的量化负载
 	unsigned long			load_avg;
+	/*
+	 * 负载均衡算法使用runnable_load_avg用于累加在该就绪队列上所有调度
+	 * 实体的量化负载的总和，它在SMP负载均衡算法中用于衡量CPU是否繁忙
+	 */
 	unsigned long			runnable_load_avg;
+	/*
+	 * 一个进程或者就绪队列当前的计算能力
+	 */
 	unsigned long			util_avg;
 	struct util_est			util_est;
 } ____cacheline_aligned;

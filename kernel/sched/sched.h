@@ -782,6 +782,8 @@ extern void rto_push_irq_work_func(struct irq_work *work);
  * Locking rule: those places that want to lock multiple runqueues
  * (such as the load balancing or the thread migration code), lock
  * acquire operations must be ordered by ascending &runqueue.
+ *
+ * 就绪队列
  */
 struct rq {
 	/* runqueue lock: */

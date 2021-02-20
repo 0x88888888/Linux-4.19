@@ -1182,11 +1182,14 @@ static void __init do_initcalls(void)
      * 4. subsys_initcall(init_user_reserve)
      * 4. subsys_initcall(mem_cgroup_init)
      * 4. subsys_initcall(mem_cgroup_swap_init)
+     * 4. subsys_initcall(ksm_init)
      *
      * 5. fs_initcall(inet_init)
      * 
+     * 
      * 6. __initcall(cpucache_init)
      * 6. __initcall(memblock_init_debugfs)
+     * 6. rootfs_initcall(populate_rootfs)
      * 
      */
 	for (level = 0; level < ARRAY_SIZE(initcall_levels) - 1; level++)
