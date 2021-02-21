@@ -1602,6 +1602,17 @@ static void __sdt_free(const struct cpumask *cpu_map)
 	}
 }
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      sched_init_smp()
+ *       sched_init_domains()
+ *        build_sched_domains()
+ *         build_sched_domain()
+ */
 static struct sched_domain *build_sched_domain(struct sched_domain_topology_level *tl,
 		const struct cpumask *cpu_map, struct sched_domain_attr *attr,
 		struct sched_domain *child, int cpu)
@@ -1663,7 +1674,10 @@ build_sched_domains(const struct cpumask *cpu_map, struct sched_domain_attr *att
 		struct sched_domain_topology_level *tl;
 
 		sd = NULL;
+		//遍历sched_domain_toplogy
 		for_each_sd_topology(tl) {
+
+		    //建立sched_domain
 			sd = build_sched_domain(tl, cpu_map, attr, sd, i);
 			if (tl == sched_domain_topology)
 				*per_cpu_ptr(d.sd, i) = sd;
@@ -1682,6 +1696,7 @@ build_sched_domains(const struct cpumask *cpu_map, struct sched_domain_attr *att
 				if (build_overlap_sched_groups(sd, i))
 					goto error;
 			} else {
+			    //给sched_domain建立sched_group
 				if (build_sched_groups(sd, i))
 					goto error;
 			}
@@ -1788,6 +1803,8 @@ void free_sched_domains(cpumask_var_t doms[], unsigned int ndoms)
  *     kernel_init_freeable()
  *      sched_init_smp()
  *       sched_init_domains()
+ *
+ * 创建CPU拓扑关系
  */
 int sched_init_domains(const struct cpumask *cpu_map)
 {
@@ -1799,6 +1816,7 @@ int sched_init_domains(const struct cpumask *cpu_map)
 
 	arch_update_cpu_topology();
 	ndoms_cur = 1;
+	
 	doms_cur = alloc_sched_domains(ndoms_cur);
 	if (!doms_cur)
 		doms_cur = &fallback_doms;

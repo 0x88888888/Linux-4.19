@@ -118,11 +118,20 @@
  * @rmap_list: head for this mm_slot's singly-linked list of rmap_items
  * @mm: the mm that this information is valid for
  *
- * 链接到ksm_mm_head
+ * 描述添加到KSM系统中将要被扫描的进程mm_struct
  */
 struct mm_slot {
+    /*
+     * 添加到mm_slot哈希表中
+     */
 	struct hlist_node link;
+	/*
+	 * 添加到mm_slot链表中，链表头在ksm_mm_head中
+	 */
 	struct list_head mm_list;
+	/*
+	 * rmap_item链表头
+	 */
 	struct rmap_item *rmap_list;
 	struct mm_struct *mm;
 };
@@ -137,9 +146,15 @@ struct mm_slot {
  * There is only the one ksm_scan instance of this cursor structure.
  */
 struct ksm_scan {
+    /*
+     * 当前正在扫描的mm_slot
+     */
 	struct mm_slot *mm_slot;
+	//下一次扫描地址
 	unsigned long address;
+	//将要扫描的rmap_item
 	struct rmap_item **rmap_list;
+	//全部扫描完成后会计数一次,用于删除unstable节点
 	unsigned long seqnr;
 };
 
@@ -194,22 +209,43 @@ struct stable_node {
  * @node: rb node of this rmap_item in the unstable tree
  * @head: pointer to stable_node heading this list in the stable tree
  * @hlist: link into hlist of rmap_items hanging off that stable_node
+ *
+ * 所有rmap_item链接成一个链表，链表头是ksm_scan.rmap_list
  */
 struct rmap_item {
-	struct rmap_item *rmap_list;
+    /*
+     * 所有的rmap_item链接成一个链表，链表头是ksm_scan.rmap_list
+     */
+	struct rmap_item *rmap_list; 
 	union {
+		/*
+		 * 当rmap_item加入stable树时，指向vma->anon_vma
+		 */
 		struct anon_vma *anon_vma;	/* when stable */
 #ifdef CONFIG_NUMA
 		int nid;		/* when node of unstable tree */
 #endif
 	};
 	struct mm_struct *mm;
+	/*
+	 * rmap_item所跟踪的用户空间地址
+	 */
 	unsigned long address;		/* + low bits used for flags below */
+	/*
+	 * 虚拟地址对应的物理页面的旧校验值
+	 */
 	unsigned int oldchecksum;	/* when unstable */
 	union {
+		/*
+		 * rmap_item加入unstable红黑树的节点
+		 */
 		struct rb_node node;	/* when node of unstable tree */
 		struct {		/* when listed from stable tree */
+			/*
+			 * 加入stable红黑树的节点
+			 */
 			struct stable_node *head;
+			//stable链表
 			struct hlist_node hlist;
 		};
 	};
@@ -1121,6 +1157,17 @@ out:
  * @orig_pte: the original value of the pte
  *
  * Returns 0 on success, -EFAULT on failure.
+ *
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    ksm_init() 创建ksm_scan_thread线程
+ *     ksm_scan_thread()
+ *      ksm_do_scan(scan_npages == ksm_thread_pages_to_scan)
+ *       cmp_and_merge_page()
+ *        try_to_merge_with_ksm_page()
+ *         try_to_merge_one_page()
+ *          replace_page()
  */
 static int replace_page(struct vm_area_struct *vma, struct page *page,
 			struct page *kpage, pte_t orig_pte)
@@ -1181,11 +1228,14 @@ static int replace_page(struct vm_area_struct *vma, struct page *page,
 	 * See Documentation/vm/mmu_notifier.rst
 	 */
 	ptep_clear_flush(vma, addr, ptep);
+	//设置pte了
 	set_pte_at_notify(mm, addr, ptep, newpte);
 
+    //释放page了
 	page_remove_rmap(page, false);
 	if (!page_mapped(page))
 		try_to_free_swap(page);
+	
 	put_page(page);
 
 	pte_unmap_unlock(ptep, ptl);
@@ -1204,6 +1254,16 @@ out:
  *         or NULL the first time when we want to use page as kpage.
  *
  * This function returns 0 if the pages were merged, -EFAULT otherwise.
+ *
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    ksm_init() 创建ksm_scan_thread线程
+ *     ksm_scan_thread()
+ *      ksm_do_scan(scan_npages == ksm_thread_pages_to_scan)
+ *       cmp_and_merge_page()
+ *        try_to_merge_with_ksm_page()
+ *         try_to_merge_one_page()
  */
 static int try_to_merge_one_page(struct vm_area_struct *vma,
 				 struct page *page, struct page *kpage)
@@ -1255,7 +1315,7 @@ static int try_to_merge_one_page(struct vm_area_struct *vma,
 				SetPageDirty(page);
 			err = 0;
 		} else if (pages_identical(page, kpage))
-			err = replace_page(vma, page, kpage, orig_pte);
+			err = replace_page(vma, page, kpage, orig_pte); //page和kpage ksm了
 	}
 
 	if ((vma->vm_flags & VM_LOCKED) && kpage && !err) {
@@ -1279,6 +1339,15 @@ out:
  * but no new kernel page is allocated: kpage must already be a ksm page.
  *
  * This function returns 0 if the pages were merged, -EFAULT otherwise.
+ *
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    ksm_init() 创建ksm_scan_thread线程
+ *     ksm_scan_thread()
+ *      ksm_do_scan(scan_npages == ksm_thread_pages_to_scan)
+ *       cmp_and_merge_page()
+ *        try_to_merge_with_ksm_page()
  */
 static int try_to_merge_with_ksm_page(struct rmap_item *rmap_item,
 				      struct page *page, struct page *kpage)
@@ -2031,6 +2100,14 @@ static void stable_tree_append(struct rmap_item *rmap_item,
  *
  * @page: the page that we are searching identical page to.
  * @rmap_item: the reverse mapping into the virtual address of this page
+ *
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    ksm_init() 创建ksm_scan_thread线程
+ *     ksm_scan_thread()
+ *      ksm_do_scan(scan_npages == ksm_thread_pages_to_scan)
+ *       cmp_and_merge_page()
  */
 static void cmp_and_merge_page(struct page *page, struct rmap_item *rmap_item)
 {
@@ -2073,6 +2150,7 @@ static void cmp_and_merge_page(struct page *page, struct rmap_item *rmap_item)
 	remove_rmap_item_from_tree(rmap_item);
 
 	if (kpage) {
+		//ksm合并了
 		err = try_to_merge_with_ksm_page(rmap_item, page, kpage);
 		if (!err) {
 			/*
@@ -2210,6 +2288,15 @@ static struct rmap_item *get_next_rmap_item(struct mm_slot *mm_slot,
 	return rmap_item;
 }
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    ksm_init() 创建ksm_scan_thread线程
+ *     ksm_scan_thread()
+ *      ksm_do_scan(scan_npages == ksm_thread_pages_to_scan)
+ *       scan_get_next_rmap_item()
+ */
 static struct rmap_item *scan_get_next_rmap_item(struct page **page)
 {
 	struct mm_struct *mm;
@@ -2371,6 +2458,13 @@ next_mm:
 /**
  * ksm_do_scan  - the ksm scanner main worker function.
  * @scan_npages:  number of pages we want to scan before we return.
+ *
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    ksm_init() 创建ksm_scan_thread线程
+ *     ksm_scan_thread()
+ *      ksm_do_scan(scan_npages == ksm_thread_pages_to_scan)
  */
 static void ksm_do_scan(unsigned int scan_npages)
 {
@@ -2382,6 +2476,7 @@ static void ksm_do_scan(unsigned int scan_npages)
 		rmap_item = scan_get_next_rmap_item(&page);
 		if (!rmap_item)
 			return;
+		
 		cmp_and_merge_page(page, rmap_item);
 		put_page(page);
 	}
@@ -2392,6 +2487,13 @@ static int ksmd_should_run(void)
 	return (ksm_run & KSM_RUN_MERGE) && !list_empty(&ksm_mm_head.mm_list);
 }
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    ksm_init() 创建ksm_scan_thread线程
+ *     ksm_scan_thread()
+ */
 static int ksm_scan_thread(void *nothing)
 {
 	set_freezable();
@@ -2402,6 +2504,7 @@ static int ksm_scan_thread(void *nothing)
 		wait_while_offlining();
 		if (ksmd_should_run())
 			ksm_do_scan(ksm_thread_pages_to_scan);
+		
 		mutex_unlock(&ksm_thread_mutex);
 
 		try_to_freeze();
@@ -3152,6 +3255,12 @@ static const struct attribute_group ksm_attr_group = {
 };
 #endif /* CONFIG_SYSFS */
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    ksm_init()
+ */
 static int __init ksm_init(void)
 {
 	struct task_struct *ksm_thread;

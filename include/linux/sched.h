@@ -400,7 +400,10 @@ struct util_est {
 struct sched_avg {
 	u64				last_update_time;
 	u64				load_sum;
+
+	//runnable时包括在空闲队列中没有running时的时间
 	u64				runnable_load_sum;
+	//只包括running时的时间
 	u32				util_sum;
 	u32				period_contrib;
 	//进程的量化负载

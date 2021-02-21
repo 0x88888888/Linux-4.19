@@ -8652,12 +8652,14 @@ redo:
 		goto out_balanced;
 	}
 
+    //查找负载最重的sched_group
 	group = find_busiest_group(&env);
 	if (!group) {
 		schedstat_inc(sd->lb_nobusyg[idle]);
 		goto out_balanced;
 	}
 
+    //查找负载最终的rq
 	busiest = find_busiest_queue(&env, group);
 	if (!busiest) {
 		schedstat_inc(sd->lb_nobusyq[idle]);
@@ -8703,6 +8705,7 @@ more_balance:
 		rq_unlock(busiest, &rf);
 
 		if (cur_ld_moved) {
+			//移动到env->dst_rq上去
 			attach_tasks(&env);
 			ld_moved += cur_ld_moved;
 		}
@@ -9035,7 +9038,8 @@ static void rebalance_domains(struct rq *rq, enum cpu_idle_type idle)
 	u64 max_cost = 0;
 
 	rcu_read_lock();
-	
+
+	//遍历rq->sd
 	for_each_domain(cpu, sd) {
 		/*
 		 * Decay the newidle max times here because this is a regular
@@ -9072,6 +9076,7 @@ static void rebalance_domains(struct rq *rq, enum cpu_idle_type idle)
 		}
 
 		if (time_after_eq(jiffies, sd->last_balance + interval)) {
+			//去cpu负载均衡
 			if (load_balance(cpu, rq, sd, idle, &continue_balancing)) {
 				/*
 				 * The LBF_DST_PINNED logic could have changed
@@ -9675,7 +9680,8 @@ out:
  * run_rebalance_domains is triggered when needed from the scheduler tick.
  * Also triggered for nohz idle balancing (with nohz_balancing_kick set).
  *
- *
+ * 
+ * SCHED_SOFTIRQ软中断，cpu负载均衡
  */
 static __latent_entropy void run_rebalance_domains(struct softirq_action *h)
 {

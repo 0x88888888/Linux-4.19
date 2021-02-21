@@ -1219,6 +1219,12 @@ struct sched_group_capacity {
 	unsigned long		cpumask[0];		/* Balance mask */
 };
 
+/*
+ * sched_domain_topology_level:CPU拓扑关系
+ * sched_domain : 调度域,表示某个调度等级,超线程，core，die这些级别
+ * sched_group : 调度组，表示一组调度属性相关的CPU，通常一个调度域里有多个调度组
+ *
+ */
 struct sched_group {
 	struct sched_group	*next;			/* Must be a circular list */
 	atomic_t		ref;

@@ -1425,7 +1425,8 @@ static noinline void __init kernel_init_freeable(void)
 
     // 启动 secondary cpus
 	smp_init();
-	
+
+	//创建CPU拓扑关系
 	sched_init_smp();
 
 	page_alloc_init_late();

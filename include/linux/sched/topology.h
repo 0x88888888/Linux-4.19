@@ -74,6 +74,12 @@ struct sched_domain_shared {
 	int		has_idle_cores;
 };
 
+/*
+ * sched_domain_topology_level:CPU拓扑关系
+ * sched_domain : 调度域,表示某个调度等级,超线程，core，die这些级别
+ * sched_group : 调度组，表示一组调度属性相关的CPU，通常一个调度域里有多个调度组
+ *
+ */
 struct sched_domain {
 	/* These fields must be setup */
 	struct sched_domain *parent;	/* top domain must be null terminated */
@@ -185,9 +191,14 @@ struct sd_data {
 
 /*
  * x86_topology,default_topology
+ *
+ * sched_domain_topology_level:CPU拓扑关系
+ * sched_domain : 调度域,表示某个调度等级,超线程，core，die这些级别
+ * sched_group : 调度组，表示一组调度属性相关的CPU，通常一个调度域里有多个调度组
+ * 
  */
 struct sched_domain_topology_level {
-	sched_domain_mask_f mask;
+	sched_domain_mask_f mask; //在这个层级里面，包含哪些CPU
 	sched_domain_flags_f sd_flags;
 	int		    flags;
 	int		    numa_level;
