@@ -1273,7 +1273,10 @@ __do_page_fault(struct pt_regs *regs, unsigned long error_code,
 		return;
 	}
 
-	/* kprobes don't want to hook the spurious faults: */
+	/* kprobes don't want to hook the spurious faults: 
+	 *
+	 * kprobes处理了这个缺页异常？
+	 */
 	if (unlikely(kprobes_fault(regs)))
 		return;
 
@@ -1312,6 +1315,7 @@ __do_page_fault(struct pt_regs *regs, unsigned long error_code,
 
 	perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, regs, address);
 
+    //写保护异常
 	if (error_code & X86_PF_WRITE)
 		flags |= FAULT_FLAG_WRITE;
 	
@@ -1333,10 +1337,13 @@ __do_page_fault(struct pt_regs *regs, unsigned long error_code,
 	 * deadlock. Attempt to lock the address space, if we cannot we then
 	 * validate the source. If this is invalid we can skip the address
 	 * space check, thus avoiding the deadlock:
+	 *
+	 * 在内核态访问用户态时出现exception，从exception table 中查找异常处理程序
 	 */
 	if (unlikely(!down_read_trylock(&mm->mmap_sem))) {
 		if (!(error_code & X86_PF_USER) &&
 		    !search_exception_tables(regs->ip)) {
+		    
 			bad_area_nosemaphore(regs, error_code, address, NULL);
 			return;
 		}
@@ -1351,7 +1358,7 @@ retry:
 		might_sleep();
 	}
 
-    //发生缺页异常的地址，查找vma
+    //用户态发生缺页异常的地址，查找vma
 	vma = find_vma(mm, address);
 	if (unlikely(!vma)) {
 		bad_area(regs, error_code, address);

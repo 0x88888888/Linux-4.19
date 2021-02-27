@@ -1907,6 +1907,15 @@ bool pmd_trans_migrating(pmd_t pmd)
  * Attempt to migrate a misplaced page to the specified destination
  * node. Caller is expected to have an elevated reference count on
  * the page that will be dropped by this function before returning.
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      migrate_misplaced_page()
+ *
+ * numa机器,迁移一个page到node
  */
 int migrate_misplaced_page(struct page *page, struct vm_area_struct *vma,
 			   int node)
@@ -1936,6 +1945,7 @@ int migrate_misplaced_page(struct page *page, struct vm_area_struct *vma,
 		goto out;
 
 	list_add(&page->lru, &migratepages);
+	//走起
 	nr_remaining = migrate_pages(&migratepages, alloc_misplaced_dst_page,
 				     NULL, node, MIGRATE_ASYNC,
 				     MR_NUMA_MISPLACED);

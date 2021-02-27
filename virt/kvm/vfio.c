@@ -417,6 +417,11 @@ static int kvm_vfio_create(struct kvm_device *dev, u32 type)
 	return 0;
 }
 
+/*
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops)
+ *   kvm_vfio_ops_init()
+ */
 int kvm_vfio_ops_init(void)
 {
 	return kvm_register_device_ops(&kvm_vfio_ops, KVM_DEV_TYPE_VFIO);

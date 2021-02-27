@@ -6011,7 +6011,7 @@ void __ref build_all_zonelists(pg_data_t *pgdat)
  *    zone_sizes_init()
  *     free_area_init_nodes()
  *      free_area_init_node()
- *       free_area_init_core()
+ *       free_area_init_core() 给每个zone调用memmap_init
  *        memmap_init()
  *         memmap_init_zone(context == MEMMAP_EARLY)
  */
@@ -6129,7 +6129,7 @@ static void __meminit zone_init_free_lists(struct zone *zone)
  *    zone_sizes_init()
  *     free_area_init_nodes()
  *      free_area_init_node()
- *       free_area_init_core()
+ *       free_area_init_core() 给每个zone调用memmap_init
  *        memmap_init()
  */
 #define memmap_init(size, nid, zone, start_pfn) \
@@ -6979,7 +6979,7 @@ static void __init free_area_init_core(struct pglist_data *pgdat)
 		 * when the bootmem allocator frees pages into the buddy system.
 		 * And all highmem pages will be managed by the buddy system.
 		 *
-		 * 
+		 * 设置zone对象的成员
 		 */
 		zone_init_internals(zone, j, nid, freesize);
 

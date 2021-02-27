@@ -247,6 +247,7 @@ static struct page *follow_pmd_mask(struct vm_area_struct *vma,
 	pmdval = READ_ONCE(*pmd);
 	if (pmd_none(pmdval))
 		return no_page_table(vma, flags);
+	
 	if (pmd_huge(pmdval) && vma->vm_flags & VM_HUGETLB) {
 		page = follow_huge_pmd(mm, address, pmd, flags);
 		if (page)
@@ -265,10 +266,13 @@ retry:
 	if (!pmd_present(pmdval)) {
 		if (likely(!(flags & FOLL_MIGRATION)))
 			return no_page_table(vma, flags);
+		
 		VM_BUG_ON(thp_migration_supported() &&
 				  !is_pmd_migration_entry(pmdval));
+		
 		if (is_pmd_migration_entry(pmdval))
 			pmd_migration_entry_wait(mm, pmd);
+		
 		pmdval = READ_ONCE(*pmd);
 		/*
 		 * MADV_DONTNEED may convert the pmd to null because
@@ -536,6 +540,14 @@ unmap:
  * mmap_sem must be held on entry.  If @nonblocking != NULL and
  * *@flags does not include FOLL_NOWAIT, the mmap_sem may be released.
  * If it is, *@nonblocking will be set to 0 and -EBUSY returned.
+ *
+ * vm_mmap_pgoff()
+ * SYSCALL_DEFINE1(brk)
+ *  mm_populate()
+ *   __mm_populate()
+ *    populate_vma_page_range()
+ *     __get_user_pages(pages==NULL, vmas == NULL,)
+ *      faultin_page()
  */
 static int faultin_page(struct task_struct *tsk, struct vm_area_struct *vma,
 		unsigned long address, unsigned int *flags, int *nonblocking)
@@ -698,10 +710,12 @@ static int check_vma_flags(struct vm_area_struct *vma, unsigned long gup_flags)
  * instead of __get_user_pages. __get_user_pages should be used only if
  * you need some special @gup_flags.
  *
- * mm_populate()
- *  __mm_populate()
- *   populate_vma_page_range()
- *    __get_user_pages()
+ * vm_mmap_pgoff()
+ * SYSCALL_DEFINE1(brk)
+ *  mm_populate()
+ *   __mm_populate()
+ *    populate_vma_page_range()
+ *     __get_user_pages(pages==NULL, vmas == NULL,)
  */
 static long __get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 		unsigned long start, unsigned long nr_pages,
@@ -765,6 +779,7 @@ retry:
 		page = follow_page_mask(vma, start, foll_flags, &page_mask);
 		if (!page) {
 			int ret;
+			//这里去走handle_mm_fault了，去分配一个page
 			ret = faultin_page(tsk, vma, start, &foll_flags,
 					nonblocking);
 			switch (ret) {
@@ -1234,9 +1249,13 @@ EXPORT_SYMBOL(get_user_pages_longterm);
  * If @nonblocking is non-NULL, it must held for read only and may be
  * released.  If it's released, *@nonblocking will be set to 0.
  *
- * mm_populate()
- *  __mm_populate()
- *   populate_vma_page_range()
+ * vm_mmap_pgoff()
+ * SYSCALL_DEFINE1(brk)
+ *  mm_populate()
+ *   __mm_populate()
+ *    populate_vma_page_range()
+ *
+ * 映射vma中的[start, end]到page去
  */
 long populate_vma_page_range(struct vm_area_struct *vma,
 		unsigned long start, unsigned long end, int *nonblocking)
@@ -1272,6 +1291,8 @@ long populate_vma_page_range(struct vm_area_struct *vma,
 	/*
 	 * We made sure addr is within a VMA, so the following will
 	 * not result in a stack expansion that recurses back here.
+	 *
+	 * 在gup.c中
 	 */
 	return __get_user_pages(current, mm, start, nr_pages, gup_flags,
 				NULL, NULL, nonblocking);
@@ -1284,8 +1305,10 @@ long populate_vma_page_range(struct vm_area_struct *vma,
  * flags. VMAs must be already marked with the desired vm_flags, and
  * mmap_sem must not be held.
  *
- * mm_populate()
- *  __mm_populate()
+ * vm_mmap_pgoff()
+ * SYSCALL_DEFINE1(brk)
+ *  mm_populate()
+ *   __mm_populate()
  */
 int __mm_populate(unsigned long start, unsigned long len, int ignore_errors)
 {
@@ -1323,6 +1346,8 @@ int __mm_populate(unsigned long start, unsigned long len, int ignore_errors)
 		 * Now fault in a range of pages. populate_vma_page_range()
 		 * double checks the vma flags, so that it won't mlock pages
 		 * if the vma was already munlocked.
+		 * 
+		 * 开始映射
 		 */
 		ret = populate_vma_page_range(vma, nstart, nend, &locked);
 		if (ret < 0) {
@@ -1332,6 +1357,7 @@ int __mm_populate(unsigned long start, unsigned long len, int ignore_errors)
 			}
 			break;
 		}
+		//下一个
 		nend = nstart + ret * PAGE_SIZE;
 		ret = 0;
 	}

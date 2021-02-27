@@ -936,6 +936,9 @@ struct kvm_lapic_irq {
 	bool msi_redir_hint;
 };
 
+/*
+ * 在vmx.c中定义了struct kvm_x86_ops vmx_x86_ops对象
+ */
 struct kvm_x86_ops {
 	int (*cpu_has_kvm_support)(void);          /* __init */
 	int (*disabled_by_bios)(void);             /* __init */
@@ -1142,6 +1145,9 @@ struct kvm_arch_async_pf {
 	bool direct_map;
 };
 
+/*
+ * 在kvm_arch_init中设置 kvm_x86_ops==vmx_x86_ops
+ */
 extern struct kvm_x86_ops *kvm_x86_ops;
 
 #define __KVM_HAVE_ARCH_VM_ALLOC

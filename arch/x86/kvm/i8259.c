@@ -578,6 +578,12 @@ static const struct kvm_io_device_ops picdev_eclr_ops = {
 	.write    = picdev_eclr_write,
 };
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_arch_vm_ioctl()
+ *    kvm_pic_init()
+ */
 int kvm_pic_init(struct kvm *kvm)
 {
 	struct kvm_pic *s;

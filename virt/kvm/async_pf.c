@@ -46,6 +46,11 @@ static inline void kvm_async_page_present_async(struct kvm_vcpu *vcpu,
 
 static struct kmem_cache *async_pf_cache;
 
+/*
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops)
+ *   kvm_async_pf_init()
+ */
 int kvm_async_pf_init(void)
 {
 	async_pf_cache = KMEM_CACHE(kvm_async_pf, 0);

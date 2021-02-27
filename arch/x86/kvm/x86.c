@@ -4370,6 +4370,11 @@ split_irqchip_unlock:
 	return r;
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_arch_vm_ioctl()
+ */
 long kvm_arch_vm_ioctl(struct file *filp,
 		       unsigned int ioctl, unsigned long arg)
 {
@@ -4479,9 +4484,11 @@ set_identity_unlock:
 		r = -ENXIO;
 		if (!irqchip_kernel(kvm))
 			goto get_irqchip_out;
+		
 		r = kvm_vm_ioctl_get_irqchip(kvm, chip);
 		if (r)
 			goto get_irqchip_out;
+		
 		r = -EFAULT;
 		if (copy_to_user(argp, chip, sizeof *chip))
 			goto get_irqchip_out;
@@ -4503,6 +4510,7 @@ set_identity_unlock:
 		r = -ENXIO;
 		if (!irqchip_kernel(kvm))
 			goto set_irqchip_out;
+		
 		r = kvm_vm_ioctl_set_irqchip(kvm, chip);
 		if (r)
 			goto set_irqchip_out;
@@ -4651,6 +4659,7 @@ set_identity_unlock:
 			goto out;
 
 		r = -ENOTTY;
+		//vmx_x86_ops->mem_enc_reg_region 为空函数
 		if (kvm_x86_ops->mem_enc_reg_region)
 			r = kvm_x86_ops->mem_enc_reg_region(kvm, &region);
 		break;
@@ -4683,6 +4692,12 @@ out:
 	return r;
 }
 
+/*
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops)
+ *   kvm_arch_hardware_setup()
+ *    kvm_init_msr_list()
+ */
 static void kvm_init_msr_list(void)
 {
 	u32 dummy[2];
@@ -6529,6 +6544,12 @@ static int kvmclock_cpu_online(unsigned int cpu)
 	return 0;
 }
 
+/*
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops)
+ *   kvm_arch_init(opaque==&vmx_x86_ops)
+ *    kvm_timer_init()
+ */
 static void kvm_timer_init(void)
 {
 	max_tsc_khz = tsc_khz;
@@ -6588,6 +6609,12 @@ static struct perf_guest_info_callbacks kvm_guest_cbs = {
 	.get_guest_ip		= kvm_get_guest_ip,
 };
 
+/*
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops)
+ *   kvm_arch_init(opaque==&vmx_x86_ops)
+ *    kvm_set_mmio_spte_mask()
+ */
 static void kvm_set_mmio_spte_mask(void)
 {
 	u64 mask;
@@ -6661,6 +6688,11 @@ static struct notifier_block pvclock_gtod_notifier = {
 };
 #endif
 
+/*
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops)
+ *   kvm_arch_init(opaque==&vmx_x86_ops)
+ */
 int kvm_arch_init(void *opaque)
 {
 	int r;
@@ -6696,11 +6728,13 @@ int kvm_arch_init(void *opaque)
 
 	kvm_set_mmio_spte_mask();
 
+    //赋值为vmx_x86_ops
 	kvm_x86_ops = ops;
 
 	kvm_mmu_set_mask_ptes(PT_USER_MASK, PT_ACCESSED_MASK,
 			PT_DIRTY_MASK, PT64_NX_MASK, 0,
 			PT_PRESENT_MASK, 0, sme_me_mask);
+	
 	kvm_timer_init();
 
 	perf_register_guest_info_callbacks(&kvm_guest_cbs);
@@ -7384,6 +7418,12 @@ EXPORT_SYMBOL_GPL(__kvm_request_immediate_exit);
  * Returns 1 to let vcpu_run() continue the guest execution loop without
  * exiting to the userspace.  Otherwise, the value will be returned to the
  * userspace.
+ *
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ *    vcpu_run()
+ *     vcpu_enter_guest()
  */
 static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 {
@@ -7397,14 +7437,19 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 	if (kvm_request_pending(vcpu)) {
 		if (kvm_check_request(KVM_REQ_GET_VMCS12_PAGES, vcpu))
 			kvm_x86_ops->get_vmcs12_pages(vcpu);
+		
 		if (kvm_check_request(KVM_REQ_MMU_RELOAD, vcpu))
 			kvm_mmu_unload(vcpu);
+		
 		if (kvm_check_request(KVM_REQ_MIGRATE_TIMER, vcpu))
 			__kvm_migrate_timers(vcpu);
+		
 		if (kvm_check_request(KVM_REQ_MASTERCLOCK_UPDATE, vcpu))
 			kvm_gen_update_masterclock(vcpu->kvm);
+		
 		if (kvm_check_request(KVM_REQ_GLOBAL_CLOCK_UPDATE, vcpu))
 			kvm_gen_kvmclock_update(vcpu);
+		
 		if (kvm_check_request(KVM_REQ_CLOCK_UPDATE, vcpu)) {
 			r = kvm_guest_time_update(vcpu);
 			if (unlikely(r))
@@ -7456,16 +7501,20 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 		}
 		if (kvm_check_request(KVM_REQ_SCAN_IOAPIC, vcpu))
 			vcpu_scan_ioapic(vcpu);
+		
 		if (kvm_check_request(KVM_REQ_LOAD_EOI_EXITMAP, vcpu))
 			vcpu_load_eoi_exitmap(vcpu);
+		
 		if (kvm_check_request(KVM_REQ_APIC_PAGE_RELOAD, vcpu))
 			kvm_vcpu_reload_apic_access_page(vcpu);
+		
 		if (kvm_check_request(KVM_REQ_HV_CRASH, vcpu)) {
 			vcpu->run->exit_reason = KVM_EXIT_SYSTEM_EVENT;
 			vcpu->run->system_event.type = KVM_SYSTEM_EVENT_CRASH;
 			r = 0;
 			goto out;
 		}
+		
 		if (kvm_check_request(KVM_REQ_HV_RESET, vcpu)) {
 			vcpu->run->exit_reason = KVM_EXIT_SYSTEM_EVENT;
 			vcpu->run->system_event.type = KVM_SYSTEM_EVENT_RESET;
@@ -7516,6 +7565,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 			if (vcpu->arch.smi_pending && !is_smm(vcpu))
 				if (!kvm_x86_ops->enable_smi_window(vcpu))
 					req_immediate_exit = true;
+				
 			if (vcpu->arch.nmi_pending)
 				kvm_x86_ops->enable_nmi_window(vcpu);
 			if (kvm_cpu_has_injectable_intr(vcpu) || req_int_win)
@@ -7536,6 +7586,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 
 	preempt_disable();
 
+    //vmx_prepare_switch_to_guest
 	kvm_x86_ops->prepare_guest_switch(vcpu);
 
 	/*
@@ -7602,6 +7653,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 		vcpu->arch.switch_db_regs &= ~KVM_DEBUGREG_RELOAD;
 	}
 
+    //vmx_vcpu_run()
 	kvm_x86_ops->run(vcpu);
 
 	/*
@@ -7637,6 +7689,8 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 	kvm_put_guest_xcr0(vcpu);
 
 	kvm_before_interrupt(vcpu);
+	
+	//vmx_handle_external_intr
 	kvm_x86_ops->handle_external_intr(vcpu);
 	kvm_after_interrupt(vcpu);
 
@@ -7717,6 +7771,12 @@ static inline bool kvm_vcpu_running(struct kvm_vcpu *vcpu)
 		!vcpu->arch.apf.halted);
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ *    vcpu_run()
+ */
 static int vcpu_run(struct kvm_vcpu *vcpu)
 {
 	int r;
@@ -7727,7 +7787,7 @@ static int vcpu_run(struct kvm_vcpu *vcpu)
 
 	for (;;) {
 		if (kvm_vcpu_running(vcpu)) {
-			r = vcpu_enter_guest(vcpu);
+			r = vcpu_enter_guest(vcpu); //走起
 		} else {
 			r = vcpu_block(kvm, vcpu);
 		}
@@ -7871,6 +7931,11 @@ static void kvm_put_guest_fpu(struct kvm_vcpu *vcpu)
 	trace_kvm_fpu(0);
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ */
 int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *kvm_run)
 {
 	int r;
@@ -7926,7 +7991,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *kvm_run)
 
 	if (kvm_run->immediate_exit)
 		r = -EINTR;
-	else
+	else //跑起
 		r = vcpu_run(vcpu);
 
 out:
@@ -8458,6 +8523,12 @@ void kvm_arch_vcpu_free(struct kvm_vcpu *vcpu)
 	free_cpumask_var(wbinvd_dirty_mask);
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_create()
+ */
 struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm,
 						unsigned int id)
 {
@@ -8468,6 +8539,7 @@ struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm,
 		"kvm: SMP vm created on host with unstable TSC; "
 		"guest TSC will not be reliable\n");
 
+    // vmx_create_vcpu
 	vcpu = kvm_x86_ops->vcpu_create(kvm, id);
 
 	return vcpu;
@@ -8700,6 +8772,11 @@ void kvm_arch_hardware_disable(void)
 	drop_user_return_notifiers();
 }
 
+/*
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops)
+ *   kvm_arch_hardware_setup()
+ */
 int kvm_arch_hardware_setup(void)
 {
 	int r;
@@ -8731,8 +8808,14 @@ void kvm_arch_hardware_unsetup(void)
 	kvm_x86_ops->hardware_unsetup();
 }
 
+/*
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops)
+ *   kvm_arch_check_processor_compat()
+ */
 void kvm_arch_check_processor_compat(void *rtn)
 {
+    //vmx_check_processor_compat
 	kvm_x86_ops->check_processor_compatibility(rtn);
 }
 
@@ -8750,6 +8833,15 @@ bool kvm_vcpu_is_bsp(struct kvm_vcpu *vcpu)
 struct static_key kvm_no_apic_vcpu __read_mostly;
 EXPORT_SYMBOL_GPL(kvm_no_apic_vcpu);
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_create()
+ *     vmx_create_vcpu()
+ *      kvm_vcpu_init()
+ *       kvm_arch_vcpu_init()
+ */
 int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
 {
 	struct page *page;
@@ -8841,9 +8933,18 @@ void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu)
 		static_key_slow_dec(&kvm_no_apic_vcpu);
 }
 
+/*
+ * schedule_tail()
+ *  finish_task_switch()
+ *   fire_sched_in_preempt_notifiers()
+ *    __fire_sched_in_preempt_notifiers()
+ *     kvm_sched_in()
+ *      kvm_arch_sched_in()
+ */
 void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu)
 {
 	vcpu->arch.l1tf_flush_l1d = true;
+    //vmx_sched_in
 	kvm_x86_ops->sched_in(vcpu, cpu);
 }
 

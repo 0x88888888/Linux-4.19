@@ -2393,6 +2393,15 @@ void task_numa_free(struct task_struct *p)
 
 /*
  * Got a PROT_NONE fault for a page on @node.
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      task_numa_fault()
+ *
+ * 
  */
 void task_numa_fault(int last_cpupid, int mem_node, int pages, int flags)
 {
@@ -2458,6 +2467,7 @@ void task_numa_fault(int last_cpupid, int mem_node, int pages, int flags)
 
 	if (migrated)
 		p->numa_pages_migrated += pages;
+	
 	if (flags & TNF_MIGRATE_FAIL)
 		p->numa_faults_locality[2] += pages;
 
@@ -2628,6 +2638,16 @@ out:
 
 /*
  * Drive the periodic memory faults..
+ *
+ * apic_timer_interrupt()  [arch/x86/entry/entry_64.S]
+ *  smp_apic_timer_interrupt()
+ *   local_apic_timer_interrupt()
+ *    tick_handle_periodic( dev==lapic_events )
+ *     tick_periodic()
+ *      update_process_times()
+ *       scheduler_tick()
+ *        task_tick_fair( queued==0)
+ *         task_tick_numa()
  */
 void task_tick_numa(struct rq *rq, struct task_struct *curr)
 {

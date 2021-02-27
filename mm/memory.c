@@ -666,6 +666,7 @@ void free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *vma,
 int __pte_alloc(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
 {
 	spinlock_t *ptl;
+	//分配page,但是这个page没有被映射到address
 	pgtable_t new = pte_alloc_one(mm, address);
 	if (!new)
 		return -ENOMEM;
@@ -688,9 +689,11 @@ int __pte_alloc(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
 	ptl = pmd_lock(mm, pmd);
 	if (likely(pmd_none(*pmd))) {	/* Has another populated it ? */
 		mm_inc_nr_ptes(mm);
+		//关联起来
 		pmd_populate(mm, pmd, new);
-		new = NULL;
+		new = NULL; //防止下面的if判断为true
 	}
+	
 	spin_unlock(ptl);
 	if (new)
 		pte_free(mm, new);
@@ -3954,6 +3957,14 @@ static vm_fault_t do_fault(struct vm_fault *vmf)
 	return ret;
 }
 
+/*
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      numa_migrate_prep()
+ */
 static int numa_migrate_prep(struct page *page, struct vm_area_struct *vma,
 				unsigned long addr, int page_nid,
 				int *flags)
@@ -3969,6 +3980,15 @@ static int numa_migrate_prep(struct page *page, struct vm_area_struct *vma,
 	return mpol_misplaced(page, vma, addr);
 }
 
+/*
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *
+ * numa 页面迁移
+ */
 static vm_fault_t do_numa_page(struct vm_fault *vmf)
 {
 	struct vm_area_struct *vma = vmf->vma;
@@ -4002,6 +4022,7 @@ static vm_fault_t do_numa_page(struct vm_fault *vmf)
 	pte = pte_mkyoung(pte);
 	if (was_writable)
 		pte = pte_mkwrite(pte);
+	
 	ptep_modify_prot_commit(vma->vm_mm, vmf->address, vmf->pte, pte);
 	update_mmu_cache(vma, vmf->address, vmf->pte);
 
@@ -4037,6 +4058,8 @@ static vm_fault_t do_numa_page(struct vm_fault *vmf)
 
 	last_cpupid = page_cpupid_last(page);
 	page_nid = page_to_nid(page);
+
+	//确定目标 node id
 	target_nid = numa_migrate_prep(page, vma, vmf->address, page_nid,
 			&flags);
 	pte_unmap_unlock(vmf->pte, vmf->ptl);
@@ -4045,6 +4068,7 @@ static vm_fault_t do_numa_page(struct vm_fault *vmf)
 		goto out;
 	}
 
+    //迁移页面
 	/* Migrate to the requested node */
 	migrated = migrate_misplaced_page(page, vma, target_nid);
 	if (migrated) {
@@ -4054,8 +4078,9 @@ static vm_fault_t do_numa_page(struct vm_fault *vmf)
 		flags |= TNF_MIGRATE_FAIL;
 
 out:
-	if (page_nid != -1)
+	if (page_nid != -1) // 走起
 		task_numa_fault(last_cpupid, page_nid, 1, flags);
+	
 	return 0;
 }
 
@@ -4326,6 +4351,15 @@ static vm_fault_t __handle_mm_fault(struct vm_area_struct *vma,
  * do_page_fault()
  *  __do_page_fault()
  *   handle_mm_fault()
+ *
+ * vm_mmap_pgoff()
+ * SYSCALL_DEFINE1(brk)
+ *  mm_populate()
+ *   __mm_populate()
+ *    populate_vma_page_range()
+ *     __get_user_pages(pages==NULL, vmas == NULL,)
+ *      faultin_page()
+ *       handle_mm_fault( falgs |= FAULT_FLAG_USER)
  */
 vm_fault_t handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
 		unsigned int flags)
@@ -4352,7 +4386,7 @@ vm_fault_t handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
 	 * space.  Kernel faults are handled more gracefully.
 	 */
 	if (flags & FAULT_FLAG_USER) //标记发生用户态的缺页,可以发生oom
-		mem_cgroup_enter_user_fault();
+		mem_cgroup_enter_user_fault();//设置current->in_user_fault == 1
 
 
 	if (unlikely(is_vm_hugetlb_page(vma)))

@@ -385,6 +385,12 @@ static const struct kvm_irq_routing_entry default_routing[] = {
 	ROUTING_ENTRY1(22), ROUTING_ENTRY1(23),
 };
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_arch_vm_ioctl()
+ *    kvm_setup_default_irq_routing()
+ */
 int kvm_setup_default_irq_routing(struct kvm *kvm)
 {
 	return kvm_set_irq_routing(kvm, default_routing,

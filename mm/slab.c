@@ -583,6 +583,18 @@ static void start_cpu_timer(int cpu)
 	}
 }
 
+/* 
+ * kmem_cache_create()
+ *	kmem_cache_create_usercopy()
+ *	 create_cache()
+ *	  __kmem_cache_create()
+ *	   setup_cpu_cache()
+ *		enable_cpucache()
+ *		 do_tune_cpucache()
+ *		  __do_tune_cpucache()
+ *         alloc_kmem_cache_cpus() 每个cpu都循环调用 init_arraycache
+ *          init_arraycache()
+ */
 static void init_arraycache(struct array_cache *ac, int limit, int batch)
 {
 	/*
@@ -1787,6 +1799,13 @@ static void slabs_destroy(struct kmem_cache *cachep, struct list_head *list)
  * high order pages for slabs.  When the gfp() functions are more friendly
  * towards high-order requests, this should be changed.
  *
+ * kmem_cache_create()
+ *  kmem_cache_create_usercopy()
+ *   create_cache()
+ *    __kmem_cache_create()
+ *     set_objfreelist_slab_cache()
+ *      calculate_slab_order()
+ *
  * 这个函数计算kmem_cache中slab对象需要的page的order，
  * 也计算slab中所有page可以分配obj的个数
  */
@@ -1859,6 +1878,18 @@ static size_t calculate_slab_order(struct kmem_cache *cachep,
 	return left_over;
 }
 
+
+/* 
+ * kmem_cache_create()
+ *	kmem_cache_create_usercopy()
+ *	 create_cache()
+ *	  __kmem_cache_create()
+ *	   setup_cpu_cache()
+ *		enable_cpucache()
+ *		 do_tune_cpucache()
+ *		  __do_tune_cpucache()
+ *         alloc_kmem_cache_cpus()
+ */
 static struct array_cache __percpu *alloc_kmem_cache_cpus(
 		struct kmem_cache *cachep, int entries, int batchcount)
 {
@@ -1880,6 +1911,14 @@ static struct array_cache __percpu *alloc_kmem_cache_cpus(
 	return cpu_cache;
 }
 
+/*
+ * kmem_cache_create()
+ *  kmem_cache_create_usercopy()
+ *   create_cache()
+ *    __kmem_cache_create()
+ *     setup_cpu_cache()
+ *
+ */
 static int __ref setup_cpu_cache(struct kmem_cache *cachep, gfp_t gfp)
 {
 	if (slab_state >= FULL)
@@ -1951,6 +1990,13 @@ __kmem_cache_alias(const char *name, unsigned int size, unsigned int align,
 	return cachep;
 }
 
+/*
+ * kmem_cache_create()
+ *  kmem_cache_create_usercopy()
+ *   create_cache()
+ *    __kmem_cache_create()
+ *     set_objfreelist_slab_cache()
+ */
 static bool set_objfreelist_slab_cache(struct kmem_cache *cachep,
 			size_t size, slab_flags_t flags)
 {
@@ -1961,8 +2007,13 @@ static bool set_objfreelist_slab_cache(struct kmem_cache *cachep,
 	if (cachep->ctor || flags & SLAB_TYPESAFE_BY_RCU)
 		return false;
 
+    /*
+     * 计算kmem_cache中slab对象需要的page的order，
+     * 也计算slab中所有page可以分配obj的个数
+     */
 	left = calculate_slab_order(cachep, size,
 			flags | CFLGS_OBJFREELIST_SLAB);
+	
 	if (!cachep->num)
 		return false;
 
@@ -2055,6 +2106,7 @@ int __kmem_cache_create(struct kmem_cache *cachep, slab_flags_t flags)
 	size_t ralign = BYTES_PER_WORD;
 	gfp_t gfp;
 	int err;
+	//slab中的对象的大小
 	unsigned int size = cachep->size;
 
 #if DEBUG
@@ -2098,6 +2150,7 @@ int __kmem_cache_create(struct kmem_cache *cachep, slab_flags_t flags)
 	 * 4) Store it.
 	 */
 	cachep->align = ralign;
+	//缓存行大小
 	cachep->colour_off = cache_line_size();
 	/* Offset must be a multiple of the alignment. */
 	if (cachep->colour_off < cachep->align)
@@ -2164,6 +2217,7 @@ int __kmem_cache_create(struct kmem_cache *cachep, slab_flags_t flags)
 	}
 #endif
 
+    //计算出slab需要的page数量，slab中对象的数量
 	if (set_objfreelist_slab_cache(cachep, size, flags)) {
 		flags |= CFLGS_OBJFREELIST_SLAB;
 		goto done;
@@ -2188,7 +2242,8 @@ done:
 	
 	if (flags & SLAB_RECLAIM_ACCOUNT)
 		cachep->allocflags |= __GFP_RECLAIMABLE;
-	
+
+	//slab中对象的大小
 	cachep->size = size;
 	cachep->reciprocal_buffer_size = reciprocal_value(size);
 
@@ -2427,6 +2482,14 @@ void __kmem_cache_release(struct kmem_cache *cachep)
  *
  * So the off-slab slab descriptor shall come from the kmalloc_{dma,}_caches,
  * which are all initialized during kmem_cache_init().
+ *
+ * kmem_cache_alloc()
+ *	slab_alloc()
+ *	 __do_cache_alloc()
+ *	  ____cache_alloc()
+ *     cache_alloc_refill()
+ *      cache_grow_begin()
+ *       alloc_slabmgmt()
  */
 static void *alloc_slabmgmt(struct kmem_cache *cachep,
 				   struct page *page, int colour_off,
@@ -2706,6 +2769,13 @@ static void slab_map_pages(struct kmem_cache *cache, struct page *page,
 /*
  * Grow (by 1) the number of slabs within a cache.  This is called by
  * kmem_cache_alloc() when there are no active objs left in a cache.
+ *
+ * kmem_cache_alloc()
+ *	slab_alloc()
+ *	 __do_cache_alloc()
+ *	  ____cache_alloc()
+ *     cache_alloc_refill()
+ *      cache_grow_begin()
  */
 static struct page *cache_grow_begin(struct kmem_cache *cachep,
 				gfp_t flags, int nodeid)
@@ -2757,7 +2827,10 @@ static struct page *cache_grow_begin(struct kmem_cache *cachep,
 
 	offset *= cachep->colour_off;
 
-	/* Get slab management. */
+	/* Get slab management.
+	 *
+	 * 设置slab头部的管理方面的数据
+	 */
 	freelist = alloc_slabmgmt(cachep, page, offset,
 			local_flags & ~GFP_CONSTRAINT_MASK, page_node);
 	if (OFF_SLAB(cachep) && !freelist)
@@ -3079,7 +3152,10 @@ static void *cache_alloc_refill(struct kmem_cache *cachep, gfp_t flags)
 	spin_lock(&n->list_lock);
 	shared = READ_ONCE(n->shared);
 
-	/* See if we can refill from the shared array */
+	/* See if we can refill from the shared array  
+	 *
+	 * kmem_cache_node->shared中有空闲的对象，从shared中搬过来用先
+	 */
 	if (shared && transfer_objects(ac, shared, batchcount)) {
 		shared->touched = 1;
 		goto alloc_done;
@@ -3087,6 +3163,7 @@ static void *cache_alloc_refill(struct kmem_cache *cachep, gfp_t flags)
 
 	while (batchcount > 0) {
 		/* Get slab alloc is to come from. */
+	    //从partial链表或者free链表中查看是否空闲的slab
 		page = get_first_slab(n, false);
 		if (!page)
 			goto must_grow;
@@ -3113,6 +3190,7 @@ direct_grow:
 				return obj;
 		}
 
+        //填充空page,slab
 		page = cache_grow_begin(cachep, gfp_exact_node(flags), node);
 
 		/*
@@ -3192,6 +3270,7 @@ static inline void *____cache_alloc(struct kmem_cache *cachep, gfp_t flags)
 
 	check_irq_off();
 
+    //先从array_cache中分配
 	ac = cpu_cache_get(cachep);
 	if (likely(ac->avail)) {
 		ac->touched = 1;
@@ -3970,7 +4049,17 @@ fail:
 	return -ENOMEM;
 }
 
-/* Always called with the slab_mutex held */
+/* Always called with the slab_mutex held 
+ *
+ * kmem_cache_create()
+ *  kmem_cache_create_usercopy()
+ *   create_cache()
+ *    __kmem_cache_create()
+ *     setup_cpu_cache()
+ *      enable_cpucache()
+ *       do_tune_cpucache()
+ *        __do_tune_cpucache()
+ */
 static int __do_tune_cpucache(struct kmem_cache *cachep, int limit,
 				int batchcount, int shared, gfp_t gfp)
 {
@@ -4017,6 +4106,15 @@ setup_node:
 	return setup_kmem_cache_nodes(cachep, gfp);
 }
 
+/*
+ * kmem_cache_create()
+ *  kmem_cache_create_usercopy()
+ *   create_cache()
+ *    __kmem_cache_create()
+ *     setup_cpu_cache()
+ *      enable_cpucache()
+ *       do_tune_cpucache()
+ */
 static int do_tune_cpucache(struct kmem_cache *cachep, int limit,
 				int batchcount, int shared, gfp_t gfp)
 {
@@ -4040,7 +4138,16 @@ static int do_tune_cpucache(struct kmem_cache *cachep, int limit,
 	return ret;
 }
 
-/* Called with slab_mutex held always */
+/* Called with slab_mutex held always 
+ *
+ * kmem_cache_create()
+ *  kmem_cache_create_usercopy()
+ *   create_cache()
+ *    __kmem_cache_create()
+ *     setup_cpu_cache()
+ *      enable_cpucache()
+ *
+ */
 static int enable_cpucache(struct kmem_cache *cachep, gfp_t gfp)
 {
 	int err;

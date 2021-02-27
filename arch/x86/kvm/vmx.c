@@ -1291,6 +1291,8 @@ static DEFINE_PER_CPU(struct vmcs *, current_vmcs);
 /*
  * We maintain a per-CPU linked-list of VMCS loaded on that CPU. This is needed
  * when a CPU is brought down, and we need to VMCLEAR all VMCSs loaded on it.
+ *
+ * 这个cpu上所有的vcpu(VMCS)
  */
 static DEFINE_PER_CPU(struct list_head, loaded_vmcss_on_cpu);
 
@@ -2137,6 +2139,24 @@ static inline void loaded_vmcs_init(struct loaded_vmcs *loaded_vmcs)
 	loaded_vmcs->launched = 0;
 }
 
+/*
+ * vmx_handle_exit()
+ *  handle_vmlaunch( launch== true)
+ *  handle_vmresume( launch == false)
+ *   nested_vmx_run()
+ *    enter_vmx_non_root_mode()
+ *     vmx_switch_vmcs() 
+ *      vmcs_load()
+ * 
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_create()
+ *     vmx_create_vcpu()
+ *      vmx_vcpu_load()
+ *       vmcs_load()
+ *
+ */
 static void vmcs_load(struct vmcs *vmcs)
 {
 	u64 phys_addr = __pa(vmcs);
@@ -2145,6 +2165,7 @@ static void vmcs_load(struct vmcs *vmcs)
 	if (static_branch_unlikely(&enable_evmcs))
 		return evmcs_load(phys_addr);
 
+    //通常走这里吧,切换vmcs了
 	asm volatile (__ex(ASM_VMX_VMPTRLD_RAX) CC_SET(na)
 		      : CC_OUT(na) (error) : "a"(&phys_addr), "m"(phys_addr)
 		      : "memory");
@@ -2860,6 +2881,14 @@ static unsigned long segment_base(u16 selector)
 }
 #endif
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ *    vcpu_run()
+ *     vcpu_enter_guest()
+ *      vmx_prepare_switch_to_guest()
+ */
 static void vmx_prepare_switch_to_guest(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
@@ -3054,10 +3083,28 @@ static void decache_tsc_multiplier(struct vcpu_vmx *vmx)
 /*
  * Switches to specified vcpu, until a matching vcpu_put(), but assumes
  * vcpu mutex is already taken.
+ *
+ * vmx_handle_exit()
+ *  handle_vmlaunch( launch== true)
+ *  handle_vmresume( launch == false)
+ *   nested_vmx_run()
+ *    enter_vmx_non_root_mode()
+ *     vmx_switch_vmcs() 
+ * 
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_create()
+ *     vmx_create_vcpu()
+ *      vmx_vcpu_load()
+ *
+ * 加载vcpu到cpu
  */
 static void vmx_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
+
+	//vcpu是否已经运行在cpu上了
 	bool already_loaded = vmx->loaded_vmcs->cpu == cpu;
 
 	if (!already_loaded) {
@@ -3072,14 +3119,17 @@ static void vmx_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 		 */
 		smp_rmb();
 
+		//cpu上所有的vcpu(VMCS)
 		list_add(&vmx->loaded_vmcs->loaded_vmcss_on_cpu_link,
 			 &per_cpu(loaded_vmcss_on_cpu, cpu));
+		
 		crash_enable_local_vmclear(cpu);
 		local_irq_enable();
 	}
 
 	if (per_cpu(current_vmcs, cpu) != vmx->loaded_vmcs->vmcs) {
 		per_cpu(current_vmcs, cpu) = vmx->loaded_vmcs->vmcs;
+		//加载vmcs了
 		vmcs_load(vmx->loaded_vmcs->vmcs);
 		indirect_branch_prediction_barrier();
 	}
@@ -4760,6 +4810,14 @@ static struct vmcs *alloc_vmcs(bool shadow)
 	return alloc_vmcs_cpu(shadow, raw_smp_processor_id());
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_create()
+ *     vmx_create_vcpu()
+ *      alloc_loaded_vmcs()
+ */
 static int alloc_loaded_vmcs(struct loaded_vmcs *loaded_vmcs)
 {
 	loaded_vmcs->vmcs = alloc_vmcs(false);
@@ -5898,6 +5956,14 @@ out:
 	return r;
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_create()
+ *     vmx_create_vcpu()
+ *      allocate_vpid()
+ */
 static int allocate_vpid(void)
 {
 	int vpid;
@@ -6563,6 +6629,13 @@ static void ept_set_mmio_spte_mask(void)
 #define VMX_XSS_EXIT_BITMAP 0
 /*
  * Sets up the vmcs for emulated real mode.
+ *
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_create()
+ *     vmx_create_vcpu()
+ *      vmx_vcpu_setup()
  */
 static void vmx_vcpu_setup(struct vcpu_vmx *vmx)
 {
@@ -8532,13 +8605,21 @@ static int handle_vmclear(struct kvm_vcpu *vcpu)
 
 static int nested_vmx_run(struct kvm_vcpu *vcpu, bool launch);
 
-/* Emulate the VMLAUNCH instruction */
+/* Emulate the VMLAUNCH instruction 
+ *
+ * vmx_handle_exit()
+ *  handle_vmlaunch()
+ */
 static int handle_vmlaunch(struct kvm_vcpu *vcpu)
 {
 	return nested_vmx_run(vcpu, true);
 }
 
-/* Emulate the VMRESUME instruction */
+/* Emulate the VMRESUME instruction 
+ *
+ * vmx_handle_exit()
+ *  handle_vmresume()
+ */
 static int handle_vmresume(struct kvm_vcpu *vcpu)
 {
 
@@ -10415,6 +10496,14 @@ static void vmx_complete_atomic_exit(struct vcpu_vmx *vmx)
 	}
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ *    vcpu_run()
+ *     vcpu_enter_guest()
+ *      vmx_handle_external_intr()
+ */
 static void vmx_handle_external_intr(struct kvm_vcpu *vcpu)
 {
 	u32 exit_intr_info = vmcs_read32(VM_EXIT_INTR_INFO);
@@ -10656,6 +10745,15 @@ static void vmx_update_hv_timer(struct kvm_vcpu *vcpu)
 	vmx->loaded_vmcs->hv_timer_armed = false;
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ *    vcpu_run()
+ *     vcpu_enter_guest()
+ *      vmx_vcpu_run()
+ *
+ */
 static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
@@ -10683,6 +10781,7 @@ static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 
 	if (test_bit(VCPU_REGS_RSP, (unsigned long *)&vcpu->arch.regs_dirty))
 		vmcs_writel(GUEST_RSP, vcpu->arch.regs[VCPU_REGS_RSP]);
+	
 	if (test_bit(VCPU_REGS_RIP, (unsigned long *)&vcpu->arch.regs_dirty))
 		vmcs_writel(GUEST_RIP, vcpu->arch.regs[VCPU_REGS_RIP]);
 
@@ -10731,6 +10830,7 @@ static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 	if (static_branch_unlikely(&vmx_l1d_should_flush))
 		vmx_l1d_flush(vcpu);
 
+    //切换
 	asm(
 		/* Store host registers */
 		"push %%" _ASM_DX "; push %%" _ASM_BP ";"
@@ -10945,6 +11045,14 @@ static void vmx_vm_free(struct kvm *kvm)
 	vfree(to_kvm_vmx(kvm));
 }
 
+/*
+ * vmx_handle_exit()
+ *  handle_vmlaunch( launch== true)
+ *  handle_vmresume( launch == false)
+ *   nested_vmx_run()
+ *    enter_vmx_non_root_mode()
+ *     vmx_switch_vmcs()
+ */
 static void vmx_switch_vmcs(struct kvm_vcpu *vcpu, struct loaded_vmcs *vmcs)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
@@ -10988,7 +11096,13 @@ static void vmx_free_vcpu(struct kvm_vcpu *vcpu)
 	kvm_vcpu_uninit(vcpu);
 	kmem_cache_free(kvm_vcpu_cache, vmx);
 }
-
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_create()
+ *     vmx_create_vcpu()
+ */
 static struct kvm_vcpu *vmx_create_vcpu(struct kvm *kvm, unsigned int id)
 {
 	int err;
@@ -11041,11 +11155,14 @@ static struct kvm_vcpu *vmx_create_vcpu(struct kvm *kvm, unsigned int id)
 
 	vmx->loaded_vmcs = &vmx->vmcs01;
 	cpu = get_cpu();
+	
 	vmx_vcpu_load(&vmx->vcpu, cpu);
 	vmx->vcpu.cpu = cpu;
+	
 	vmx_vcpu_setup(vmx);
 	vmx_vcpu_put(&vmx->vcpu);
 	put_cpu();
+	
 	if (cpu_need_virtualize_apic_accesses(&vmx->vcpu)) {
 		err = alloc_apic_access_page(kvm);
 		if (err)
@@ -11126,6 +11243,12 @@ static int vmx_vm_init(struct kvm *kvm)
 	return 0;
 }
 
+/*
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops)
+ *   kvm_arch_check_processor_compat()
+ *    vmx_check_processor_compat()
+ */
 static void __init vmx_check_processor_compat(void *rtn)
 {
 	struct vmcs_config vmcs_conf;
@@ -11134,6 +11257,7 @@ static void __init vmx_check_processor_compat(void *rtn)
 	if (setup_vmcs_config(&vmcs_conf) < 0)
 		*(int *)rtn = -EIO;
 	nested_vmx_setup_ctls_msrs(&vmcs_conf.nested, enable_apicv);
+	
 	if (memcmp(&vmcs_config, &vmcs_conf, sizeof(struct vmcs_config)) != 0) {
 		printk(KERN_ERR "kvm: CPU %d feature inconsistency!\n",
 				smp_processor_id());
@@ -12603,6 +12727,12 @@ static int check_vmentry_postreqs(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
 /*
  * If exit_qual is NULL, this is being called from state restore (either RSM
  * or KVM_SET_NESTED_STATE).  Otherwise it's called from vmlaunch/vmresume.
+ *
+ * vmx_handle_exit()
+ *  handle_vmlaunch( launch== true)
+ *  handle_vmresume( launch == false)
+ *   nested_vmx_run()
+ *    enter_vmx_non_root_mode()
  */
 static int enter_vmx_non_root_mode(struct kvm_vcpu *vcpu, u32 *exit_qual)
 {
@@ -12626,6 +12756,7 @@ static int enter_vmx_non_root_mode(struct kvm_vcpu *vcpu, u32 *exit_qual)
 		!(vmcs12->vm_entry_controls & VM_ENTRY_LOAD_BNDCFGS))
 		vmx->nested.vmcs01_guest_bndcfgs = vmcs_read64(GUEST_BNDCFGS);
 
+    //切换到
 	vmx_switch_vmcs(vcpu, &vmx->nested.vmcs02);
 	vmx_segment_cache_clear(vmx);
 
@@ -12692,6 +12823,11 @@ fail:
 /*
  * nested_vmx_run() handles a nested entry, i.e., a VMLAUNCH or VMRESUME on L1
  * for running an L2 nested guest.
+ *
+ * vmx_handle_exit()
+ *  handle_vmlaunch( launch== true)
+ *  handle_vmresume( launch == false)
+ *   nested_vmx_run()
  */
 static int nested_vmx_run(struct kvm_vcpu *vcpu, bool launch)
 {
@@ -12774,6 +12910,7 @@ static int nested_vmx_run(struct kvm_vcpu *vcpu, bool launch)
 	 */
 
 	vmx->nested.nested_run_pending = 1;
+	//guest os走起了
 	ret = enter_vmx_non_root_mode(vcpu, &exit_qual);
 	if (ret) {
 		nested_vmx_entry_failure(vcpu, vmcs12, ret, exit_qual);
@@ -13547,7 +13684,15 @@ static void vmx_cancel_hv_timer(struct kvm_vcpu *vcpu)
 	to_vmx(vcpu)->hv_deadline_tsc = -1;
 }
 #endif
-
+/*
+ * schedule_tail()
+ *  finish_task_switch()
+ *   fire_sched_in_preempt_notifiers()
+ *    __fire_sched_in_preempt_notifiers()
+ *     kvm_sched_in()
+ *      kvm_arch_sched_in()
+ *       vmx_sched_in()
+ */
 static void vmx_sched_in(struct kvm_vcpu *vcpu, int cpu)
 {
 	if (!kvm_pause_in_guest(vcpu->kvm))

@@ -2580,14 +2580,26 @@ void preempt_notifier_unregister(struct preempt_notifier *notifier)
 }
 EXPORT_SYMBOL_GPL(preempt_notifier_unregister);
 
+/*
+ * schedule_tail()
+ *  finish_task_switch()
+ *   fire_sched_in_preempt_notifiers()
+ *    __fire_sched_in_preempt_notifiers()
+ */
 static void __fire_sched_in_preempt_notifiers(struct task_struct *curr)
 {
 	struct preempt_notifier *notifier;
 
 	hlist_for_each_entry(notifier, &curr->preempt_notifiers, link)
+		// kvm_sched_in
 		notifier->ops->sched_in(notifier, raw_smp_processor_id());
 }
 
+/*
+ * schedule_tail()
+ *  finish_task_switch()
+ *   fire_sched_in_preempt_notifiers()
+ */
 static __always_inline void fire_sched_in_preempt_notifiers(struct task_struct *curr)
 {
 	if (static_branch_unlikely(&preempt_notifier_key))
@@ -2738,6 +2750,9 @@ prepare_task_switch(struct rq *rq, struct task_struct *prev,
  * local variables which were saved when this task called schedule() in the
  * past. prev == current is still correct but we need to recalculate this_rq
  * because prev may have moved to another CPU.
+ *
+ * schedule_tail()
+ *  finish_task_switch()
  */
 static struct rq *finish_task_switch(struct task_struct *prev)
 	__releases(rq->lock)
@@ -2783,6 +2798,7 @@ static struct rq *finish_task_switch(struct task_struct *prev)
 	finish_arch_post_lock_switch();
 	kcov_finish_switch(current);
 
+    //kvm用
 	fire_sched_in_preempt_notifiers(current);
 	/*
 	 * When switching through a kernel thread, the loop in
@@ -3153,6 +3169,8 @@ unsigned long long task_sched_runtime(struct task_struct *p)
  *     tick_periodic()
  *      update_process_times()
  *       scheduler_tick()
+ *
+ * 每次时钟中断都会调用到这里
  */
 void scheduler_tick(void)
 {

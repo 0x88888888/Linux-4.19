@@ -391,11 +391,15 @@ enum page_entry_size {
  * to the functions called when a no-page or a wp-page exception occurs.
  *
  * packet_mmap_ops, aio_ring_vm_ops, perf_mmap_vmops
- * dax_vm_ops, ext4_dax_vm_ops, ext4_file_vm_ops
+ * dax_vm_ops, ext4_dax_vm_ops,
  * kernfs_vm_ops, generic_file_vm_opsm, vm_ops
- * hugetlb_vm_ops, kvm_vcpu_vm_ops, mmap_mem_ops
  * dummy_vm_ops, special_mapping_vmops, legacy_special_mapping_vmops
  * shm_vm_ops,  global_mmio_vmops
+ *
+ * hugetlb_vm_ops,
+ * ext4_file_vm_ops,
+ * kvm_vcpu_vm_ops,
+ * mmap_mem_ops
  */
 struct vm_operations_struct {
 	void (*open)(struct vm_area_struct * area);
@@ -2340,6 +2344,11 @@ extern int __mm_populate(unsigned long addr, unsigned long len,
 
 /*
  * 给虚拟地址addr分配物理内存page
+ *
+ * vm_mmap_pgoff()
+ * SYSCALL_DEFINE1(brk)
+ *  mm_populate()
+ *
  */
 static inline void mm_populate(unsigned long addr, unsigned long len)
 {

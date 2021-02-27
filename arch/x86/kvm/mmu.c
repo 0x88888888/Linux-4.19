@@ -5874,6 +5874,12 @@ static void mmu_destroy_caches(void)
 	kmem_cache_destroy(mmu_page_header_cache);
 }
 
+/*
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops)
+ *   kvm_arch_init(opaque==&vmx_x86_ops)
+ *    kvm_mmu_module_init()
+ */
 int kvm_mmu_module_init(void)
 {
 	int ret = -ENOMEM;

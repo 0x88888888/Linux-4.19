@@ -2675,6 +2675,12 @@ void kvm_apic_accept_events(struct kvm_vcpu *vcpu)
 	}
 }
 
+/*
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops)
+ *   kvm_arch_init(opaque==&vmx_x86_ops)
+ *    kvm_lapic_init()
+ */
 void kvm_lapic_init(void)
 {
 	/* do not patch jump label more than once per second */

@@ -16,11 +16,13 @@ struct kmem_cache {
 	unsigned int limit;
 	unsigned int shared;
 
+    //slab中对象的大小
 	unsigned int size;
 	struct reciprocal_value reciprocal_buffer_size;
 /* 2) touched by every alloc & free from the backend */
 
 	slab_flags_t flags;		/* constant flags */
+    //每个slab中所有的page可以容纳的对象的数量
 	unsigned int num;		/* # of objs per slab */
 
 /* 3) cache_grow/shrink */
@@ -35,8 +37,11 @@ struct kmem_cache {
 	gfp_t allocflags;
 
 	size_t colour;			/* cache colouring range */
+	//cache_line_size()，缓存行大小
 	unsigned int colour_off;	/* colour offset */
+	
 	struct kmem_cache *freelist_cache;
+	
 	unsigned int freelist_size;
 
 	/* constructor func */

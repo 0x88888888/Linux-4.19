@@ -287,6 +287,14 @@ void kvm_reload_remote_mmus(struct kvm *kvm)
 	kvm_make_all_cpus_request(kvm, KVM_REQ_MMU_RELOAD);
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_create()
+ *     vmx_create_vcpu()
+ *      kvm_vcpu_init()
+ */
 int kvm_vcpu_init(struct kvm_vcpu *vcpu, struct kvm *kvm, unsigned id)
 {
 	struct page *page;
@@ -909,6 +917,12 @@ static struct kvm_memslots *install_new_memslots(struct kvm *kvm,
  * Discontiguous memory is allowed, mostly for framebuffers.
  *
  * Must be called holding kvm->slots_lock for write.
+ *
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_set_memory_region()
+ *    kvm_set_memory_region()
+ *     __kvm_set_memory_region()
  */
 int __kvm_set_memory_region(struct kvm *kvm,
 			    const struct kvm_userspace_memory_region *mem)
@@ -1074,6 +1088,12 @@ out:
 }
 EXPORT_SYMBOL_GPL(__kvm_set_memory_region);
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_set_memory_region()
+ *    kvm_set_memory_region()
+ */
 int kvm_set_memory_region(struct kvm *kvm,
 			  const struct kvm_userspace_memory_region *mem)
 {
@@ -1086,6 +1106,11 @@ int kvm_set_memory_region(struct kvm *kvm,
 }
 EXPORT_SYMBOL_GPL(kvm_set_memory_region);
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_set_memory_region()
+ */
 static int kvm_vm_ioctl_set_memory_region(struct kvm *kvm,
 					  struct kvm_userspace_memory_region *mem)
 {
@@ -2455,6 +2480,10 @@ static int kvm_create_vcpu_debugfs(struct kvm_vcpu *vcpu)
 
 /*
  * Creates some virtual cpus.  Good luck creating more than one.
+ *
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
  */
 static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
 {
@@ -2541,6 +2570,10 @@ static int kvm_vcpu_ioctl_set_sigmask(struct kvm_vcpu *vcpu, sigset_t *sigset)
 	return 0;
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ */ 
 static long kvm_vcpu_ioctl(struct file *filp,
 			   unsigned int ioctl, unsigned long arg)
 {
@@ -2587,6 +2620,7 @@ static long kvm_vcpu_ioctl(struct file *filp,
 				synchronize_rcu();
 			put_pid(oldpid);
 		}
+		//跑起
 		r = kvm_arch_vcpu_ioctl_run(vcpu, vcpu->run);
 		trace_kvm_userspace_exit(vcpu->run->exit_reason, r);
 		break;
@@ -2874,6 +2908,11 @@ void kvm_unregister_device_ops(u32 type)
 		kvm_device_ops_table[type] = NULL;
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_ioctl_create_device()
+ */
 static int kvm_ioctl_create_device(struct kvm *kvm,
 				   struct kvm_create_device *cd)
 {
@@ -2963,6 +3002,10 @@ static long kvm_vm_ioctl_check_extension_generic(struct kvm *kvm, long arg)
 	return kvm_vm_ioctl_check_extension(kvm, arg);
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ */
 static long kvm_vm_ioctl(struct file *filp,
 			   unsigned int ioctl, unsigned long arg)
 {
@@ -2973,10 +3016,10 @@ static long kvm_vm_ioctl(struct file *filp,
 	if (kvm->mm != current->mm)
 		return -EIO;
 	switch (ioctl) {
-	case KVM_CREATE_VCPU:
+	case KVM_CREATE_VCPU://创建VCPU
 		r = kvm_vm_ioctl_create_vcpu(kvm, arg);
 		break;
-	case KVM_SET_USER_MEMORY_REGION: {
+	case KVM_SET_USER_MEMORY_REGION: {//创建内存
 		struct kvm_userspace_memory_region kvm_userspace_mem;
 
 		r = -EFAULT;
@@ -3079,6 +3122,7 @@ static long kvm_vm_ioctl(struct file *filp,
 		if (copy_from_user(&routing, argp, sizeof(routing)))
 			goto out;
 		r = -EINVAL;
+		
 		if (!kvm_arch_can_set_irq_routing(kvm))
 			goto out;
 		if (routing.nr > KVM_MAX_IRQ_ROUTES)
@@ -3963,6 +4007,13 @@ struct kvm_vcpu *preempt_notifier_to_vcpu(struct preempt_notifier *pn)
 	return container_of(pn, struct kvm_vcpu, preempt_notifier);
 }
 
+/*
+ * schedule_tail()
+ *  finish_task_switch()
+ *   fire_sched_in_preempt_notifiers()
+ *    __fire_sched_in_preempt_notifiers()
+ *     kvm_sched_in()
+ */
 static void kvm_sched_in(struct preempt_notifier *pn, int cpu)
 {
 	struct kvm_vcpu *vcpu = preempt_notifier_to_vcpu(pn);
@@ -3985,6 +4036,10 @@ static void kvm_sched_out(struct preempt_notifier *pn,
 	kvm_arch_vcpu_put(vcpu);
 }
 
+/*
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops)
+ */
 int kvm_init(void *opaque, unsigned vcpu_size, unsigned vcpu_align,
 		  struct module *module)
 {
@@ -4032,6 +4087,7 @@ int kvm_init(void *opaque, unsigned vcpu_size, unsigned vcpu_align,
 	/* A kmem cache lets us meet the alignment requirements of fx_save. */
 	if (!vcpu_align)
 		vcpu_align = __alignof__(struct kvm_vcpu);
+	
 	kvm_vcpu_cache =
 		kmem_cache_create_usercopy("kvm_vcpu", vcpu_size, vcpu_align,
 					   SLAB_ACCOUNT,

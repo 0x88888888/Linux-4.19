@@ -1642,6 +1642,8 @@ static inline int collect_expired_timers(struct timer_base *base,
  *    tick_handle_periodic( dev==lapic_events )
  *     tick_periodic()
  *      update_process_times()
+ *
+ * 每次时钟中断都会调用到这里
  */
 void update_process_times(int user_tick)
 {

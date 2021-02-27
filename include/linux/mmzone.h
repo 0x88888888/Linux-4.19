@@ -749,6 +749,10 @@ typedef struct pglist_data {
 	/* Fields commonly accessed by the page reclaim scanner 
 	 *
 	 * pg_data中的lru链表，在页面回收的时候会扫描这个链表
+	 *
+	 * 包括LRU_INACTIVE_ANON, LRU_ACTIVE_ANON
+	 *     LRU_INACTIVE_FILE, LRU_ACTIVE_FILE
+	 *     LRU_UNEVICTIVE链表
      */
 	struct lruvec		lruvec;
 
