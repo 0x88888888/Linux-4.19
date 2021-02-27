@@ -7109,6 +7109,10 @@ static int handle_machine_check(struct kvm_vcpu *vcpu)
 	return 1;
 }
 
+/*
+ * vmx_handle_exit()
+ *  handle_exception()
+ */
 static int handle_exception(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
@@ -7136,8 +7140,10 @@ static int handle_exception(struct kvm_vcpu *vcpu)
 
 	if (!vmx->rmode.vm86_active && is_gp_fault(intr_info)) {
 		WARN_ON_ONCE(!enable_vmware_backdoor);
+		
 		er = kvm_emulate_instruction(vcpu,
 			EMULTYPE_VMWARE | EMULTYPE_NO_UD_ON_FAIL);
+	
 		if (er == EMULATE_USER_EXIT)
 			return 0;
 		else if (er != EMULATE_DONE)
@@ -7227,6 +7233,12 @@ static int handle_triple_fault(struct kvm_vcpu *vcpu)
 	return 0;
 }
 
+/*
+ * vmx_handle_exit()
+ *  handle_io()
+ *
+ * 处理out,in这种敏感指令
+ */
 static int handle_io(struct kvm_vcpu *vcpu)
 {
 	unsigned long exit_qualification;
@@ -7238,6 +7250,7 @@ static int handle_io(struct kvm_vcpu *vcpu)
 
 	++vcpu->stat.io_exits;
 
+    //string io,需要读多个数据
 	if (string)
 		return kvm_emulate_instruction(vcpu, 0) == EMULATE_DONE;
 
@@ -7245,6 +7258,7 @@ static int handle_io(struct kvm_vcpu *vcpu)
 	size = (exit_qualification & 7) + 1;
 	in = (exit_qualification & 8) != 0;
 
+    //普通io，操作一个数据
 	return kvm_fast_pio(vcpu, size, port, in);
 }
 
@@ -7316,6 +7330,10 @@ static int handle_desc(struct kvm_vcpu *vcpu)
 	return kvm_emulate_instruction(vcpu, 0) == EMULATE_DONE;
 }
 
+/*
+ * vmx_handle_exit()
+ *  handle_cr()
+ */
 static int handle_cr(struct kvm_vcpu *vcpu)
 {
 	unsigned long exit_qualification, val;
@@ -7550,6 +7568,10 @@ static int handle_interrupt_window(struct kvm_vcpu *vcpu)
 	return 1;
 }
 
+/*
+ * vmx_handle_exit()
+ *  handle_halt()
+ */
 static int handle_halt(struct kvm_vcpu *vcpu)
 {
 	return kvm_emulate_halt(vcpu);
@@ -7610,6 +7632,10 @@ static int handle_xrstors(struct kvm_vcpu *vcpu)
 	return 1;
 }
 
+/*
+ * vmx_handle_exit()
+ *  handle_apic_access()
+ */
 static int handle_apic_access(struct kvm_vcpu *vcpu)
 {
 	if (likely(fasteoi)) {
@@ -10832,14 +10858,19 @@ static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 
     //切换
 	asm(
-		/* Store host registers */
+		/* Store host registers 
+		 * 存储host寄存到堆栈上
+	     */
 		"push %%" _ASM_DX "; push %%" _ASM_BP ";"
 		"push %%" _ASM_CX " \n\t" /* placeholder for guest rcx */
 		"push %%" _ASM_CX " \n\t"
 		"cmp %%" _ASM_SP ", %c[host_rsp](%0) \n\t"
 		"je 1f \n\t"
 		"mov %%" _ASM_SP ", %c[host_rsp](%0) \n\t"
-		/* Avoid VMWRITE when Enlightened VMCS is in use */
+		
+		/* Avoid VMWRITE when Enlightened VMCS is in use 
+		 *
+	     */
 		"test %%" _ASM_SI ", %%" _ASM_SI " \n\t"
 		"jz 2f \n\t"
 		"mov %%" _ASM_SP ", (%%" _ASM_SI ") \n\t"
@@ -10875,13 +10906,17 @@ static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 #endif
 		"mov %c[rcx](%0), %%" _ASM_CX " \n\t" /* kills %0 (ecx) */
 
-		/* Enter guest mode */
+		/* Enter guest mode 
+		 * 进入Guest模式
+         */
 		"jne 1f \n\t"
 		__ex(ASM_VMX_VMLAUNCH) "\n\t"
 		"jmp 2f \n\t"
 		"1: " __ex(ASM_VMX_VMRESUME) "\n\t"
 		"2: "
-		/* Save guest registers, load host registers, keep flags */
+		/* Save guest registers, load host registers, keep flags 
+		 * 从Guest os退出，进入Host模式了
+         */
 		"mov %0, %c[wordsize](%%" _ASM_SP ") \n\t"
 		"pop %0 \n\t"
 		"setbe %c[fail](%0)\n\t"

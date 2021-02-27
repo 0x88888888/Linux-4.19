@@ -1701,6 +1701,9 @@ static void wait_for_master_cpu(int cpu)
  * start_kernel()  [init/main.c]
  *  trap_init()
  *   cpu_init()
+ *
+ * start_secondary()
+ *  cpu_init()
  */
 void cpu_init(void)
 {

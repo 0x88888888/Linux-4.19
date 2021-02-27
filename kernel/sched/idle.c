@@ -366,6 +366,9 @@ EXPORT_SYMBOL_GPL(play_idle);
  * start_kernle() [init/main.c]
  *  rest_init()
  *   cpu_startup_entry(CPUHP_ONLINE)
+ *
+ * start_secondary()
+ *  cpu_startup_entry(CPUHP_AP_ONLINE_IDLE)
  */
 void cpu_startup_entry(enum cpuhp_state state)
 {

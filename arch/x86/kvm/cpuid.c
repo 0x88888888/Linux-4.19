@@ -190,7 +190,15 @@ not_found:
 }
 EXPORT_SYMBOL_GPL(cpuid_query_maxphyaddr);
 
-/* when an old userspace process fills a new kernel module */
+/* when an old userspace process fills a new kernel module 
+ *
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl()
+ *    kvm_vcpu_ioctl_set_cpuid()
+ *
+ * 设置cpu特性
+ */
 int kvm_vcpu_ioctl_set_cpuid(struct kvm_vcpu *vcpu,
 			     struct kvm_cpuid *cpuid,
 			     struct kvm_cpuid_entry __user *entries)
@@ -236,6 +244,12 @@ out:
 	return r;
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl()
+ *    kvm_vcpu_ioctl_set_cpuid2()
+ */ 
 int kvm_vcpu_ioctl_set_cpuid2(struct kvm_vcpu *vcpu,
 			      struct kvm_cpuid2 *cpuid,
 			      struct kvm_cpuid_entry2 __user *entries)
@@ -249,9 +263,11 @@ int kvm_vcpu_ioctl_set_cpuid2(struct kvm_vcpu *vcpu,
 	if (copy_from_user(&vcpu->arch.cpuid_entries, entries,
 			   cpuid->nent * sizeof(struct kvm_cpuid_entry2)))
 		goto out;
+	
 	vcpu->arch.cpuid_nent = cpuid->nent;
 	kvm_apic_set_version(vcpu);
 	kvm_x86_ops->cpuid_update(vcpu);
+	
 	r = kvm_update_cpuid(vcpu);
 out:
 	return r;

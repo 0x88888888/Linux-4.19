@@ -538,6 +538,12 @@ static int __apic_accept_irq(struct kvm_lapic *apic, int delivery_mode,
 			     int vector, int level, int trig_mode,
 			     struct dest_map *dest_map);
 
+/*
+ * kvm_lapic_reg_write()
+ *  apic_send_ipi()
+ *   kvm_irq_delivery_to_apic()
+ *    kvm_apic_set_irq()
+ */
 int kvm_apic_set_irq(struct kvm_vcpu *vcpu, struct kvm_lapic_irq *irq,
 		     struct dest_map *dest_map)
 {
@@ -1013,6 +1019,12 @@ bool kvm_intr_is_single_vcpu_fast(struct kvm *kvm, struct kvm_lapic_irq *irq,
 /*
  * Add a pending IRQ into lapic.
  * Return 1 if successfully added and 0 if discarded.
+ *
+ * kvm_lapic_reg_write()
+ *  apic_send_ipi()
+ *   kvm_irq_delivery_to_apic()
+ *    kvm_apic_set_irq()
+ *     __apic_accept_irq()
  */
 static int __apic_accept_irq(struct kvm_lapic *apic, int delivery_mode,
 			     int vector, int level, int trig_mode,
@@ -1193,6 +1205,10 @@ void kvm_apic_set_eoi_accelerated(struct kvm_vcpu *vcpu, int vector)
 }
 EXPORT_SYMBOL_GPL(kvm_apic_set_eoi_accelerated);
 
+/*
+ * kvm_lapic_reg_write()
+ *  apic_send_ipi()
+ */
 static void apic_send_ipi(struct kvm_lapic *apic)
 {
 	u32 icr_low = kvm_lapic_get_reg(apic, APIC_ICR);
@@ -1206,6 +1222,7 @@ static void apic_send_ipi(struct kvm_lapic *apic)
 	irq.trig_mode = icr_low & APIC_INT_LEVELTRIG;
 	irq.shorthand = icr_low & APIC_SHORT_MASK;
 	irq.msi_redir_hint = false;
+	
 	if (apic_x2apic_mode(apic))
 		irq.dest_id = icr_high;
 	else
@@ -1774,6 +1791,19 @@ static void apic_manage_nmi_watchdog(struct kvm_lapic *apic, u32 lvt0_val)
 	}
 }
 
+/*
+ * emulator_cmpxchg_emulated()
+ *	emulator_write_emulated()
+ *	 emulator_read_write( ops==write_emulator)
+ *	  emulator_read_write_onepage( ops==write_emulator)
+ *	   write_mmio()
+ *		vcpu_mmio_write()
+ *       kvm_iodevice_write()
+ *        apic_mmio_write()
+ *         kvm_lapic_reg_write()
+ *
+ * 
+ */
 int kvm_lapic_reg_write(struct kvm_lapic *apic, u32 reg, u32 val)
 {
 	int ret = 0;
@@ -1833,13 +1863,13 @@ int kvm_lapic_reg_write(struct kvm_lapic *apic, u32 reg, u32 val)
 		}
 		break;
 	}
-	case APIC_ICR:
+	case APIC_ICR: //发送IPI中断
 		/* No delay here, so we always clear the pending bit */
 		kvm_lapic_set_reg(apic, APIC_ICR, val & ~(1 << 12));
 		apic_send_ipi(apic);
 		break;
 
-	case APIC_ICR2:
+	case APIC_ICR2: //发送IPI中断
 		if (!apic_x2apic_mode(apic))
 			val &= 0xff000000;
 		kvm_lapic_set_reg(apic, APIC_ICR2, val);
@@ -1915,6 +1945,18 @@ int kvm_lapic_reg_write(struct kvm_lapic *apic, u32 reg, u32 val)
 }
 EXPORT_SYMBOL_GPL(kvm_lapic_reg_write);
 
+/*
+ * emulator_cmpxchg_emulated()
+ *	emulator_write_emulated()
+ *	 emulator_read_write( ops==write_emulator)
+ *	  emulator_read_write_onepage( ops==write_emulator)
+ *	   write_mmio()
+ *		vcpu_mmio_write()
+ *       kvm_iodevice_write()
+ *        apic_mmio_write()
+ *
+ * 
+ */
 static int apic_mmio_write(struct kvm_vcpu *vcpu, struct kvm_io_device *this,
 			    gpa_t address, int len, const void *data)
 {

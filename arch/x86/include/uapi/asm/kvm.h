@@ -192,7 +192,9 @@ struct kvm_msr_list {
 	__u32 indices[0];
 };
 
-
+/*
+ * 
+ */
 struct kvm_cpuid_entry {
 	__u32 function;
 	__u32 eax;
@@ -202,7 +204,11 @@ struct kvm_cpuid_entry {
 	__u32 padding;
 };
 
-/* for KVM_SET_CPUID */
+/* for KVM_SET_CPUID 
+ *
+ * KVM的host 用户空间使用，用户空间定义好cpuid特性之后，
+ * 通过这个结构体传给kvm
+ */
 struct kvm_cpuid {
 	__u32 nent;
 	__u32 padding;

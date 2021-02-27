@@ -59,10 +59,22 @@ static inline int kvm_iodevice_read(struct kvm_vcpu *vcpu,
 				: -EOPNOTSUPP;
 }
 
+/*
+ * emulator_cmpxchg_emulated()
+ *	emulator_write_emulated()
+ *	 emulator_read_write( ops==write_emulator)
+ *	  emulator_read_write_onepage( ops==write_emulator)
+ *	   write_mmio()
+ *		vcpu_mmio_write()
+ *       kvm_iodevice_write()
+ */
 static inline int kvm_iodevice_write(struct kvm_vcpu *vcpu,
 				     struct kvm_io_device *dev, gpa_t addr,
 				     int l, const void *v)
 {
+    /*
+     * apic_mmio_write
+     */
 	return dev->ops->write ? dev->ops->write(vcpu, dev, addr, l, v)
 				 : -EOPNOTSUPP;
 }

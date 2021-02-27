@@ -3711,6 +3711,12 @@ static int kvm_vcpu_ioctl_enable_cap(struct kvm_vcpu *vcpu,
 	}
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl()
+ *
+ */ 
 long kvm_arch_vcpu_ioctl(struct file *filp,
 			 unsigned int ioctl, unsigned long arg)
 {
@@ -3776,23 +3782,26 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
 		r = kvm_vcpu_ioctl_smi(vcpu);
 		break;
 	}
-	case KVM_SET_CPUID: {
+	case KVM_SET_CPUID: { //设置cpuid指令获取vCPU时的信息
 		struct kvm_cpuid __user *cpuid_arg = argp;
 		struct kvm_cpuid cpuid;
 
 		r = -EFAULT;
+		//从用户空间复制进来
 		if (copy_from_user(&cpuid, cpuid_arg, sizeof cpuid))
 			goto out;
+		//
 		r = kvm_vcpu_ioctl_set_cpuid(vcpu, &cpuid, cpuid_arg->entries);
 		break;
 	}
-	case KVM_SET_CPUID2: {
+	case KVM_SET_CPUID2: { //通过软件来模拟出来的cpu特性
 		struct kvm_cpuid2 __user *cpuid_arg = argp;
 		struct kvm_cpuid2 cpuid;
 
 		r = -EFAULT;
 		if (copy_from_user(&cpuid, cpuid_arg, sizeof cpuid))
 			goto out;
+		
 		r = kvm_vcpu_ioctl_set_cpuid2(vcpu, &cpuid,
 					      cpuid_arg->entries);
 		break;
@@ -4754,6 +4763,14 @@ static void kvm_init_msr_list(void)
 	num_msr_based_features = j;
 }
 
+/*
+ * emulator_cmpxchg_emulated()
+ *  emulator_write_emulated()
+ *   emulator_read_write( ops==write_emulator)
+ *    emulator_read_write_onepage( ops==write_emulator)
+ *     write_mmio()
+ *      vcpu_mmio_write()
+ */
 static int vcpu_mmio_write(struct kvm_vcpu *vcpu, gpa_t addr, int len,
 			   const void *v)
 {
@@ -5116,6 +5133,13 @@ static int write_emulate(struct kvm_vcpu *vcpu, gpa_t gpa,
 	return emulator_write_phys(vcpu, gpa, val, bytes);
 }
 
+/*
+ * emulator_cmpxchg_emulated()
+ *  emulator_write_emulated()
+ *   emulator_read_write( ops==write_emulator)
+ *    emulator_read_write_onepage( ops==write_emulator)
+ *     write_mmio()
+ */
 static int write_mmio(struct kvm_vcpu *vcpu, gpa_t gpa, int bytes, void *val)
 {
 	trace_kvm_mmio(KVM_TRACE_MMIO_WRITE, bytes, gpa, val);
@@ -5152,6 +5176,12 @@ static const struct read_write_emulator_ops write_emultor = {
 	.write = true,
 };
 
+/*
+ * emulator_cmpxchg_emulated()
+ *  emulator_write_emulated()
+ *   emulator_read_write( ops==write_emulator)
+ *    emulator_read_write_onepage( ops==write_emulator)
+ */
 static int emulator_read_write_onepage(unsigned long addr, void *val,
 				       unsigned int bytes,
 				       struct x86_exception *exception,
@@ -5182,11 +5212,16 @@ static int emulator_read_write_onepage(unsigned long addr, void *val,
 			return X86EMUL_PROPAGATE_FAULT;
 	}
 
+    /*
+     *
+     */
 	if (!ret && ops->read_write_emulate(vcpu, gpa, val, bytes))
 		return X86EMUL_CONTINUE;
 
 	/*
 	 * Is this MMIO handled locally?
+	 *
+	 * write_mmio()
 	 */
 	handled = ops->read_write_mmio(vcpu, gpa, bytes, val);
 	if (handled == bytes)
@@ -5204,6 +5239,11 @@ static int emulator_read_write_onepage(unsigned long addr, void *val,
 	return X86EMUL_CONTINUE;
 }
 
+/*
+ * emulator_cmpxchg_emulated()
+ *  emulator_write_emulated()
+ *   emulator_read_write( ops==write_emulator)
+ */
 static int emulator_read_write(struct x86_emulate_ctxt *ctxt,
 			unsigned long addr,
 			void *val, unsigned int bytes,
@@ -5268,6 +5308,10 @@ static int emulator_read_emulated(struct x86_emulate_ctxt *ctxt,
 				   exception, &read_emultor);
 }
 
+/*
+ * emulator_cmpxchg_emulated()
+ *  emulator_write_emulated()
+ */
 static int emulator_write_emulated(struct x86_emulate_ctxt *ctxt,
 			    unsigned long addr,
 			    const void *val,
@@ -6166,6 +6210,17 @@ static bool is_vmware_backdoor_opcode(struct x86_emulate_ctxt *ctxt)
 	return false;
 }
 
+/*
+ * vmx_handle_exit()
+ *	handle_exception()
+ *   kvm_emulate_instruction( emulation_type==EMULTYPE_VMWARE | EMULTYPE_NO_UD_ON_FAIL)
+ *    x86_emulate_instruction( cr2 ==0 , emulation_type==EMULTYPE_VMWARE | EMULTYPE_NO_UD_ON_FAIL,insn=NULL, insn_len=0)
+ *
+ * vmx_handle_exit()
+ *  handle_io()
+ *   kvm_emulate_instruction(emulation_type==0) 
+ *    x86_emulate_instruction( cr2 ==0 ,emulation_type==0,insn=NULL, insn_len=0)
+ */
 int x86_emulate_instruction(struct kvm_vcpu *vcpu,
 			    unsigned long cr2,
 			    int emulation_type,
@@ -6311,6 +6366,19 @@ restart:
 	return r;
 }
 
+/*
+ * vmx_handle_exit()
+ *	handle_exception()
+ *   kvm_emulate_instruction(  emulation_type==EMULTYPE_VMWARE | EMULTYPE_NO_UD_ON_FAIL)
+ *
+ * vmx_handle_exit()
+ *  handle_io()
+ *   kvm_emulate_instruction( emulation_type==0)
+ *
+ * vmx_handle_exit()
+ *  handle_apic_access()
+ *   kvm_emulate_instruction( emulation_type==0)
+ */
 int kvm_emulate_instruction(struct kvm_vcpu *vcpu, int emulation_type)
 {
 	return x86_emulate_instruction(vcpu, 0, emulation_type, NULL, 0);
@@ -6357,6 +6425,12 @@ static int complete_fast_pio_in(struct kvm_vcpu *vcpu)
 	return 1;
 }
 
+/*
+ * vmx_handle_exit()
+ *  handle_io()
+ *   kvm_fast_pio()
+ *    kvm_fast_pio_in()
+ */
 static int kvm_fast_pio_in(struct kvm_vcpu *vcpu, int size,
 			   unsigned short port)
 {
@@ -6378,6 +6452,11 @@ static int kvm_fast_pio_in(struct kvm_vcpu *vcpu, int size,
 	return 0;
 }
 
+/*
+ * vmx_handle_exit()
+ *  handle_io()
+ *   kvm_fast_pio()
+ */
 int kvm_fast_pio(struct kvm_vcpu *vcpu, int size, unsigned short port, int in)
 {
 	int ret = kvm_skip_emulated_instruction(vcpu);
@@ -6779,6 +6858,12 @@ void kvm_arch_exit(void)
 	free_percpu(shared_msrs);
 }
 
+/*
+ * vmx_handle_exit()
+ *  handle_halt()
+ *   kvm_emulate_halt()
+ *    kvm_vcpu_halt()
+ */
 int kvm_vcpu_halt(struct kvm_vcpu *vcpu)
 {
 	++vcpu->stat.halt_exits;
@@ -6792,6 +6877,11 @@ int kvm_vcpu_halt(struct kvm_vcpu *vcpu)
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_halt);
 
+/*
+ * vmx_handle_exit()
+ *  handle_halt()
+ *   kvm_emulate_halt()
+ */
 int kvm_emulate_halt(struct kvm_vcpu *vcpu)
 {
 	int ret = kvm_skip_emulated_instruction(vcpu);
@@ -7641,6 +7731,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 	trace_kvm_entry(vcpu->vcpu_id);
 	if (lapic_timer_advance_ns)
 		wait_lapic_expire(vcpu);
+	
 	guest_enter_irqoff();
 
 	if (unlikely(vcpu->arch.switch_db_regs)) {
@@ -7718,6 +7809,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 		kvm_lapic_sync_from_vapic(vcpu);
 
 	vcpu->arch.gpa_available = false;
+	//vmx_handle_exit
 	r = kvm_x86_ops->handle_exit(vcpu);
 	return r;
 

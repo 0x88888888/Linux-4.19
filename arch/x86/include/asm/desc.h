@@ -427,6 +427,9 @@ static inline void load_debug_idt(void)
  *  trap_init()
  *   cpu_init()
  *    load_current_idt()
+ *
+ * start_secondary()
+ *  load_current_idt()
  */
 static inline void load_current_idt(void)
 {

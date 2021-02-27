@@ -2600,7 +2600,7 @@ static long kvm_vcpu_ioctl(struct file *filp,
 	if (mutex_lock_killable(&vcpu->mutex))
 		return -EINTR;
 	switch (ioctl) {
-	case KVM_RUN: {
+	case KVM_RUN: { //跑起vCPU
 		struct pid *oldpid;
 		r = -EINVAL;
 		if (arg)
@@ -2625,7 +2625,7 @@ static long kvm_vcpu_ioctl(struct file *filp,
 		trace_kvm_userspace_exit(vcpu->run->exit_reason, r);
 		break;
 	}
-	case KVM_GET_REGS: {
+	case KVM_GET_REGS: { //获取vCPU的寄存器信息
 		struct kvm_regs *kvm_regs;
 
 		r = -ENOMEM;
@@ -2636,6 +2636,7 @@ static long kvm_vcpu_ioctl(struct file *filp,
 		if (r)
 			goto out_free1;
 		r = -EFAULT;
+		//复制到用户空间去
 		if (copy_to_user(argp, kvm_regs, sizeof(struct kvm_regs)))
 			goto out_free1;
 		r = 0;
@@ -2643,7 +2644,7 @@ out_free1:
 		kfree(kvm_regs);
 		break;
 	}
-	case KVM_SET_REGS: {
+	case KVM_SET_REGS: {//设置vCPU的寄存器信息
 		struct kvm_regs *kvm_regs;
 
 		r = -ENOMEM;
@@ -2772,7 +2773,7 @@ out_free1:
 		r = kvm_arch_vcpu_ioctl_set_fpu(vcpu, fpu);
 		break;
 	}
-	default:
+	default://这里还有很多
 		r = kvm_arch_vcpu_ioctl(filp, ioctl, arg);
 	}
 out:

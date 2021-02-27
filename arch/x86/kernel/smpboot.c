@@ -146,6 +146,9 @@ static inline void smpboot_restore_warm_reset_vector(void)
 /*
  * Report back to the Boot Processor during boot time or to the caller processor
  * during CPU online.
+ *
+ * start_secondary()
+ *  smp_callin()
  */
 static void smp_callin(void)
 {
@@ -233,6 +236,7 @@ static void notrace start_secondary(void *unused)
 	cr4_init_shadow();
 	__flush_tlb_all();
 #endif
+
 	load_current_idt();
 	cpu_init();
 	x86_cpuinit.early_percpu_clock_init();
@@ -1029,7 +1033,10 @@ static int do_boot_cpu(int apicid, int cpu, struct task_struct *idle,
 {
 	volatile u32 *trampoline_status =
 		(volatile u32 *) __va(real_mode_header->trampoline_status);
-	/* start_ip had better be page-aligned! */
+	/* start_ip had better be page-aligned! 
+	 *
+	 * 在trampoline_64.S的trampoline_start
+	 */
 	unsigned long start_ip = real_mode_header->trampoline_start;
 
 	unsigned long boot_error = 0;
@@ -1084,6 +1091,7 @@ static int do_boot_cpu(int apicid, int cpu, struct task_struct *idle,
 	 * - Use an INIT boot APIC message for APs or NMI for BSP.
 	 *
 	 * apic->wakeup_secondary_cpu == 0
+	 * 启动ap
 	 */
 	if (apic->wakeup_secondary_cpu)
 		boot_error = apic->wakeup_secondary_cpu(apicid, start_ip);
