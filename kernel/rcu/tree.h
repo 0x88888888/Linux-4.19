@@ -128,9 +128,13 @@ struct rcu_node {
 	raw_spinlock_t __private lock;	/* Root rcu_node's lock protects */
 					/*  some rcu_state fields as well as */
 					/*  following. */
-	//本节点宽限期编号，等于或小于根节点的gp_seqgp_seq			
+	/*
+	 * 本节点宽限期编号，等于或小于根节点的gp_seq
+	 * 在rcu_gp_cleanup() 中更新这个值,开始新的grace period
+	 */
 	unsigned long gp_seq;	/* Track rsp->rcu_gp_seq. */
 	unsigned long gp_seq_needed; /* Track rsp->rcu_gp_seq_needed. */
+	
 	unsigned long completedqs; /* All QSes done for this node. */
 	/*
 	 * qsmask中的每个bit都对应着一个cpu是否已经过了 grace period(就是reports QS了)
@@ -342,6 +346,7 @@ struct rcu_data {
 
 	/* 5) _rcu_barrier(), OOM callbacks, and expediting. */
 	struct rcu_head barrier_head;
+//没有定义					
 #ifdef CONFIG_RCU_FAST_NO_HZ
 	struct rcu_head oom_head;
 #endif /* #ifdef CONFIG_RCU_FAST_NO_HZ */
@@ -349,6 +354,7 @@ struct rcu_data {
 	int exp_dynticks_snap;		/* Double-check need for IPI. */
 
 	/* 6) Callback offloading. */
+	//没有定义
 #ifdef CONFIG_RCU_NOCB_CPU
 
 	struct rcu_head *nocb_head;	/* CBs waiting for kthread. */
@@ -472,7 +478,9 @@ struct rcu_state {
 	 * 应该是当前正在进行的grace period
 	 * 初始值为-300
 	 *
-	 * //当前宽限期编号，gp_seq > ()，表明正处在grace period内
+	 * //当前grace period编号，gp_seq > ()，表明正处在grace period内
+	 *
+	 * 在rcu_gp_cleanup()中调用rcu_seq_end()使得 gp_seq+1,开始一个新的grace period
 	*/
 	unsigned long gp_seq;			/* Grace-period sequence #. */
 	/*

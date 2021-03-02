@@ -33,6 +33,7 @@
 #include <uapi/linux/sched/types.h>
 #include "../time/tick-internal.h"
 
+//没有定义
 #ifdef CONFIG_RCU_BOOST
 
 #include "../locking/rtmutex_common.h"
@@ -59,6 +60,7 @@ DEFINE_PER_CPU(char, rcu_cpu_has_work);
 
 #endif /* #else #ifdef CONFIG_RCU_BOOST */
 
+//没有定义
 #ifdef CONFIG_RCU_NOCB_CPU
 static cpumask_var_t rcu_nocb_mask; /* CPUs to have callbacks offloaded. */
 static bool __read_mostly rcu_nocb_poll;    /* Offload kthread are to poll. */
@@ -1039,6 +1041,7 @@ dump_blkd_tasks(struct rcu_state *rsp, struct rcu_node *rnp, int ncheck)
 
 #endif /* #else #ifdef CONFIG_PREEMPT_RCU */
 
+//没有定义
 #ifdef CONFIG_RCU_BOOST
 
 static void rcu_wake_cond(struct task_struct *t, int status)
@@ -2139,7 +2142,8 @@ static bool __call_rcu_nocb(struct rcu_data *rdp, struct rcu_head *rhp,
 
 	if (!rcu_is_nocb_cpu(rdp->cpu))
 		return false;
-	
+
+	//rhp排队
 	__call_rcu_nocb_enqueue(rdp, rhp, &rhp->next, 1, lazy, flags);
 	
 	if (__is_kfree_rcu_offset((unsigned long)rhp->func))
@@ -2160,7 +2164,7 @@ static bool __call_rcu_nocb(struct rcu_data *rdp, struct rcu_head *rhp,
 	if (irqs_disabled_flags(flags) &&
 	    !rcu_is_watching() &&
 	    cpu_online(smp_processor_id()))
-		invoke_rcu_core();
+		invoke_rcu_core(); //设置RCU_SOFTIRQ软中断
 
 	return true;
 }

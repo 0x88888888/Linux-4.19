@@ -803,6 +803,10 @@ static struct rcu_node *rcu_get_root(struct rcu_state *rsp)
  *     cpu_idle_poll()
  *      rcu_idle_enter()
  *       rcu_eqs_enter(false)
+ *
+ * __context_tracking_enter()
+ *  rcu_user_enter()
+ *   rcu_eqs_enter(user==true)
  */
 static void rcu_eqs_enter(bool user)
 {
@@ -871,6 +875,9 @@ void rcu_idle_enter(void)
  *
  * If you add or remove a call to rcu_user_enter(), be sure to test with
  * CONFIG_RCU_EQS_DEBUG=y.
+ *
+ * __context_tracking_enter()
+ *  rcu_user_enter()
  */
 void rcu_user_enter(void)
 {
@@ -1003,6 +1010,7 @@ static void rcu_eqs_exit(bool user)
 	
 	rcu_dynticks_task_exit();
 	rcu_dynticks_eqs_exit();
+	
 	rcu_cleanup_after_idle();
 	trace_rcu_dyntick(TPS("End"), rdtp->dynticks_nesting, 1, rdtp->dynticks);
 	WARN_ON_ONCE(IS_ENABLED(CONFIG_RCU_EQS_DEBUG) && !user && !is_idle_task(current));
@@ -2089,9 +2097,15 @@ static bool rcu_advance_cbs(struct rcu_state *rsp, struct rcu_node *rnp,
  *  __call_rcu()
  *   __call_rcu_core()
  *    note_gp_changes()
- *     __note_gp_changes()
+ *     __note_gp_changes(rnp == rdp->mynode)
+ *
+ * rcu_gp_kthread()
+ *  rcu_gp_cleanup()
+ *   __note_gp_changes()
  *
  * 修改rcu_data 是否开始或者结束一个grace period的状态 
+ *
+ * 
  */
 static bool __note_gp_changes(struct rcu_state *rsp, struct rcu_node *rnp,
 			      struct rcu_data *rdp)
@@ -2107,7 +2121,9 @@ static bool __note_gp_changes(struct rcu_state *rsp, struct rcu_node *rnp,
 
 	/* Handle the ends of any preceding grace periods first.
 	 *
-	 * 处理grace period结束
+	 * 处理grace period结束,也就是有新的grace period开始了
+	 *
+	 * rdp->gp_seq < rnp->gp_seq
 	 */
 	if (rcu_seq_completed_gp(rdp->gp_seq, rnp->gp_seq) ||
 	    unlikely(READ_ONCE(rdp->gpwrap))) {
@@ -2119,6 +2135,9 @@ static bool __note_gp_changes(struct rcu_state *rsp, struct rcu_node *rnp,
 	}
 
 	/* Now handle the beginnings of any new-to-this-CPU grace periods. */
+	/*
+	 * rdp->gp_seq < rnp->gp_seq 说明有是有新的grace period开始了
+	 */
 	if (rcu_seq_new_gp(rdp->gp_seq, rnp->gp_seq) ||
 	    unlikely(READ_ONCE(rdp->gpwrap))) {
 		/*
@@ -2137,13 +2156,14 @@ static bool __note_gp_changes(struct rcu_state *rsp, struct rcu_node *rnp,
 		zero_cpu_stall_ticks(rdp);
 	}
 
-    //上面的节点复制给下一级节点		
+    //父节点的grace period值复制给下一级节点		
 	rdp->gp_seq = rnp->gp_seq;  /* Remember new grace-period state. */
 		
 	if (ULONG_CMP_GE(rnp->gp_seq_needed, rdp->gp_seq_needed) || rdp->gpwrap)
 		rdp->gp_seq_needed = rnp->gp_seq_needed;
 	
 	WRITE_ONCE(rdp->gpwrap, false);
+	
 	rcu_gpnum_ovf(rnp, rdp);
 	return ret;
 }
@@ -2164,8 +2184,12 @@ static void note_gp_changes(struct rcu_state *rsp, struct rcu_data *rdp)
 	struct rcu_node *rnp;
 
 	local_irq_save(flags);
-	//父节点
+	//rcu_data的父节点,rcu_node
 	rnp = rdp->mynode;
+	/*
+	 * rcu_data->gq_seq == rcu_node->gp_seq,说明没有开始新的grace period?
+	 *
+	 */
 	if ((rdp->gp_seq == rcu_seq_current(&rnp->gp_seq) &&
 	     !unlikely(READ_ONCE(rdp->gpwrap))) || /* w/out lock. */
 	    !raw_spin_trylock_rcu_node(rnp)) { /* irqs already off, so later. 得到rnp->lock*/
@@ -2208,6 +2232,7 @@ static bool rcu_gp_init(struct rcu_state *rsp)
 	//得到根节点
 	struct rcu_node *rnp = rcu_get_root(rsp);
 
+    //grace period 开始的jiffies
 	WRITE_ONCE(rsp->gp_activity, jiffies);
 	raw_spin_lock_irq_rcu_node(rnp);
 	if (!READ_ONCE(rsp->gp_flags)) {
@@ -2385,6 +2410,11 @@ static void rcu_gp_fqs(struct rcu_state *rsp, bool first_time)
 
 /*
  * Clean up after the old grace period.
+ *
+ * rcu_gp_kthread()
+ *  rcu_gp_cleanup()
+ *
+ * 
  */
 static void rcu_gp_cleanup(struct rcu_state *rsp)
 {
@@ -2397,6 +2427,7 @@ static void rcu_gp_cleanup(struct rcu_state *rsp)
 
 	WRITE_ONCE(rsp->gp_activity, jiffies);
 	raw_spin_lock_irq_rcu_node(rnp);
+	//grace period经历的jiffies
 	gp_duration = jiffies - rsp->gp_start;
 	if (gp_duration > rsp->gp_max)
 		rsp->gp_max = gp_duration;
@@ -2419,18 +2450,26 @@ static void rcu_gp_cleanup(struct rcu_state *rsp)
 	 * the current grace period to be completely recorded in all of
 	 * the rcu_node structures before the beginning of the next grace
 	 * period is recorded in any of the rcu_node structures.
+	 *
+	 * 开始了一个new grace period了，需要从rsp->gp_seq传递到rcu_data->gp_seq上去
 	 */
 	new_gp_seq = rsp->gp_seq;
 	rcu_seq_end(&new_gp_seq);
+	/*
+	 * 循环，遍历整个rcu树上的rcu_node,设置  rcu_data->gp_seq=rsp->gp_seq,
+	 * 开始了一个new grace period了
+	 */
 	rcu_for_each_node_breadth_first(rsp, rnp) {
 		raw_spin_lock_irq_rcu_node(rnp);
 		if (WARN_ON_ONCE(rcu_preempt_blocked_readers_cgp(rnp)))
 			dump_blkd_tasks(rsp, rnp, 10);
 		WARN_ON_ONCE(rnp->qsmask);
+		//写入到rcu_data->gp_seq里去
 		WRITE_ONCE(rnp->gp_seq, new_gp_seq);
 		rdp = this_cpu_ptr(rsp->rda);
 		if (rnp == rdp->mynode)
 			needgp = __note_gp_changes(rsp, rnp, rdp) || needgp;
+		
 		/* smp_mb() provided by prior unlock-lock pair. */
 		needgp = rcu_future_gp_cleanup(rsp, rnp) || needgp;
 		sq = rcu_nocb_gp_get(rnp);
@@ -2443,7 +2482,10 @@ static void rcu_gp_cleanup(struct rcu_state *rsp)
 	rnp = rcu_get_root(rsp);
 	raw_spin_lock_irq_rcu_node(rnp); /* GP before rsp->gp_seq update. */
 
-	/* Declare grace period done. */
+	/* Declare grace period done. 
+	 * 
+	 * 开始了一个新的grace period了
+	 */
 	rcu_seq_end(&rsp->gp_seq);
 	trace_rcu_grace_period(rsp->name, rsp->gp_seq, TPS("end"));
 	rsp->gp_state = RCU_GP_IDLE;
@@ -2474,7 +2516,7 @@ static void rcu_gp_cleanup(struct rcu_state *rsp)
  *
  * rcu_spawn_gp_kthread()
  *  ......
- *   rcu_gp_kthread()
+ *   rcu_gp_kthread(),arg 为rcu_sched_state 或 rcu_bh_state 或 rcu_preempt_state
  */
 static int __noreturn rcu_gp_kthread(void *arg)
 {
@@ -2504,7 +2546,7 @@ static int __noreturn rcu_gp_kthread(void *arg)
 			//grace period结束了
 			rsp->gp_state = RCU_GP_DONE_GPS;
 			/* Locking provides needed memory barrier. 
-			 * 启动一个grace period ,rsp->gp_seq
+			 * 启动一个grace period ,rsp->gp_seq++
 			 */
 			if (rcu_gp_init(rsp))
 				break;
@@ -2573,6 +2615,7 @@ static int __noreturn rcu_gp_kthread(void *arg)
 
 		/* Handle grace-period end. */
 		rsp->gp_state = RCU_GP_CLEANUP;
+		//开始一个new grace period了
 		rcu_gp_cleanup(rsp);
 		rsp->gp_state = RCU_GP_CLEANED;
 	}
@@ -3155,6 +3198,13 @@ static void force_qs_rnp(struct rcu_state *rsp, int (*f)(struct rcu_data *rsp))
  *
  * rcu_sched_force_quiescent_state(rcu_sched_state)
  *  force_quiescent_state()
+ *
+ * call_rcu()
+ *  __call_rcu()
+ *   __call_rcu_core()
+ *    force_quiescent_state()
+ *
+ * 唤醒rcu_gp_kthread
  */
 static void force_quiescent_state(struct rcu_state *rsp)
 {
@@ -3167,6 +3217,7 @@ static void force_quiescent_state(struct rcu_state *rsp)
 	rnp = __this_cpu_read(rsp->rda->mynode);
 	
 	for (; rnp != NULL; rnp = rnp->parent) {
+		
 		ret = (READ_ONCE(rsp->gp_flags) & RCU_GP_FLAG_FQS) ||
 		      !raw_spin_trylock(&rnp->fqslock);
 		
@@ -3301,7 +3352,7 @@ __rcu_process_callbacks(struct rcu_state *rsp)
 	 * 在rdp->cblist->head 到 rdp->cblist->tails[RCU_DONE_TAIL]有对象回收函数
 	 */
 	if (rcu_segcblist_ready_cbs(&rdp->cblist))
-		invoke_rcu_callbacks(rsp, rdp); //调用对象回收函数
+		invoke_rcu_callbacks(rsp, rdp); //唤醒rcu_cpu_kthread线程, 调用对象回收函数
 
 	/* Do any needed deferred wakeups of rcuo kthreads. */
 	do_nocb_deferred_wakeup(rdp);
@@ -3414,7 +3465,7 @@ static void __call_rcu_core(struct rcu_state *rsp, struct rcu_data *rdp,
 	 * invoking force_quiescent_state() if the newly enqueued callback
 	 * is the only one waiting for a grace period to complete.
 	 *
-	 *  callbacks链表中有很多待处理的
+	 *  callbacks链表中有很多待处理的,要force 一下grace period了
 	 */
 	if (unlikely(rcu_segcblist_n_cbs(&rdp->cblist) >
 		     rdp->qlen_last_fqs_check + qhimark)) {
@@ -3423,14 +3474,16 @@ static void __call_rcu_core(struct rcu_state *rsp, struct rcu_data *rdp,
 		note_gp_changes(rsp, rdp);
 
 		/* Start a new grace period if one not already started. */
-		if (!rcu_gp_in_progress(rsp)) {
+		if (!rcu_gp_in_progress(rsp)) { /* rsp->gp_seq==0，走这里 */
 			rcu_accelerate_cbs_unlocked(rsp, rdp->mynode, rdp);
-		} else {
+			
+		} else {  // rsp->gp_seq !=0,走这里
+		
 			/* Give the grace period a kick. */
 			rdp->blimit = LONG_MAX;
 			if (rsp->n_force_qs == rdp->n_force_qs_snap &&
 			    rcu_segcblist_first_pend_cb(&rdp->cblist) != head)
-				force_quiescent_state(rsp);
+				force_quiescent_state(rsp); //唤醒rcu_gp_kthread
 			
 			rdp->n_force_qs_snap = rsp->n_force_qs;
 			//重新设置了
@@ -3459,7 +3512,7 @@ static void rcu_leak_callback(struct rcu_head *rhp)
  *  __call_rcu(rsp == rcu_sched_state , lazy == 0)
  *
  * call_rcu()
- *  __call_rcu( rsp == rcu_state_p)
+ *  __call_rcu( rsp == rcu_state_p,cpu==-1 , lazy=0)
  *
  */
 static void
@@ -3474,6 +3527,7 @@ __call_rcu(struct rcu_head *head, rcu_callback_t func,
 	 */
 	WARN_ON_ONCE((unsigned long)head & (sizeof(void *) - 1));
 
+    //忽略
 	if (debug_rcu_head_queue(head)) {
 		/*
 		 * Probable double call_rcu(), so leak the callback.
@@ -3505,8 +3559,9 @@ __call_rcu(struct rcu_head *head, rcu_callback_t func,
 		if (cpu != -1) //特定cpu的rcu_data对象
 			rdp = per_cpu_ptr(rsp->rda, cpu);
 		
-		if (likely(rdp->mynode)) { //有父节点
+		if (likely(rdp->mynode)) { //有父节点，也即是有rcu_node
 			/* Post-boot, so this should be for a no-CBs CPU. */
+		    //排队，设置RCU_SOFTIRQ软中断，就返回来了
 			offline = !__call_rcu_nocb(rdp, head, lazy, flags);
 			WARN_ON_ONCE(offline);
 			/* Offline CPU, _call_rcu() illegal, leak callback.  */
