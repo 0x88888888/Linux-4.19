@@ -24,12 +24,17 @@
  * A note on @num_free: with indirect buffers, each buffer needs one
  * element in the queue, otherwise a buffer will need one element per
  * sg element.
+ *
+ * 看vring_virtqueue, vring_virtqueue包含了virtqueue和vring
  */
 struct virtqueue {
     //链接virtqueue
 	struct list_head list;
 	void (*callback)(struct virtqueue *vq);
 	const char *name;
+	/*
+	 * virtqueue所属的virtio_device
+	 */
 	struct virtio_device *vdev;
 	unsigned int index;
 	unsigned int num_free;
@@ -133,6 +138,9 @@ struct virtio_device {
 	struct virtio_device_id id;
 	const struct virtio_config_ops *config;
 	const struct vringh_config_ops *vringh_config;
+	/*
+	 * 链接到virtqueue->list
+	 */
 	struct list_head vqs;
 	u64 features;
 	void *priv;

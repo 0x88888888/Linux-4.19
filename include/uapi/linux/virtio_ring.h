@@ -94,6 +94,9 @@ struct vring_used {
 	struct vring_used_elem ring[];
 };
 
+/*
+ * 看vring_virtqueue, vring_virtqueue包含了virtqueue和vring
+ */
 struct vring {
 	unsigned int num;
 

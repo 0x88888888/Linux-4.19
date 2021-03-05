@@ -77,7 +77,7 @@ struct rcu_cblist {
 #define RCU_DONE_TAIL		0	/* Also RCU_WAIT head. */
 #define RCU_WAIT_TAIL		1	/* Also RCU_NEXT_READY head. */
 #define RCU_NEXT_READY_TAIL	2	/* Also RCU_NEXT head. */
-#define RCU_NEXT_TAIL		3
+#define RCU_NEXT_TAIL		3   /* rcu_call加入到这里? */
 #define RCU_CBLIST_NSEGS	4
 
 /*

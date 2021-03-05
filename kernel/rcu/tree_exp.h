@@ -208,6 +208,7 @@ static void __rcu_report_exp_rnp(struct rcu_state *rsp, struct rcu_node *rnp,
 {
 	unsigned long mask;
 
+    //这个while循环，一直设置rnp->expmask,上报
 	for (;;) {
 		if (!sync_rcu_preempt_exp_done(rnp)) {
 			if (!rnp->expmask)
@@ -278,7 +279,10 @@ static void rcu_report_exp_cpu_mult(struct rcu_state *rsp, struct rcu_node *rnp,
  *  __schedule()
  *   rcu_note_context_switch()
  *    rcu_sched_qs()
- *     rcu_report_exp_rdp()
+ *     rcu_report_exp_rdp(rsp == rcu_sched_state, rdp == this_cpu_ptr(&rcu_sched_data), wake == true)
+ *
+ * rcu_report_dead()
+ *  rcu_report_exp_rdp(rsp == rcu_sched_state, rdp == this_cpu_ptr(&rcu_sched_data), wake == true)
  */
 static void rcu_report_exp_rdp(struct rcu_state *rsp, struct rcu_data *rdp,
 			       bool wake)
@@ -371,6 +375,7 @@ static void sync_sched_exp_handler(void *data)
 	if (!(READ_ONCE(rnp->expmask) & rdp->grpmask) ||
 	    __this_cpu_read(rcu_sched_data.cpu_no_qs.b.exp))
 		return;
+	
 	if (rcu_is_cpu_rrupt_from_idle()) {
 		rcu_report_exp_rdp(&rcu_sched_state,
 				   this_cpu_ptr(&rcu_sched_data), true);

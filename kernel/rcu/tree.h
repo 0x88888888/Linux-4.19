@@ -131,10 +131,19 @@ struct rcu_node {
 	/*
 	 * 本节点宽限期编号，等于或小于根节点的gp_seq
 	 * 在rcu_gp_cleanup() 中更新这个值,开始新的grace period
+	 *
+	 * gp_seq的最低2位表示grace period的状态，为0表示 not yet started
+	 *                                        为1表示 in progress
+	 *
+	 *  may lag up to one step behind their rcu_state counterpart.
 	 */
 	unsigned long gp_seq;	/* Track rsp->rcu_gp_seq. */
 	unsigned long gp_seq_needed; /* Track rsp->rcu_gp_seq_needed. */
-	
+
+	/* 在rcu_report_qs_rnp()设置rnp->completedqs = rnp->gp_seq 
+	 *
+	 * 在这个rcu_node上已经完成的quiescent state的grace period number
+	 */
 	unsigned long completedqs; /* All QSes done for this node. */
 	/*
 	 * qsmask中的每个bit都对应着一个cpu是否已经过了 grace period(就是reports QS了)
@@ -177,7 +186,7 @@ struct rcu_node {
 	int	grplo;		/* lowest-numbered CPU or group here. */
 	//该分组的CPU最小编号			
 	int	grphi;		/* highest-numbered CPU or group here. */
-	//该分组在上一层分组里的编号
+	//该rcu_node在parent rcu_node里的编号
 	u8	grpnum;		/* CPU/group number for next level up. */
 	//在树中的层级，Root为0
 	u8	level;		/* root is at level 0. */
@@ -245,7 +254,7 @@ struct rcu_node {
  */
 union rcu_noqs {
 	struct {
-		u8 norm;
+		u8 norm;//标记new grace period是否需要经历一个quiscent state,true表示需要，
 		u8 exp;
 	} b; /* Bits. */
 	u16 s; /* Set of bits, aggregate OR here. */
@@ -288,6 +297,7 @@ struct rcu_data {
 	bool		core_needs_qs;	/* Core waits for quiesc state. */
 	/* CPU是否在线，不在线的CPU需要特殊处理，以提高性能*/
 	bool		beenonline;	/* CPU online at least once. */
+	//在rcu_gpnum_ovf()中设置为true
 	bool		gpwrap;		/* Possible ->gp_seq wrap. */
 	
 	/*
@@ -478,7 +488,9 @@ struct rcu_state {
 	 * 应该是当前正在进行的grace period
 	 * 初始值为-300
 	 *
-	 * //当前grace period编号，gp_seq > ()，表明正处在grace period内
+	 * gp_seq的最低2位表示grace period的状态，为0表示 not yet started
+	 *                                        为1表示 in progress 
+	 *
 	 *
 	 * 在rcu_gp_cleanup()中调用rcu_seq_end()使得 gp_seq+1,开始一个新的grace period
 	*/
@@ -494,6 +506,12 @@ struct rcu_state {
 	struct swait_queue_head gp_wq;		/* Where GP task waits. */
 	/*
 	 * RCU_GP_FLAG_INIT, RCU_GP_FLAG_FQS
+	 *
+	 * 在force_quiescent_state()和rcu_report_qs_rsp()中标记RCU_GP_FLAG_FQS
+	 *
+	 * 在rcu_gp_kthread()->rcu_gp_fqs()中去除标记RCU_GP_FLAG_FQS
+	 *
+	 * 在rcu_gp_kthread()->rcu_gp_cleanup()中RCU_GP_FLAG_INIT
 	 */
 	short gp_flags;				/* Commands for GP task. */
 
@@ -563,6 +581,9 @@ struct rcu_state {
 						/*  a reluctant CPU. */
 	unsigned long n_force_qs_gpstart;	/* Snapshot of n_force_qs at */
 						/*  GP start. */
+	/*
+	 * 注: tracks the duration of the longest grace period in jiffies.
+	 */
 	unsigned long gp_max;			/* Maximum GP duration in */
 						/*  jiffies. */
 	const char *name;			/* Name of structure. */
@@ -577,8 +598,12 @@ struct rcu_state {
 						/*  GP pre-initialization. */
 };
 
-/* Values for rcu_state structure's gp_flags field. */
+/* Values for rcu_state structure's gp_flags field. 
+ *
+ * 在rcu_gp_cleanup()中设置rcu_state->gp_flags == RCU_GP_FLAG_INIT
+ */
 #define RCU_GP_FLAG_INIT 0x1	/* Need grace-period initialization. */
+//需要来一次force quiscent state,用rcu_gp_fqs()这个来force quiscent state
 #define RCU_GP_FLAG_FQS  0x2	/* Need grace-period quiescent-state forcing. */
 
 /* Values for rcu_state structure's gp_state field. */

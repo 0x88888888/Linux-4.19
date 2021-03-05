@@ -40,13 +40,14 @@
  */
 
 #define RCU_SEQ_CTR_SHIFT	2
+//rcu_node->gp_seq 的最低两位是state
 #define RCU_SEQ_STATE_MASK	((1 << RCU_SEQ_CTR_SHIFT /* 2 */) - 1)
 
 /*
  * Return the counter portion of a sequence number previously returned
  * by rcu_seq_snap() or rcu_seq_current().
  *
- * 从
+ * 从rcu_node->gp_seq ,rcu_state->gp_seq中获取grace period的值部分
  */
 static inline unsigned long rcu_seq_ctr(unsigned long s)
 {
@@ -89,8 +90,11 @@ static inline void rcu_seq_set_state(unsigned long *sp, int newstate)
 
 /* Adjust sequence number for start of update-side operation. 
  *
- * rcu_gp_init()
- *  rcu_seq_start(&rsp->gp_seq)
+ * rcu_spawn_gp_kthread()
+ *  ......
+ *   rcu_gp_kthread()
+ *    rcu_gp_init() 这个函数被循环调用
+ *     rcu_seq_start(&rsp->gp_seq)
  *
  * _rcu_barrier()
  *  rcu_seq_start(&rsp->barrier_sequence)
@@ -178,7 +182,7 @@ static inline bool rcu_seq_done(unsigned long *sp, unsigned long s)
 /*
  * Has a grace period completed since the time the old gp_seq was collected?
  *
- * old < new就是completed了
+ * old < new, old就是completed了
  */
 static inline bool rcu_seq_completed_gp(unsigned long old, unsigned long new)
 {
@@ -300,6 +304,7 @@ static inline bool __rcu_reclaim(const char *rn, struct rcu_head *head)
 	}
 }
 
+// 有定义
 #ifdef CONFIG_RCU_STALL_COMMON
 
 extern int rcu_cpu_stall_suppress;
@@ -496,6 +501,7 @@ do {									\
 
 #endif /* #if defined(SRCU) || !defined(TINY_RCU) */
 
+//没有定义
 #ifdef CONFIG_TINY_RCU
 /* Tiny RCU doesn't expedite, as its purpose in life is instead to be tiny. */
 static inline bool rcu_gp_is_normal(void) { return true; }
@@ -525,6 +531,9 @@ enum rcutorture_type {
 	INVALID_RCU_FLAVOR
 };
 
+/*
+ * 有定义
+ */
 #if defined(CONFIG_TREE_RCU) || defined(CONFIG_PREEMPT_RCU)
 void rcutorture_get_gp_data(enum rcutorture_type test_type, int *flags,
 			    unsigned long *gp_seq);
@@ -542,6 +551,7 @@ static inline void rcutorture_get_gp_data(enum rcutorture_type test_type,
 	*gp_seq = 0;
 }
 static inline void rcutorture_record_progress(unsigned long vernum) { }
+//没有定义
 #ifdef CONFIG_RCU_TRACE
 void do_trace_rcu_torture_read(const char *rcutorturename,
 			       struct rcu_head *rhp,
@@ -554,6 +564,7 @@ void do_trace_rcu_torture_read(const char *rcutorturename,
 #endif
 #endif
 
+//没有定义
 #ifdef CONFIG_TINY_SRCU
 
 static inline void srcutorture_get_gp_data(enum rcutorture_type test_type,
@@ -566,6 +577,7 @@ static inline void srcutorture_get_gp_data(enum rcutorture_type test_type,
 	*gp_seq = sp->srcu_idx;
 }
 
+//有定义
 #elif defined(CONFIG_TREE_SRCU)
 
 void srcutorture_get_gp_data(enum rcutorture_type test_type,
@@ -574,6 +586,9 @@ void srcutorture_get_gp_data(enum rcutorture_type test_type,
 
 #endif
 
+/*
+ * 没有定义
+ */
 #ifdef CONFIG_TINY_RCU
 static inline unsigned long rcu_get_gp_seq(void) { return 0; }
 static inline unsigned long rcu_bh_get_gp_seq(void) { return 0; }
@@ -603,6 +618,9 @@ extern struct workqueue_struct *rcu_gp_wq;
 extern struct workqueue_struct *rcu_par_gp_wq;
 #endif /* #else #ifdef CONFIG_TINY_RCU */
 
+/*
+ * 没有定义
+ */
 #ifdef CONFIG_RCU_NOCB_CPU
 bool rcu_is_nocb_cpu(int cpu);
 #else

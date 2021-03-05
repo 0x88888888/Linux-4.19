@@ -1451,6 +1451,7 @@ static void rcu_prepare_kthreads(int cpu)
 
 #endif /* #else #ifdef CONFIG_RCU_BOOST */
 
+ //没有定义
 #if !defined(CONFIG_RCU_FAST_NO_HZ)
 
 /*
