@@ -7744,9 +7744,9 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 		vcpu->arch.switch_db_regs &= ~KVM_DEBUGREG_RELOAD;
 	}
 
-    //vmx_vcpu_run()
+    //vmx_vcpu_run(),这里从host切入到guest 了
 	kvm_x86_ops->run(vcpu);
-
+    //返回就是VM exit了
 	/*
 	 * Do this here before restoring debug registers on the host.  And
 	 * since we do this before handling the vmexit, a DR access vmexit
@@ -7809,7 +7809,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 		kvm_lapic_sync_from_vapic(vcpu);
 
 	vcpu->arch.gpa_available = false;
-	//vmx_handle_exit
+	//vmx_handle_exit，如果host 内核能够处理，handle_exit就返回1，否则返回0，需要host 的user space来处理
 	r = kvm_x86_ops->handle_exit(vcpu);
 	return r;
 

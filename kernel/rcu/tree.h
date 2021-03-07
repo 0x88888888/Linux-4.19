@@ -148,6 +148,9 @@ struct rcu_node {
 	/*
 	 * qsmask中的每个bit都对应着一个cpu是否已经过了 grace period(就是reports QS了)
 	 * 0表示已经通过grace period了，1表示没有通过grace period
+	 *
+	 * 在rcu_gp_init()中rcu_node->qsmask=rcu_node->qsmaskinit
+	 *                  
 	 */
 	unsigned long qsmask;	/* CPUs or groups that need to switch in */
 				/*  order for current grace period to proceed.*/
@@ -159,7 +162,8 @@ struct rcu_node {
 		
 	unsigned long rcu_gp_init_mask;	/* Mask of offline CPUs at GP init. */
 	/*
-	 * 每个GP初始化时,qsmaskinit等于qsmark的初始值。
+	 * 在rcu_gp_init()中rcu_node->qsmask = rcu_node->qsmaskinit
+	 *                  rnp->qsmaskinit = rnp->qsmaskinitnext
 	 */
 	unsigned long qsmaskinit;
 				/* Per-GP initial value for qsmask. */
@@ -228,6 +232,7 @@ struct rcu_node {
 				/*  boosting for this rcu_node structure. */
 	unsigned int boost_kthread_status;
 				/* State of boost_kthread_task for tracing. */
+	//没有定义
 #ifdef CONFIG_RCU_NOCB_CPU
 	struct swait_queue_head nocb_gp_wq[2];
 				/* Place for rcu_nocb_kthread() to wait GP. */

@@ -2301,7 +2301,7 @@ static bool rcu_gp_init(struct rcu_state *rsp)
 	WRITE_ONCE(rsp->gp_flags, 0); /* Clear all flags: New grace period. */
 
     
-	if (WARN_ON_ONCE(rcu_gp_in_progress(rsp))) { //rsp->gp_seq != 0 ，走这里
+	if (WARN_ON_ONCE(rcu_gp_in_progress(rsp))) { //rsp->gp_seq 的state部分!= 0 ，走这里
 		/*
 		 * Grace period already in progress, don't start another.
 		 * Not supposed to be able to happen.
@@ -3437,6 +3437,14 @@ rcu_check_gp_start_stall(struct rcu_state *rsp, struct rcu_node *rnp,
  *      rcu_process_callbacks()
  *       __rcu_process_callbacks()
  *
+ * apic_timer_interrupt()
+ *  smp_apic_timer_interrupt()
+ *   exiting_irq()
+ *    irq_exit()
+ *     invoke_softirq() 
+ *      rcu_process_callbacks() 
+ *       __rcu_process_callbacks()
+ *
  * rsp 分别为rcu_bh_state,rcu_sched_state,rcu_state_p三个对象
  */
 static void
@@ -3449,9 +3457,9 @@ __rcu_process_callbacks(struct rcu_state *rsp)
 	WARN_ON_ONCE(!rdp->beenonline);
 
 	/* 
-	 *　Update RCU state based on any recent quiescent states. 
+	 * Update RCU state based on any recent quiescent states. 
 	 *
-	 * 确认是否需要wait 一个quiescent state
+	 *
 	 */
 	rcu_check_quiescent_state(rsp, rdp);
 
@@ -3493,6 +3501,13 @@ __rcu_process_callbacks(struct rcu_state *rsp)
  *     __do_softirq()
  *      rcu_process_callbacks()
  *
+ * apic_timer_interrupt()
+ *  smp_apic_timer_interrupt()
+ *   exiting_irq()
+ *    irq_exit()
+ *     invoke_softirq() 
+ *      rcu_process_callbacks()
+ * 
  * rcu_process_callbacks() [RCU_SOFTIRQ软中断处理函数]
  *
  */
@@ -3593,7 +3608,7 @@ static void __call_rcu_core(struct rcu_state *rsp, struct rcu_data *rdp,
 	 *  callbacks链表中有很多待处理的,要force 一下grace period了
 	 */
 	if (unlikely(rcu_segcblist_n_cbs(&rdp->cblist) >
-		     rdp->qlen_last_fqs_check + qhimark)) {
+		     rdp->qlen_last_fqs_check + qhimark)) { //callback 太长了，需要note change一下
 
 		/* Are we ignoring a completed grace period? */
 		note_gp_changes(rsp, rdp);

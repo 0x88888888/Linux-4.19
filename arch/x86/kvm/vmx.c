@@ -10144,6 +10144,13 @@ static void dump_vmcs(void)
 /*
  * The guest has exited.  See if we can fix it or if we need userspace
  * assistance.
+ *
+ * vcpu_run()
+ *  vcpu_enter_guest()
+ *   vmx_handle_exit()
+ *
+ *　vmx_handle_exit,如果host 内核能够处理，handle_exit就返回1，
+ ×　　　　　　　　　否则返回0，需要host 的user space来处理(kvmtool这类工具)
  */
 static int vmx_handle_exit(struct kvm_vcpu *vcpu)
 {
