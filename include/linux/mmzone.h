@@ -416,6 +416,8 @@ struct zone {
 	 *每个分组页块在位图中占用4位，其中3位用来存放页块的迁移类型。
 	 *
 	 * 函数set_pageblock_migratetype()用来在页块标志位图中设置页块的迁移类型
+	 *
+	 * 在setup_usemap()中分配
 	 */
 	unsigned long		*pageblock_flags;
 #endif /* CONFIG_SPARSEMEM */
@@ -663,6 +665,7 @@ typedef struct pglist_data {
 	struct zone node_zones[MAX_NR_ZONES];
 	struct zonelist node_zonelists[MAX_ZONELISTS];
 	int nr_zones;
+	
 #ifdef CONFIG_FLAT_NODE_MEM_MAP	/* means !SPARSEMEM */
 	struct page *node_mem_map;
 #ifdef CONFIG_PAGE_EXTENSION
@@ -694,18 +697,22 @@ typedef struct pglist_data {
 	int node_id;
     /* kswaped页换出守护进程使用的等待队列 */						 
 	wait_queue_head_t kswapd_wait;
+	//内存不够，reclaim内存时,等待在这个上面的进程
 	wait_queue_head_t pfmemalloc_wait;
 	/* 指针指向kswapd内核线程的进程描述符 */
 	struct task_struct *kswapd;	/* Protected by
 					   mem_hotplug_begin/end() */
-	/* kswapd将要创建的空闲块大小取对数的值
+					   	
+	/* 需要kswapd进程换出去的物理page的order量
 	 * 下面两个值在wakeup_kswapd()中设置
 	 */				   	
 	int kswapd_order;
+	//kswapd时，选择的prefered zone,从这个zone中swap 出去
 	enum zone_type kswapd_classzone_idx;
 
 	int kswapd_failures;		/* Number of 'reclaimed == 0' runs */
 
+//有定义
 #ifdef CONFIG_COMPACTION
 	int kcompactd_max_order;
 	enum zone_type kcompactd_classzone_idx;

@@ -3926,7 +3926,7 @@ out:
 /* Try memory compaction for high-order allocations before reclaim 
  *
  * __alloc_pages_slowpath()
- *  __alloc_pages_direct_compact()
+ *  __alloc_pages_direct_compact(prio == INIT_COMPACT_PRIORITY)
  */
 static struct page *
 __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
@@ -6738,6 +6738,9 @@ static unsigned long __init usemap_size(unsigned long zone_start_pfn, unsigned l
 	return usemapsize / 8;
 }
 
+/*
+ * size:page数量
+ */
 static void __ref setup_usemap(struct pglist_data *pgdat,
 				struct zone *zone,
 				unsigned long zone_start_pfn,
@@ -6772,8 +6775,9 @@ void __init set_pageblock_order(void)
 	if (pageblock_order)
 		return;
 
+    //通常，支持huge page
 	if (HPAGE_SHIFT > PAGE_SHIFT)
-		order = HUGETLB_PAGE_ORDER;
+		order = HUGETLB_PAGE_ORDER; //21-12==9
 	else
 		order = MAX_ORDER - 1;
 
@@ -6931,6 +6935,7 @@ static void __init free_area_init_core(struct pglist_data *pgdat)
 
     //逐个zone遍历过去
 	for (j = 0; j < MAX_NR_ZONES; j++) {
+		
 		struct zone *zone = pgdat->node_zones + j;
 		unsigned long size, freesize, memmap_pages;
 	
@@ -6988,7 +6993,7 @@ static void __init free_area_init_core(struct pglist_data *pgdat)
 
 		//设置pageblock_order
 		set_pageblock_order();
-		//空函数
+		//
 		setup_usemap(pgdat, zone, zone_start_pfn, size);
 		
 		init_currently_empty_zone(zone, zone_start_pfn, size);

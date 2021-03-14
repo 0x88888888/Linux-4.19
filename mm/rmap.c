@@ -220,8 +220,12 @@ static void anon_vma_chain_link(struct vm_area_struct *vma,
 	avc->vma = vma;
 	avc->anon_vma = anon_vma;
 	list_add(&avc->same_vma, &vma->anon_vma_chain);
-	//定义在interval_tree.c中
-	//将anon_vma_chain->rb   插入到anon_vma->rb_root中
+	/*
+	 * 定义在interval_tree.c中
+	 * 将anon_vma_chain->rb   插入到anon_vma->rb_root中
+	 *
+	 * 在mm/interval_tree.c中
+	 */
 	anon_vma_interval_tree_insert(avc, &anon_vma->rb_root);
 }
 
@@ -474,6 +478,8 @@ int anon_vma_fork(struct vm_area_struct *vma, struct vm_area_struct *pvma)
 	 * so rmap can find non-COWed pages in child processes.
 	 *
 	 * 这个调用很重要,构建vma和pmva之间的链接
+	 *
+	 * 此时vma->anon_vma_chain为空链表
 	 */
 	error = anon_vma_clone(vma, pvma);
 	if (error)
@@ -513,6 +519,10 @@ int anon_vma_fork(struct vm_area_struct *vma, struct vm_area_struct *pvma)
 	vma->anon_vma = anon_vma;
 	
 	anon_vma_lock_write(anon_vma);
+	/*
+	 * 自己这一层建立vma->anon_vma_chain(连接到avc->same_vma)
+	 * anon_vma->rb_root = avc->rb
+	 */
 	anon_vma_chain_link(vma, avc, anon_vma);
 	anon_vma->parent->degree++;
 	anon_vma_unlock_write(anon_vma);

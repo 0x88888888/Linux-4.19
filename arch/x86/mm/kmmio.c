@@ -226,6 +226,11 @@ static void disarm_kmmio_fault_page(struct kmmio_fault_page *f)
 /*
  * Interrupts are disabled on entry as trap3 is an interrupt gate
  * and they remain disabled throughout this function.
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   kmmio_fault()
+ *    kmmio_handler()
  */
 int kmmio_handler(struct pt_regs *regs, unsigned long addr)
 {

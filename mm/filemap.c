@@ -897,10 +897,30 @@ EXPORT_SYMBOL(add_to_page_cache_locked);
 
 /*
  * add_ra_bio_pages()
- * ext4_mpage_readpages()
  * page_cache_read()
  * generic_file_buffered_read()
  *  add_to_page_cache_lru()
+ *
+ * read_pages()
+ *  add_to_page_cache_lru()
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_fault()   [mmap后，引发的缺页异常]
+ *       do_read_fault()
+ *        __do_fault()
+ *         ext4_filemap_fault()
+ *          filemap_fault()
+ *           do_sync_mmap_readahead()
+ *            ra_submit()
+ *             __do_page_cache_readahead()
+ *              read_pages()
+ *               ext4_readpages()
+ *                ext4_mpage_readpages()
+ *                 add_to_page_cache_lru()
  */
 int add_to_page_cache_lru(struct page *page, struct address_space *mapping,
 				pgoff_t offset, gfp_t gfp_mask)
@@ -909,6 +929,7 @@ int add_to_page_cache_lru(struct page *page, struct address_space *mapping,
 	int ret;
 
 	__SetPageLocked(page);
+	//添加到address_space中去先,成为page cache了
 	ret = __add_to_page_cache_locked(page, mapping, offset,
 					 gfp_mask, &shadow);
 	if (unlikely(ret))
@@ -2063,6 +2084,16 @@ static void shrink_readahead_size_eio(struct file *filp,
  *
  * This is really ugly. But the goto's actually try to clarify some
  * of the logic when it comes to error handling etc.
+ *
+ * SYSCALL_DEFINE3(read)
+ *  ksys_read()
+ *   vfs_read()
+ *    __vfs_read()
+ *     new_sync_read()
+ *      call_read_iter()
+ *       ext4_file_read_iter()
+ *        generic_file_read_iter()
+ *         generic_file_buffered_read()
  */
 static ssize_t generic_file_buffered_read(struct kiocb *iocb,
 		struct iov_iter *iter, ssize_t written)
@@ -2103,9 +2134,10 @@ find_page:
 		}
 
 		page = find_get_page(mapping, index);
-		if (!page) {
+		if (!page) { //没有找到，读磁盘去
 			if (iocb->ki_flags & IOCB_NOWAIT)
 				goto would_block;
+			//同步去预读
 			page_cache_sync_readahead(mapping,
 					ra, filp,
 					index, last_index - index);
@@ -2113,7 +2145,8 @@ find_page:
 			if (unlikely(page == NULL))
 				goto no_cached_page;
 		}
-		if (PageReadahead(page)) {
+		
+		if (PageReadahead(page)) {//有异步去headahead
 			page_cache_async_readahead(mapping,
 					ra, filp, page,
 					index, last_index - index);
@@ -2141,6 +2174,7 @@ find_page:
 			/* pipes can't handle partially uptodate pages */
 			if (unlikely(iter->type & ITER_PIPE))
 				goto page_not_up_to_date;
+			
 			if (!trylock_page(page))
 				goto page_not_up_to_date;
 			/* Did it get truncated before we got the lock? */
@@ -2189,16 +2223,19 @@ page_ok:
 		/*
 		 * When a sequential read accesses a page several times,
 		 * only mark it as accessed the first time.
+		 *
+		 * 标记
 		 */
 		if (prev_index != index || offset != prev_offset)
 			mark_page_accessed(page);
+		
 		prev_index = index;
 
 		/*
 		 * Ok, we have the page, and it's up-to-date, so
 		 * now we can copy it to user space...
+		 * 复制到用户空间去
 		 */
-
 		ret = copy_page_to_iter(page, offset, nr, iter);
 		offset += ret;
 		index += offset >> PAGE_SHIFT;
@@ -2324,6 +2361,15 @@ out:
  *
  * This is the "read_iter()" routine for all filesystems
  * that can use the page cache directly.
+ *
+ * SYSCALL_DEFINE3(read)
+ *  ksys_read()
+ *   vfs_read()
+ *    __vfs_read()
+ *     new_sync_read()
+ *      call_read_iter()
+ *       ext4_file_read_iter()
+ *        generic_file_read_iter()
  */
 ssize_t
 generic_file_read_iter(struct kiocb *iocb, struct iov_iter *iter)
@@ -2421,6 +2467,18 @@ static int page_cache_read(struct file *file, pgoff_t offset, gfp_t gfp_mask)
 /*
  * Synchronous readahead happens when we don't even find
  * a page in the page cache at all.
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_fault()   [mmap后，引发的缺页异常]
+ *       do_read_fault()
+ *        __do_fault()
+ *         ext4_filemap_fault()
+ *          filemap_fault()
+ *           do_sync_mmap_readahead()
  */
 static void do_sync_mmap_readahead(struct vm_area_struct *vma,
 				   struct file_ra_state *ra,
@@ -2432,6 +2490,7 @@ static void do_sync_mmap_readahead(struct vm_area_struct *vma,
 	/* If we don't want any read-ahead, don't bother */
 	if (vma->vm_flags & VM_RAND_READ)
 		return;
+	
 	if (!ra->ra_pages)
 		return;
 
@@ -2454,6 +2513,8 @@ static void do_sync_mmap_readahead(struct vm_area_struct *vma,
 
 	/*
 	 * mmap read-around
+	 *
+	 * mmap，走这里
 	 */
 	ra->start = max_t(long, 0, offset - ra->ra_pages / 2);
 	ra->size = ra->ra_pages;
@@ -2464,6 +2525,18 @@ static void do_sync_mmap_readahead(struct vm_area_struct *vma,
 /*
  * Asynchronous readahead happens when we find the page and PG_readahead,
  * so we want to possibly extend the readahead further..
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_fault()   [mmap后，引发的缺页异常]
+ *       do_read_fault()
+ *        __do_fault()
+ *         ext4_filemap_fault()
+ *          filemap_fault()
+ *           do_async_mmap_readahead()
  */
 static void do_async_mmap_readahead(struct vm_area_struct *vma,
 				    struct file_ra_state *ra,
@@ -2512,11 +2585,11 @@ static void do_async_mmap_readahead(struct vm_area_struct *vma,
  *   handle_mm_fault()
  *    __handle_mm_fault()
  *     handle_pte_fault()
- *      do_fault()
+ *      do_fault()   [mmap后，引发的缺页异常]
  *       do_read_fault()
  *        __do_fault()
  *         ext4_filemap_fault()
- *          filemap_fault()
+ *          filemap_fault(vmf->falgs |= FAULT_FLAG_USER)
  */
 vm_fault_t filemap_fault(struct vm_fault *vmf)
 {
@@ -2525,7 +2598,7 @@ vm_fault_t filemap_fault(struct vm_fault *vmf)
 	struct address_space *mapping = file->f_mapping;
 	struct file_ra_state *ra = &file->f_ra;
 	struct inode *inode = mapping->host;
-	pgoff_t offset = vmf->pgoff;
+	pgoff_t offset = vmf->pgoff;//文件内page off
 	pgoff_t max_off;
 	struct page *page;
 	vm_fault_t ret = 0;
@@ -2537,7 +2610,7 @@ vm_fault_t filemap_fault(struct vm_fault *vmf)
 	/*
 	 * Do we have something in the page cache already?
 	 *
-	 * 在page cache中是否可以找到
+	 * 在address_space中是否可以找到
 	 */
 	page = find_get_page(mapping, offset);
 	if (likely(page) && !(vmf->flags & FAULT_FLAG_TRIED)) { //在page cache中找到
@@ -2545,10 +2618,10 @@ vm_fault_t filemap_fault(struct vm_fault *vmf)
 		 * We found the page, so try async readahead before
 		 * waiting for the lock.
 		 *
-		 * 异步预读了
+		 * 找到了，也要异步的预读一点，免得下次又缺页
 		 */
 		do_async_mmap_readahead(vmf->vma, ra, file, page, offset);
-	} else if (!page) { //page cache中没有找到
+	} else if (!page) { //mmap的异常，走这里,page cache中没有找到
 		/* No page in the page cache at all 
 		 * 需要去磁盘同步读了
 	     */
@@ -2645,12 +2718,24 @@ page_not_uptodate:
 }
 EXPORT_SYMBOL(filemap_fault);
 
+/*
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_fault() [mmap后，引发的缺页异常]
+ *       do_read_fault()
+ *        do_fault_around()
+ *         filemap_map_pages()
+ */
 void filemap_map_pages(struct vm_fault *vmf,
 		pgoff_t start_pgoff, pgoff_t end_pgoff)
 {
 	struct radix_tree_iter iter;
 	void **slot;
 	struct file *file = vmf->vma->vm_file;
+	//先从address_sapce中查找
 	struct address_space *mapping = file->f_mapping;
 	pgoff_t last_pgoff = start_pgoff;
 	unsigned long max_idx;

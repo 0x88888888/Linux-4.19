@@ -753,6 +753,27 @@ wakeup_secondary_cpu_via_nmi(int apicid, unsigned long start_eip)
 	return (send_status | accept_status);
 }
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ * 	   kernel_init_freeable()
+ * 	    smp_init()
+ * 	     cpu_up()
+ * 	      do_cpu_up()
+ * 		   _cpu_up()
+ * 		    cpuhp_up_callbacks()
+ * 		     cpuhp_invoke_callback()
+ * 		      bringup_cpu()
+ * 			   __cpu_up()
+ * 			    native_cpu_up()
+ *               do_boot_cpu()
+ *                wakeup_cpu_via_init_nmi()
+ *                 wakeup_secondary_cpu_via_init()
+ *
+ * 通过发送STARTUP 唤醒secondary cpu
+ */
 static int
 wakeup_secondary_cpu_via_init(int phys_apicid, unsigned long start_eip)
 {
@@ -826,7 +847,10 @@ wakeup_secondary_cpu_via_init(int phys_apicid, unsigned long start_eip)
 
 		/* Target chip */
 		/* Boot on the stack */
-		/* Kick the second */
+		/* Kick the second
+		 *
+		 * 发送STARTUP 事件，唤醒secondary cpu
+		 */
 		apic_icr_write(APIC_DM_STARTUP | (start_eip >> 12),
 			       phys_apicid);
 

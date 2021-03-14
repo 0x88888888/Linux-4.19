@@ -39,8 +39,10 @@ enum pageblock_bits {
 	NR_PAGEBLOCK_BITS
 };
 
+//有定义
 #ifdef CONFIG_HUGETLB_PAGE
 
+//没有定义
 #ifdef CONFIG_HUGETLB_PAGE_SIZE_VARIABLE
 
 /* Huge page sizes are variable */

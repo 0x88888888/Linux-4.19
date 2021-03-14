@@ -2328,6 +2328,11 @@ extern int do_munmap(struct mm_struct *, unsigned long, size_t,
 /*
  * SYSCALL_DEFINE5(remap_file_pages) mmap.c中
  *  do_mmap_pgoff()
+ *
+ * SYSCALL_DEFINE6(mmap_pgoff)
+ *  ksys_mmap_pgoff()
+ *   vm_mmap_pgoff()
+ *    do_mmap_pgoff()
  */
 static inline unsigned long
 do_mmap_pgoff(struct file *file, unsigned long addr,
@@ -2349,6 +2354,10 @@ extern int __mm_populate(unsigned long addr, unsigned long len,
  * SYSCALL_DEFINE1(brk)
  *  mm_populate()
  *
+ * SYSCALL_DEFINE6(mmap_pgoff)
+ *  ksys_mmap_pgoff()
+ *   vm_mmap_pgoff()
+ *    mm_populate()
  */
 static inline void mm_populate(unsigned long addr, unsigned long len)
 {

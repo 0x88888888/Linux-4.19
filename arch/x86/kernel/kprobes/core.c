@@ -968,6 +968,12 @@ out:
 }
 NOKPROBE_SYMBOL(kprobe_debug_handler);
 
+/*
+ * do_page_fault()
+ *  __do_page_fault()
+ *   kprobes_fault()
+ *    kprobe_fault_handler()
+ */
 int kprobe_fault_handler(struct pt_regs *regs, int trapnr)
 {
 	struct kprobe *cur = kprobe_running();

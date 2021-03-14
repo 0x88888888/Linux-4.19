@@ -1808,9 +1808,18 @@ struct inode_operations {
 	int (*set_acl)(struct inode *, struct posix_acl *, int);
 } ____cacheline_aligned;
 
+/*
+ * SYSCALL_DEFINE3(read)
+ *  ksys_read()
+ *   vfs_read()
+ *    __vfs_read()
+ *     new_sync_read()
+ *      call_read_iter()
+ */
 static inline ssize_t call_read_iter(struct file *file, struct kiocb *kio,
 				     struct iov_iter *iter)
 {
+    // ext4_file_operations->read_iter=ext4_file_read_iter
 	return file->f_op->read_iter(kio, iter);
 }
 

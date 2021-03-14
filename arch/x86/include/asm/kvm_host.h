@@ -519,6 +519,9 @@ struct kvm_vcpu_arch {
 	DECLARE_BITMAP(ioapic_handled_vectors, 256);
 	unsigned long apic_attention;
 	int32_t apic_arb_prio;
+	/*
+	 * KVM_MP_STATE_UNINITIALIZED之类的
+	 */
 	int mp_state;
 	u64 ia32_misc_enable_msr;
 	u64 smbase;

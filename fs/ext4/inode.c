@@ -3331,6 +3331,23 @@ static int ext4_readpage(struct file *file, struct page *page)
 	return ret;
 }
 
+/*
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_fault()   [mmap后，引发的缺页异常]
+ *       do_read_fault()
+ *        __do_fault()
+ *         ext4_filemap_fault()
+ *          filemap_fault()
+ *           do_sync_mmap_readahead()
+ *            ra_submit()
+ *             __do_page_cache_readahead()
+ *              read_pages()
+ *               ext4_readpages()
+ */
 static int
 ext4_readpages(struct file *file, struct address_space *mapping,
 		struct list_head *pages, unsigned nr_pages)
@@ -6256,10 +6273,10 @@ out:
  *   handle_mm_fault()
  *    __handle_mm_fault()
  *     handle_pte_fault()
- *      do_fault()
+ *      do_fault()    [mmap后，引发的缺页异常]
  *       do_read_fault()
  *        __do_fault()
- *         ext4_filemap_fault()
+ *         ext4_filemap_fault(vmf->falgs |= FAULT_FLAG_USER)
  */
 int ext4_filemap_fault(struct vm_fault *vmf)
 {

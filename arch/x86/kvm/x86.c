@@ -8041,7 +8041,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *kvm_run)
 			r = -EINTR;
 			goto out;
 		}
+
+		//先切换vCPU的线程，block住这个线程，等待cpu准备好
 		kvm_vcpu_block(vcpu);
+		
 		kvm_apic_accept_events(vcpu);
 		kvm_clear_request(KVM_REQ_UNHALT, vcpu);
 		r = -EAGAIN;

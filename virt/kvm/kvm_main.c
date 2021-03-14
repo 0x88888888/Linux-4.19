@@ -2176,6 +2176,11 @@ out:
 
 /*
  * The vCPU has executed a HLT instruction with in-kernel mode enabled.
+ *
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ *    kvm_vcpu_block()
  */
 void kvm_vcpu_block(struct kvm_vcpu *vcpu)
 {

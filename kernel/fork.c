@@ -496,6 +496,7 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 		/*
 		 * Don't duplicate many vmas if we've been oom-killed (for
 		 * example)
+		 * 先去处理signal
 		 */
 		if (fatal_signal_pending(current)) {
 			retval = -EINTR;

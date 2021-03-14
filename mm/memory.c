@@ -840,11 +840,14 @@ struct page *_vm_normal_page(struct vm_area_struct *vma, unsigned long addr,
 {
 	unsigned long pfn = pte_pfn(pte);
 
+    //有定义
 	if (IS_ENABLED(CONFIG_ARCH_HAS_PTE_SPECIAL)) {
 		if (likely(!pte_special(pte)))
 			goto check_pfn;
+		//anonymous 映射的时候，vm_ops==NULL
 		if (vma->vm_ops && vma->vm_ops->find_special_page)
 			return vma->vm_ops->find_special_page(vma, addr);
+		
 		if (vma->vm_flags & (VM_PFNMAP | VM_MIXEDMAP))
 			return NULL;
 		if (is_zero_pfn(pfn))
@@ -2603,6 +2606,7 @@ static vm_fault_t wp_page_copy(struct vm_fault *vmf)
 		 * thread doing COW.
 		 */
 		ptep_clear_flush_notify(vma, vmf->address, vmf->pte);
+		
 		page_add_new_anon_rmap(new_page, vma, vmf->address, false);
 		mem_cgroup_commit_charge(new_page, memcg, false, false);
 		lru_cache_add_active_or_unevictable(new_page, vma);
@@ -3266,8 +3270,9 @@ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 		if (ret)
 			goto unlock;
 		/* Deliver the page fault to userland, check inside PT lock */
-		if (userfaultfd_missing(vma)) {
+		if (userfaultfd_missing(vma)) { //用户态来的
 			pte_unmap_unlock(vmf->pte, vmf->ptl);
+			
 			return handle_userfault(vmf, VM_UFFD_MISSING);
 		}
 		goto setpte;
@@ -3278,7 +3283,8 @@ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 	 */
 	if (unlikely(anon_vma_prepare(vma)))
 		goto oom;
-	
+
+	//从
 	page = alloc_zeroed_user_highpage_movable(vma, vmf->address);
 	if (!page)
 		goto oom;
@@ -3347,11 +3353,11 @@ oom:
  *   handle_mm_fault()
  *    __handle_mm_fault()
  *     handle_pte_fault()
- *      do_fault()
+ *      do_fault()  [mmap后，引发的缺页异常]
  *       do_read_fault() 
  *       do_shared_fault()
  *       do_cow_fault()
- *        __do_fault()
+ *        __do_fault(vmf->falgs |= FAULT_FLAG_USER)
  *
  */
 static vm_fault_t __do_fault(struct vm_fault *vmf)
@@ -3359,7 +3365,7 @@ static vm_fault_t __do_fault(struct vm_fault *vmf)
 	struct vm_area_struct *vma = vmf->vma;
 	vm_fault_t ret;
 
-    //ext4_file_vm_ops
+    //ext4_file_vm_ops->fault == ext4_filemap_fault
 	ret = vma->vm_ops->fault(vmf);
 	if (unlikely(ret & (VM_FAULT_ERROR | VM_FAULT_NOPAGE | VM_FAULT_RETRY |
 			    VM_FAULT_DONE_COW)))
@@ -3725,7 +3731,7 @@ late_initcall(fault_around_debugfs);
  *   handle_mm_fault()
  *    __handle_mm_fault()
  *     handle_pte_fault()
- *      do_fault()
+ *      do_fault() [mmap后，引发的缺页异常]
  *       do_read_fault()
  *        do_fault_around()
  */
@@ -3762,6 +3768,11 @@ static vm_fault_t do_fault_around(struct vm_fault *vmf)
 		smp_wmb(); /* See comment in __pte_alloc() */
 	}
 
+    /*
+     * ext4_file_vm_ops->map_pages== filemap_map_pages
+     *
+     * 这个函数只会从address_page中查找
+     */
 	vmf->vma->vm_ops->map_pages(vmf, start_pgoff, end_pgoff);
 
 	/* Huge page is mapped? Page fault is solved */
@@ -3791,8 +3802,8 @@ out:
  *   handle_mm_fault()
  *    __handle_mm_fault()
  *     handle_pte_fault()
- *      do_fault()
- *       do_read_fault()
+ *      do_fault() [mmap后，引发的缺页异常]
+ *       do_read_fault(vmf->falgs |= FAULT_FLAG_USER)
  */
 static vm_fault_t do_read_fault(struct vm_fault *vmf)
 {
@@ -3807,11 +3818,11 @@ static vm_fault_t do_read_fault(struct vm_fault *vmf)
 	 * 假设为ext4文件系统,vm_ops==ext4_file_vm_ops
 	 */
 	if (vma->vm_ops->map_pages && fault_around_bytes >> PAGE_SHIFT > 1) {
-		ret = do_fault_around(vmf);
+		ret = do_fault_around(vmf); //ext4使用默认的实现，只会从address_space中查找
 		if (ret)
 			return ret;
 	}
-
+    //如果do_fault_around()在address_space中查找失败，还是会走到这里
 	ret = __do_fault(vmf);
 	if (unlikely(ret & (VM_FAULT_ERROR | VM_FAULT_NOPAGE | VM_FAULT_RETRY)))
 		return ret;
@@ -3837,7 +3848,7 @@ static vm_fault_t do_cow_fault(struct vm_fault *vmf)
 	struct vm_area_struct *vma = vmf->vma;
 	vm_fault_t ret;
 
-    //分配avc，建立vma,avc,anon三者的关系
+    //分配avc,anon，建立vma,avc,anon三者的关系
 	if (unlikely(anon_vma_prepare(vma)))
 		return VM_FAULT_OOM;
 
@@ -3855,6 +3866,7 @@ static vm_fault_t do_cow_fault(struct vm_fault *vmf)
 	ret = __do_fault(vmf);
 	if (unlikely(ret & (VM_FAULT_ERROR | VM_FAULT_NOPAGE | VM_FAULT_RETRY)))
 		goto uncharge_out;
+	
 	if (ret & VM_FAULT_DONE_COW)
 		return ret;
     //将刚刚读取来的内容复制到cow_page中过来
@@ -3932,7 +3944,9 @@ static vm_fault_t do_shared_fault(struct vm_fault *vmf)
  *   handle_mm_fault()
  *    __handle_mm_fault()
  *     handle_pte_fault()
- *      do_fault()
+ *      do_fault(vmf->falgs |= FAULT_FLAG_USER) [mmap后，引发的缺页异常]
+ *
+ * mmap操作后，然后读写内存，引发的缺页异常，走这里
  */
 static vm_fault_t do_fault(struct vm_fault *vmf)
 {
@@ -3942,7 +3956,7 @@ static vm_fault_t do_fault(struct vm_fault *vmf)
 	/* The VMA was not fully populated on mmap() or missing VM_DONTEXPAND */
 	if (!vma->vm_ops->fault)
 		ret = VM_FAULT_SIGBUS;
-	else if (!(vmf->flags & FAULT_FLAG_WRITE))
+	else if (!(vmf->flags & FAULT_FLAG_WRITE)) //mmap，是这个
 		ret = do_read_fault(vmf);
 	else if (!(vma->vm_flags & VM_SHARED))
 		ret = do_cow_fault(vmf);
@@ -4156,7 +4170,18 @@ static vm_fault_t wp_huge_pud(struct vm_fault *vmf, pud_t orig_pud)
  *  __do_page_fault()
  *   handle_mm_fault()
  *    __handle_mm_fault()
- *     handle_pte_fault()
+ *     handle_pte_fault(vmf->falgs |= FAULT_FLAG_USER)
+ *
+ * vm_mmap_pgoff()
+ * SYSCALL_DEFINE1(brk)
+ *  mm_populate()
+ *   __mm_populate()
+ *    populate_vma_page_range()
+ *     __get_user_pages(pages==NULL, vmas == NULL,)
+ *      faultin_page()
+ *       handle_mm_fault( )
+ *        __handle_mm_fault()
+ *         handle_pte_fault()
  */
 static vm_fault_t handle_pte_fault(struct vm_fault *vmf)
 {
@@ -4201,7 +4226,7 @@ static vm_fault_t handle_pte_fault(struct vm_fault *vmf)
 	if (!vmf->pte) {
 		if (vma_is_anonymous(vmf->vma)) //匿名映射
 			return do_anonymous_page(vmf); //anonymous mapping 的page
-		else//映射到文件
+		else//映射到文件,mmap之类的，然后读写内存，产生缺页异常，走这里
 			return do_fault(vmf); //
 	}
 
@@ -4255,7 +4280,17 @@ unlock:
  * do_page_fault()
  *  __do_page_fault()
  *   handle_mm_fault()
- *    __handle_mm_fault()
+ *    __handle_mm_fault( falgs |= FAULT_FLAG_USER)
+ *
+ * vm_mmap_pgoff()
+ * SYSCALL_DEFINE1(brk)
+ *  mm_populate()
+ *   __mm_populate()
+ *    populate_vma_page_range()
+ *     __get_user_pages(pages==NULL, vmas == NULL,)
+ *      faultin_page()
+ *       handle_mm_fault( )
+ *        __handle_mm_fault()
  */
 static vm_fault_t __handle_mm_fault(struct vm_area_struct *vma,
 		unsigned long address, unsigned int flags)
@@ -4265,7 +4300,7 @@ static vm_fault_t __handle_mm_fault(struct vm_area_struct *vma,
 		.address = address & PAGE_MASK,
 		.flags = flags,
 		.pgoff = linear_page_index(vma, address),
-		.gfp_mask = __get_fault_gfp_mask(vma),
+		.gfp_mask = __get_fault_gfp_mask(vma),//这里没有确定从那个zone中分配
 	};
 	unsigned int dirty = flags & FAULT_FLAG_WRITE;
 	struct mm_struct *mm = vma->vm_mm;
@@ -4324,6 +4359,7 @@ static vm_fault_t __handle_mm_fault(struct vm_area_struct *vma,
 				pmd_migration_entry_wait(mm, vmf.pmd);
 			return 0;
 		}
+		
 		if (pmd_trans_huge(orig_pmd) || pmd_devmap(orig_pmd)) {
 			if (pmd_protnone(orig_pmd) && vma_is_accessible(vma))
 				return do_huge_pmd_numa_page(&vmf, orig_pmd);
@@ -4350,7 +4386,7 @@ static vm_fault_t __handle_mm_fault(struct vm_area_struct *vma,
  *
  * do_page_fault()
  *  __do_page_fault()
- *   handle_mm_fault()
+ *   handle_mm_fault( falgs |= FAULT_FLAG_USER)
  *
  * vm_mmap_pgoff()
  * SYSCALL_DEFINE1(brk)
@@ -4359,7 +4395,7 @@ static vm_fault_t __handle_mm_fault(struct vm_area_struct *vma,
  *    populate_vma_page_range()
  *     __get_user_pages(pages==NULL, vmas == NULL,)
  *      faultin_page()
- *       handle_mm_fault( falgs |= FAULT_FLAG_USER)
+ *       handle_mm_fault( )
  */
 vm_fault_t handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
 		unsigned int flags)
@@ -4391,7 +4427,7 @@ vm_fault_t handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
 
 	if (unlikely(is_vm_hugetlb_page(vma)))
 		ret = hugetlb_fault(vma->vm_mm, vma, address, flags);
-	else
+	else//不是huge page,就走这里，通常都是走这里
 		ret = __handle_mm_fault(vma, address, flags);
 
 	if (flags & FAULT_FLAG_USER) {

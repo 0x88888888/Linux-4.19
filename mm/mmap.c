@@ -1386,6 +1386,12 @@ static inline bool file_mmap_ok(struct file *file, struct inode *inode,
  * SYSCALL_DEFINE5(remap_file_pages) mmap.c中
  *  do_mmap_pgoff()
  *   do_mmap()
+ *
+ * SYSCALL_DEFINE6(mmap_pgoff)
+ *  ksys_mmap_pgoff()
+ *   vm_mmap_pgoff()
+ *    do_mmap_pgoff()
+ *     do_mmap()
  */
 unsigned long do_mmap(struct file *file, unsigned long addr,
 			unsigned long len, unsigned long prot,
@@ -1573,6 +1579,10 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
 	return addr;
 }
 
+/*
+ * SYSCALL_DEFINE6(mmap_pgoff)
+ *  ksys_mmap_pgoff()
+ */
 unsigned long ksys_mmap_pgoff(unsigned long addr, unsigned long len,
 			      unsigned long prot, unsigned long flags,
 			      unsigned long fd, unsigned long pgoff)
@@ -1587,6 +1597,7 @@ unsigned long ksys_mmap_pgoff(unsigned long addr, unsigned long len,
 			return -EBADF;
 		if (is_file_hugepages(file))
 			len = ALIGN(len, huge_page_size(hstate_file(file)));
+		
 		retval = -EINVAL;
 		if (unlikely(flags & MAP_HUGETLB && !is_file_hugepages(file)))
 			goto out_fput;

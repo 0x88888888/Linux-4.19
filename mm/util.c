@@ -341,6 +341,11 @@ int __weak get_user_pages_fast(unsigned long start,
 }
 EXPORT_SYMBOL_GPL(get_user_pages_fast);
 
+/*
+ * SYSCALL_DEFINE6(mmap_pgoff)
+ *  ksys_mmap_pgoff()
+ *   vm_mmap_pgoff()
+ */
 unsigned long vm_mmap_pgoff(struct file *file, unsigned long addr,
 	unsigned long len, unsigned long prot,
 	unsigned long flag, unsigned long pgoff)
@@ -354,11 +359,13 @@ unsigned long vm_mmap_pgoff(struct file *file, unsigned long addr,
 	if (!ret) {
 		if (down_write_killable(&mm->mmap_sem))
 			return -EINTR;
+		//走起,这里应该只是分配VMA
 		ret = do_mmap_pgoff(file, addr, len, prot, flag, pgoff,
 				    &populate, &uf);
 		up_write(&mm->mmap_sem);
 		userfaultfd_unmap_complete(mm, &uf);
-		if (populate)
+		
+		if (populate)//需要分配物理page
 			mm_populate(ret, populate);
 	}
 	return ret;

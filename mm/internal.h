@@ -59,6 +59,19 @@ extern unsigned int __do_page_cache_readahead(struct address_space *mapping,
 
 /*
  * Submit IO for the read-ahead request in file_ra_state.
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_fault()   [mmap后，引发的缺页异常]
+ *       do_read_fault()
+ *        __do_fault()
+ *         ext4_filemap_fault()
+ *          filemap_fault()
+ *           do_sync_mmap_readahead()
+ *            ra_submit()
  */
 static inline unsigned long ra_submit(struct file_ra_state *ra,
 		struct address_space *mapping, struct file *filp)

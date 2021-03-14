@@ -138,7 +138,7 @@ struct rcu_node {
 	 *  may lag up to one step behind their rcu_state counterpart.
 	 */
 	unsigned long gp_seq;	/* Track rsp->rcu_gp_seq. */
-	unsigned long gp_seq_needed; /* Track rsp->rcu_gp_seq_needed. */
+	unsigned long gp_seq_needed; /* 这个值为rsp->gp_seq, Track rsp->rcu_gp_seq_needed. */
 
 	/* 在rcu_report_qs_rnp()设置rnp->completedqs = rnp->gp_seq 
 	 *
@@ -194,7 +194,11 @@ struct rcu_node {
 	u8	grpnum;		/* CPU/group number for next level up. */
 	//在树中的层级，Root为0
 	u8	level;		/* root is at level 0. */
-	
+
+	/*
+	 * 这个值只在rcu_gp_init()中设置
+	 * 而且只有在配置了preemptable_rcu的情况才有可能设置为true
+	 */
 	bool	wait_blkd_tasks;/* Necessary to wait for blocked tasks to */
 				/*  exit RCU read-side critical sections */
 				/*  before propagating offline up the */
@@ -290,10 +294,11 @@ struct rcu_data {
 	unsigned long	rcu_qs_ctr_snap;/* Snapshot of rcu_qs_ctr to check */
 					/*  for rcu_all_qs() invocations. */
 
-	//记录本cpu是否经历了QS状态
+	//注:indicates that the CPU has not yet passed through a quiescent state
 	union rcu_noqs	cpu_no_qs;	/* No QSes yet for this CPU. */
 	/*
 	 * RCU需要本CPU上报QS状态
+	 * 注:indicates that the RCU core needs a quiescent state from the corresponding CPU
 	 *
 	 * __note_gp_change()中设置 
 	 *
@@ -302,7 +307,11 @@ struct rcu_data {
 	bool		core_needs_qs;	/* Core waits for quiesc state. */
 	/* CPU是否在线，不在线的CPU需要特殊处理，以提高性能*/
 	bool		beenonline;	/* CPU online at least once. */
-	//在rcu_gpnum_ovf()中设置为true
+	/* 在rcu_gpnum_ovf()中设置为true
+	 *
+	 * 注:indicates that the corresponding CPU has remained idle for so long that the gp_seq counter is in danger of overflow, 
+	 * which will cause the CPU to disregard the values of its counters on its next exit from idle.
+	 */
 	bool		gpwrap;		/* Possible ->gp_seq wrap. */
 	
 	/*
@@ -507,6 +516,12 @@ struct rcu_state {
 	struct task_struct *gp_kthread;		/* Task for grace periods. */
 	/*
 	 * 在rcu_gp_kthread_wake中唤醒
+	 * rcu_gp_kthread在gp_wq上wait，等待被唤醒
+	 *
+	 * 有别的线程来调用rcu_gp_kthread_wake()来唤醒cu_gp_kthread
+	 *
+	 * SOFTIRQ, call_rcu, rcu_migrate_callbacks,
+	 * rcu_prepare_for_idle ,rcu_nocb_wait_gp 来唤醒
 	 */
 	struct swait_queue_head gp_wq;		/* Where GP task waits. */
 	/*
@@ -608,19 +623,28 @@ struct rcu_state {
  * 在rcu_gp_cleanup()中设置rcu_state->gp_flags == RCU_GP_FLAG_INIT
  */
 #define RCU_GP_FLAG_INIT 0x1	/* Need grace-period initialization. */
-//需要来一次force quiscent state,用rcu_gp_fqs()这个来force quiscent state
+/*
+ * 需要来一次force quiscent state,用rcu_gp_fqs()这个来force quiscent state
+ *
+ * 在rcu_report_qs_rsp()和force_quiescent_state()中设置,然后唤醒gp_rcu_kthread()
+ */
 #define RCU_GP_FLAG_FQS  0x2	/* Need grace-period quiescent-state forcing. */
 
+
 /* Values for rcu_state structure's gp_state field. */
-#define RCU_GP_IDLE	 0	/* Initial state and no GP in progress. */
-#define RCU_GP_WAIT_GPS  1	/* Wait for grace-period start. */
-#define RCU_GP_DONE_GPS  2	/* Wait done for grace-period start. */
-#define RCU_GP_ONOFF     3	/* Grace-period initialization hotplug. */
-#define RCU_GP_INIT      4	/* Grace-period initialization. */
-#define RCU_GP_WAIT_FQS  5	/* Wait for force-quiescent-state time. */
-#define RCU_GP_DOING_FQS 6	/* Wait done for force-quiescent-state time. */
-#define RCU_GP_CLEANUP   7	/* Grace-period cleanup started. */
-#define RCU_GP_CLEANED   8	/* Grace-period cleanup complete. */
+#define RCU_GP_IDLE	     0	/* 在rcu_gp_cleanup()中设置,Initial state and no GP in progress. */
+
+#define RCU_GP_WAIT_GPS  1	/* 在rcu_gp_kthread()中设置,在调用swait_event_idle_exclusive()之前, Wait for grace-period start. */
+#define RCU_GP_DONE_GPS  2	/* 在rcu_gp_kthread()中设置,在调用swait_event_idle_exclusive()之后, Wait done for grace-period start. */
+
+#define RCU_GP_ONOFF     3	/* 在rcu_gp_init()中设置,Grace-period initialization hotplug. */
+#define RCU_GP_INIT      4	/* 在rcu_gp_init()中设置,Grace-period initialization. */
+
+#define RCU_GP_WAIT_FQS  5	/* 在rcu_gp_kthread()中设置,Wait for force-quiescent-state time. */
+#define RCU_GP_DOING_FQS 6	/* 在rcu_gp_kthread()中设置,Wait done for force-quiescent-state time. */
+
+#define RCU_GP_CLEANUP   7	/* 在rcu_gp_kthread()中设置,在调用rcu_gp_cleanup()之前,     Grace-period cleanup started. */
+#define RCU_GP_CLEANED   8	/* 在rcu_gp_kthread()中设置,在调用rcu_gp_cleanup()之后, Grace-period cleanup complete. */
 
 //没有定义
 #ifndef RCU_TREE_NONCORE

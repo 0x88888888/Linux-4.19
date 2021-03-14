@@ -1864,7 +1864,7 @@ static bool rcu_start_this_gp(struct rcu_node *rnp_start /* 必然是 leaf node 
 		if (rnp != rnp_start)
 			raw_spin_lock_rcu_node(rnp);
 
-		//gp_seq_req在rcu_node中 属于已经处理过的
+		//gp_seq_req是即将要开始的grace period
 		if (ULONG_CMP_GE(rnp->gp_seq_needed, gp_seq_req) ||
 		    rcu_seq_started(&rnp->gp_seq, gp_seq_req) ||
 		    (rnp != rnp_start &&
@@ -1909,6 +1909,7 @@ static bool rcu_start_this_gp(struct rcu_node *rnp_start /* 必然是 leaf node 
 	}
 	
 	trace_rcu_this_gp(rnp, rdp, gp_seq_req, TPS("Startedroot"));
+	//grace period  init过了
 	WRITE_ONCE(rsp->gp_flags, rsp->gp_flags | RCU_GP_FLAG_INIT);
 	
 	rsp->gp_req_activity = jiffies;
@@ -1921,6 +1922,7 @@ static bool rcu_start_this_gp(struct rcu_node *rnp_start /* 必然是 leaf node 
 unlock_out:
 	/* Push furthest requested GP to leaf node and rcu_data structure. */
 	if (ULONG_CMP_LT(gp_seq_req, rnp->gp_seq_needed)) {
+		
 		rnp_start->gp_seq_needed = rnp->gp_seq_needed;
 		
 		rdp->gp_seq_needed = rnp->gp_seq_needed;
@@ -2132,7 +2134,7 @@ static bool rcu_advance_cbs(struct rcu_state *rsp, struct rcu_node *rnp,
  * rcu_spawn_gp_kthread()
  *  ......
  *   rcu_gp_kthread()
- *    rcu_gp_init()
+ *    rcu_gp_init() 开始一个新的grace period
  *     __note_gp_changes()
  *
  * call_rcu()
@@ -2142,7 +2144,7 @@ static bool rcu_advance_cbs(struct rcu_state *rsp, struct rcu_node *rnp,
  *     __note_gp_changes(rnp == rdp->mynode)
  *
  * rcu_gp_kthread()
- *  rcu_gp_cleanup()
+ *  rcu_gp_cleanup() 结束一个新的grace period?
  *   __note_gp_changes()
  *
  * rcu_process_callbacks()
@@ -2152,6 +2154,8 @@ static bool rcu_advance_cbs(struct rcu_state *rsp, struct rcu_node *rnp,
  *     __note_gp_changes() 
  *
  * 修改rcu_data 是否开始或者结束一个grace period的状态 
+ *
+ * 在开始或者结束一个grace period，都要调用这个函数
  *
  * 
  */
@@ -2163,22 +2167,22 @@ static bool __note_gp_changes(struct rcu_state *rsp, struct rcu_node *rnp,
 
 	raw_lockdep_assert_held_rcu_node(rnp);
 
-    //上下级的grace period值相等，不用处理
+    //上下级的grace period值相等，说明gp没有change啊，不用处理
 	if (rdp->gp_seq == rnp->gp_seq)
 		return false; /* Nothing to do. */
 
 	/* Handle the ends of any preceding grace periods first.
 	 *
-	 * 处理grace period结束,也就是有新的grace period开始了
+	 * 处理grace period结束
 	 *
 	 * rdp->gp_seq < rnp->gp_seq,说明rdp->gp_seq就是completed的了
 	 */
 	if (rcu_seq_completed_gp(rdp->gp_seq, rnp->gp_seq) ||
 	    unlikely(READ_ONCE(rdp->gpwrap))) {
-	    
+	    //调整rdp->cblist[]到 RCU_DONE_TAIL这个链表上来，一遍以后invock哦
 		ret = rcu_advance_cbs(rsp, rnp, rdp); /* Advance callbacks. */
 		trace_rcu_grace_period(rsp->name, rdp->gp_seq, TPS("cpuend"));
-	} else {
+	} else { // rcu_data->gp_seq还没有completed
 		ret = rcu_accelerate_cbs(rsp, rnp, rdp); /* Recent callbacks. */
 	}
 
@@ -2326,6 +2330,7 @@ static bool rcu_gp_init(struct rcu_state *rsp)
 	 * will handle subsequent offline CPUs.
 	 */
 	rsp->gp_state = RCU_GP_ONOFF;
+	//遍历所有的leaf rcu_node,看是否有online上来的,或者offline掉的
 	rcu_for_each_leaf_node(rsp, rnp) {
 		spin_lock(&rsp->ofl_lock);
 		raw_spin_lock_irq_rcu_node(rnp);
@@ -2345,13 +2350,13 @@ static bool rcu_gp_init(struct rcu_state *rsp)
 
 		/* If zero-ness of ->qsmaskinit changed, propagate up tree. */
 		if (!oldmask != !rnp->qsmaskinit) {
-			if (!oldmask) { /* First online CPU for rcu_node. */
+			if (!oldmask) { /* 上线 First online CPU for rcu_node. */
 				if (!rnp->wait_blkd_tasks) /* Ever offline? */
-					rcu_init_new_rnp(rnp);
+					rcu_init_new_rnp(rnp);//上线，设置上级的rnp->qsmaskinit
 				
 			} else if (rcu_preempt_has_tasks(rnp)) {
 				rnp->wait_blkd_tasks = true; /* blocked tasks */
-			} else { /* Last offline CPU and can propagate. */
+			} else { /*离线，设置上级的rnp->qsmaskinit, Last offline CPU and can propagate. */
 				rcu_cleanup_dead_rnp(rnp);
 			}
 		}
@@ -2401,7 +2406,7 @@ static bool rcu_gp_init(struct rcu_state *rsp)
 		/* 设置rnp->gp_seq == rsp->gp_seq */
 		WRITE_ONCE(rnp->gp_seq, rsp->gp_seq);
 		//最后一层的rcu_node,也就是是rcu_data的parent
-		if (rnp == rdp->mynode)
+		if (rnp == rdp->mynode) //开始一个grace period，grace period值 change了
 			(void)__note_gp_changes(rsp, rnp, rdp);
 		//空函数
 		rcu_preempt_boost_start_gp(rnp);
@@ -2613,7 +2618,7 @@ static int __noreturn rcu_gp_kthread(void *arg)
 					       TPS("reqwait"));
 			//等待grace period 结束
 			rsp->gp_state = RCU_GP_WAIT_GPS;
-			//当rsp->flags要设置RCU_GP_FLAG_INIT时，唤醒当前进程
+			//当rsp->flags要设置RCU_GP_FLAG_INIT时,在force_quiescent_state()中唤醒
 			swait_event_idle_exclusive(rsp->gp_wq, READ_ONCE(rsp->gp_flags) &
 						     RCU_GP_FLAG_INIT);
 
@@ -2621,9 +2626,17 @@ static int __noreturn rcu_gp_kthread(void *arg)
 			rsp->gp_state = RCU_GP_DONE_GPS;
 			
 			/* Locking provides needed memory barrier. 
-			 * 启动一个grace period ,rsp->gp_seq++
+			 * 启动一个grace period ,
+			 *
+			 * 0.设置rsp->gp_flags =0, rsp->gp_activity=jiffies
+			 * 1.设置rsp->gp_seq++
+			 * 2.设置rsp->gp_state == RCU_GP_ONOFF,处理idle状态的cpu
+			 * 3.设置rsp->gp_state == RCU_GP_INIT,将rsp->gp_seq传递到rcu_node->gp_seq,rcu_data->gp_seq上去
+			 * 
+			 * 这个函数会调用__note_gp_changes
+			 *       也可能会调用rcu_report_qs_rnp()
 			 */
-			if (rcu_gp_init(rsp))
+			if (rcu_gp_init(rsp)) //init成功，才会跳出这个死循环
 				break;
 			
 			//让出CPU
@@ -2656,18 +2669,24 @@ static int __noreturn rcu_gp_kthread(void *arg)
 			
 			rsp->gp_state = RCU_GP_DOING_FQS;
 			/* Locking provides needed memory barriers. */
-			/* If grace period done, leave loop. */
+			/* If grace period done, leave loop. 
+			 *
+			 * rnp是root rcu_node
+			 */
 			if (!READ_ONCE(rnp->qsmask) &&
 			    !rcu_preempt_blocked_readers_cgp(rnp))
 				break;
 			
-			/* If time for quiescent-state forcing, do it. */
+			/* If time for quiescent-state forcing, do it.
+			 *
+			 * 在别的地方标记了RCU_GP_FLAG_FQS或者 过了很长时间了
+			 */
 			if (ULONG_CMP_GE(jiffies, rsp->jiffies_force_qs) ||
 			    (gf & RCU_GP_FLAG_FQS)) {
 				trace_rcu_grace_period(rsp->name,
 						       READ_ONCE(rsp->gp_seq),
 						       TPS("fqsstart"));
-				
+				//force quiscent state了，上报
 				rcu_gp_fqs(rsp, first_gp_fqs);
 				
 				first_gp_fqs = false;
@@ -2736,6 +2755,7 @@ static void rcu_report_qs_rsp(struct rcu_state *rsp, unsigned long flags)
 	WARN_ON_ONCE(!rcu_gp_in_progress(rsp));
 	//标记掉，已经经历了force quiscent state？
 	WRITE_ONCE(rsp->gp_flags, READ_ONCE(rsp->gp_flags) | RCU_GP_FLAG_FQS);
+	
 	raw_spin_unlock_irqrestore_rcu_node(rcu_get_root(rsp), flags);
 	rcu_gp_kthread_wake(rsp);
 }
@@ -3336,7 +3356,8 @@ static void force_quiescent_state(struct rcu_state *rsp)
 
 	/* Funnel through hierarchy to reduce memory contention. */
 	rnp = __this_cpu_read(rsp->rda->mynode);
-	
+
+	//一直走到root node,rnp_old == root rcu_node对象
 	for (; rnp != NULL; rnp = rnp->parent) {
 
 	    //
@@ -3355,14 +3376,14 @@ static void force_quiescent_state(struct rcu_state *rsp)
 	/* Reached the root of the rcu_node tree, acquire lock. */
 	raw_spin_lock_irqsave_rcu_node(rnp_old, flags);
 	raw_spin_unlock(&rnp_old->fqslock);
-	if (READ_ONCE(rsp->gp_flags) & RCU_GP_FLAG_FQS) {
+	if (READ_ONCE(rsp->gp_flags) & RCU_GP_FLAG_FQS) {//有这个标记，说明有别的线程也调用了这个函数，还没有清除RCU_GP_FLAG_FQS
 		raw_spin_unlock_irqrestore_rcu_node(rnp_old, flags);
 		return;  /* Someone beat us to it. */
 	}
 	//记录已经经历了force quiescent state了
 	WRITE_ONCE(rsp->gp_flags, READ_ONCE(rsp->gp_flags) | RCU_GP_FLAG_FQS);
 	raw_spin_unlock_irqrestore_rcu_node(rnp_old, flags);
-	rcu_gp_kthread_wake(rsp);
+	rcu_gp_kthread_wake(rsp);//唤醒rcu_gp_kthread线程
 }
 
 /*

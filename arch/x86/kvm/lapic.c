@@ -1105,7 +1105,7 @@ static int __apic_accept_irq(struct kvm_lapic *apic, int delivery_mode,
 		}
 		break;
 
-	case APIC_DM_STARTUP:
+	case APIC_DM_STARTUP://guest收到 唤醒secondary cpu的ipi中断
 		apic_debug("SIPI to vcpu %d vector 0x%02x\n",
 			   vcpu->vcpu_id, vector);
 		result = 1;
@@ -1114,7 +1114,7 @@ static int __apic_accept_irq(struct kvm_lapic *apic, int delivery_mode,
 		smp_wmb();
 		set_bit(KVM_APIC_SIPI, &apic->pending_events);
 		kvm_make_request(KVM_REQ_EVENT, vcpu);
-		kvm_vcpu_kick(vcpu);
+		kvm_vcpu_kick(vcpu);//唤醒
 		break;
 
 	case APIC_DM_EXTINT:

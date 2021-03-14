@@ -70,10 +70,29 @@
 enum pageflags {
 	PG_locked,		/* page已经上锁, Page is locked. Don't touch. */
 	PG_error,       /* 表示page发生了IO错误 */
+   /*
+    * gup_pte_range()
+    * __gup_device_huge()
+    * gup_huge_pmd(),gup_huge_pud(),gup_huge_pgd()
+    * __split_huge_pmd_locked()
+    * migrate_page_states()
+    * mark_page_accessed()
+    * page_check_references()这些函数会调用SetPageReferenced() 设置这个标志为
+    */	
 	PG_referenced,  /* 该标志位用来实现LRU算法中的第二次机会 */
 	PG_uptodate,    /* 表示页面的内容是有效的,当该页面上的读操作完成后,设置该标志 */
 	PG_dirty,       /* 表示页面内容被修改过，为脏页 */
 	PG_lru,         /* 表示该page在LRU链表中 */
+	/*
+	 * add_to_page_cache_lru(),migrate_page_states()
+	 * migrate_misplaced_transhuge_page()
+	 * SetPageSlabPfmemalloc(),
+	 * __activate_page()  [swap.c]
+	 * __lru_cache_activate_page()  [swap.c]
+	 * lru_cache_add_active_or_unevictable()  [swap.c]
+	 * shrink_page_list()  [swap.c]
+	 * 这几个函数会调用SetPageActive() 设置该标志
+	 */
 	PG_active,      /* 表示该page在活跃LRU链表中 */
 	PG_waiters,		/* page有waiter在等待, Page has waiters, check its waitqueue. Must be bit #7 and in the same byte as "PG_locked" */
 	PG_slab,        /* 表示该page属于由slab分配器创建的slab */
@@ -94,6 +113,7 @@ enum pageflags {
 #ifdef CONFIG_ARCH_USES_PG_UNCACHED
 	PG_uncached,		/* Page has been mapped as uncached */
 #endif
+//有定义
 #ifdef CONFIG_MEMORY_FAILURE
 	PG_hwpoison,		/* hardware poisoned page. Don't touch */
 #endif

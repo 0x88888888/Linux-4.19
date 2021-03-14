@@ -41,7 +41,7 @@
 
 #define RCU_SEQ_CTR_SHIFT	2
 //rcu_node->gp_seq 的最低两位是state
-#define RCU_SEQ_STATE_MASK	((1 << RCU_SEQ_CTR_SHIFT /* 2 */) - 1)
+#define RCU_SEQ_STATE_MASK	((1 << RCU_SEQ_CTR_SHIFT /* 2 */) - 1)  /* == 0B11*/
 
 /*
  * Return the counter portion of a sequence number previously returned
@@ -103,7 +103,7 @@ static inline void rcu_seq_start(unsigned long *sp)
 {
 	WRITE_ONCE(*sp, *sp + 1);
 	smp_mb(); /* Ensure update-side operation after counter increment. */
-	WARN_ON_ONCE(rcu_seq_state(*sp) != 1);
+	WARN_ON_ONCE(rcu_seq_state(*sp) != 1);//只检查gp_sq的最低两位状态位就够了
 }
 
 /* Compute the end-of-grace-period value for the specified sequence number. */
@@ -143,7 +143,7 @@ static inline void rcu_seq_end(unsigned long *sp)
 static inline unsigned long rcu_seq_snap(unsigned long *sp)
 {
 	unsigned long s;
-
+                          //0b111
 	s = (READ_ONCE(*sp) + 2 * RCU_SEQ_STATE_MASK + 1) & ~RCU_SEQ_STATE_MASK;
 	smp_mb(); /* Above access must not bleed into critical section. */
 	return s;
@@ -203,6 +203,8 @@ static inline bool rcu_seq_new_gp(unsigned long old, unsigned long new)
 /*
  * Roughly how many full grace periods have elapsed between the collection
  * of the two specified grace periods?
+ *
+ *  计算两个grace period之间的差值
  */
 static inline unsigned long rcu_seq_diff(unsigned long new, unsigned long old)
 {
@@ -217,6 +219,7 @@ static inline unsigned long rcu_seq_diff(unsigned long new, unsigned long old)
 	rnd_diff = (new & ~RCU_SEQ_STATE_MASK) -
 		   ((old + RCU_SEQ_STATE_MASK) & ~RCU_SEQ_STATE_MASK) +
 		   ((new & RCU_SEQ_STATE_MASK) || (old & RCU_SEQ_STATE_MASK));
+	
 	if (ULONG_CMP_GE(RCU_SEQ_STATE_MASK, rnd_diff))
 		return 1; /* Definitely no grace period has elapsed. */
 	return ((rnd_diff - RCU_SEQ_STATE_MASK - 1) >> RCU_SEQ_CTR_SHIFT) + 2;

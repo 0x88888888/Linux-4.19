@@ -1176,6 +1176,7 @@ static void __init do_initcalls(void)
      * 会调用 populate_rootfs,
      *
      * 1. core_initcall(sock_init)
+     * 1. core_initcall(init_zero_pfn)
      * 1. core_initcall(cgroup_wq_init)
      * 1. core_initcall(init_zero_pfn)
      *

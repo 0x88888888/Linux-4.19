@@ -392,6 +392,13 @@ int rw_verify_area(int read_write, struct file *file, const loff_t *ppos, size_t
 				read_write == READ ? MAY_READ : MAY_WRITE);
 }
 
+/*
+ * SYSCALL_DEFINE3(read)
+ *  ksys_read()
+ *   vfs_read()
+ *    __vfs_read()
+ *     new_sync_read()
+ */
 static ssize_t new_sync_read(struct file *filp, char __user *buf, size_t len, loff_t *ppos)
 {
 	struct iovec iov = { .iov_base = buf, .iov_len = len };
@@ -400,6 +407,7 @@ static ssize_t new_sync_read(struct file *filp, char __user *buf, size_t len, lo
 	ssize_t ret;
 
 	init_sync_kiocb(&kiocb, filp);
+	
 	kiocb.ki_pos = *ppos;
 	iov_iter_init(&iter, READ, &iov, 1, len);
 
@@ -409,9 +417,21 @@ static ssize_t new_sync_read(struct file *filp, char __user *buf, size_t len, lo
 	return ret;
 }
 
+/*
+ * SYSCALL_DEFINE3(read)
+ *  ksys_read()
+ *   vfs_read()
+ *    __vfs_read()
+ */
 ssize_t __vfs_read(struct file *file, char __user *buf, size_t count,
 		   loff_t *pos)
 {
+    /*
+     * ext4_file_operations->read= NULL
+     * ext4_dir_operations->read= NULL
+     *
+     * ext4_file_operations->read_iter=ext4_file_read_iter
+     */
 	if (file->f_op->read)
 		return file->f_op->read(file, buf, count, pos);
 	else if (file->f_op->read_iter)
@@ -434,6 +454,11 @@ ssize_t kernel_read(struct file *file, void *buf, size_t count, loff_t *pos)
 }
 EXPORT_SYMBOL(kernel_read);
 
+/*
+ * SYSCALL_DEFINE3(read)
+ *  ksys_read()
+ *   vfs_read()
+ */
 ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 {
 	ssize_t ret;
@@ -568,6 +593,10 @@ static inline void file_pos_write(struct file *file, loff_t pos)
 	file->f_pos = pos;
 }
 
+/*
+ * SYSCALL_DEFINE3(read)
+ *  ksys_read()
+ */
 ssize_t ksys_read(unsigned int fd, char __user *buf, size_t count)
 {
 	struct fd f = fdget_pos(fd);

@@ -398,6 +398,11 @@ void rcu_segcblist_advance(struct rcu_segcblist *rsclp, unsigned long seq)
  * grace-period sequence number seq at which new callbacks would become
  * ready to invoke.  Returns true if there are callbacks that won't be
  * ready to invoke until seq, false otherwise.
+ *
+ *
+ * __note_gp_changes()
+ *  rcu_accelerate_cbs()
+ *   rcu_segcblist_accelerate()
  */
 bool rcu_segcblist_accelerate(struct rcu_segcblist *rsclp, unsigned long seq)
 {

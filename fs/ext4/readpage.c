@@ -96,6 +96,24 @@ static void mpage_end_io(struct bio *bio)
 	bio_put(bio);
 }
 
+/*
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_fault()   [mmap后，引发的缺页异常]
+ *       do_read_fault()
+ *        __do_fault()
+ *         ext4_filemap_fault()
+ *          filemap_fault()
+ *           do_sync_mmap_readahead()
+ *            ra_submit()
+ *             __do_page_cache_readahead()
+ *              read_pages()
+ *               ext4_readpages()
+ *                ext4_mpage_readpages()
+ */
 int ext4_mpage_readpages(struct address_space *mapping,
 			 struct list_head *pages, struct page *page,
 			 unsigned nr_pages, bool is_readahead)
@@ -130,6 +148,8 @@ int ext4_mpage_readpages(struct address_space *mapping,
 		if (pages) {
 			page = list_entry(pages->prev, struct page, lru);
 			list_del(&page->lru);
+
+			//添加page到address_space和lruvec->list[LRU_INACTIVE_FILE],清空PG_active,PG_referenced标记
 			if (add_to_page_cache_lru(page, mapping, page->index,
 				  readahead_gfp_mask(mapping)))
 				goto next_page;

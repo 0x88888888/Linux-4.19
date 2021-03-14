@@ -914,6 +914,11 @@ static int fallback_migrate_page(struct address_space *mapping,
  * Return value:
  *   < 0 - error code
  *  MIGRATEPAGE_SUCCESS - success
+ *
+ * migrate_pages()
+ *  unmap_and_move()
+ *   __unmap_and_move()
+ *    move_to_new_page()
  */
 static int move_to_new_page(struct page *newpage, struct page *page,
 				enum migrate_mode mode)
@@ -988,6 +993,11 @@ out:
 	return rc;
 }
 
+/* 
+ * migrate_pages()
+ *  unmap_and_move()
+ *   __unmap_and_move()
+ */
 static int __unmap_and_move(struct page *page, struct page *newpage,
 				int force, enum migrate_mode mode)
 {
@@ -1144,6 +1154,9 @@ out:
 /*
  * Obtain the lock on page, remove all ptes and migrate the page
  * to the newly allocated page in newpage.
+ *
+ * migrate_pages()
+ *  unmap_and_move()
  */
 static ICE_noinline int unmap_and_move(new_page_t get_new_page,
 				   free_page_t put_new_page,
@@ -1368,6 +1381,19 @@ out:
  * or free list only if ret != 0.
  *
  * Returns the number of pages that were not migrated, or an error code.
+ *
+ * SYSCALL_DEFINE6(move_pages) [migrage.c]
+ *  kernel_move_pages()
+ *   do_pages_move()
+ *    do_move_pages_to_node()
+ *     migrate_pages()
+ *
+ * __alloc_pages_slowpath()
+ *  __alloc_pages_direct_compact()
+ *   try_to_compact_pages()
+ *    compact_zone_order()
+ *     compact_zone()
+ *      migrate_pages()
  */
 int migrate_pages(struct list_head *from, new_page_t get_new_page,
 		free_page_t put_new_page, unsigned long private,
@@ -1472,6 +1498,12 @@ static int store_status(int __user *status, int start, int value, int nr)
 	return 0;
 }
 
+/*
+ * SYSCALL_DEFINE6(move_pages) [migrage.c]
+ *  kernel_move_pages()
+ *   do_pages_move()
+ *    do_move_pages_to_node()
+ */
 static int do_move_pages_to_node(struct mm_struct *mm,
 		struct list_head *pagelist, int node)
 {
@@ -1562,6 +1594,10 @@ out:
 /*
  * Migrate an array of page address onto an array of nodes and fill
  * the corresponding array of status.
+ *
+ * SYSCALL_DEFINE6(move_pages) [migrage.c]
+ *  kernel_move_pages()
+ *   do_pages_move()
  */
 static int do_pages_move(struct mm_struct *mm, nodemask_t task_nodes,
 			 unsigned long nr_pages,
@@ -1724,6 +1760,9 @@ static int do_pages_stat(struct mm_struct *mm, unsigned long nr_pages,
 /*
  * Move a list of pages in the address space of the currently executing
  * process.
+ *
+ * SYSCALL_DEFINE6(move_pages) [migrage.c]
+ *  kernel_move_pages()
  */
 static int kernel_move_pages(pid_t pid, unsigned long nr_pages,
 			     const void __user * __user *pages,

@@ -32,6 +32,10 @@
 /*
  * Returns 0 if mmiotrace is disabled, or if the fault is not
  * handled by mmiotrace:
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   kmmio_fault()
  */
 static nokprobe_inline int
 kmmio_fault(struct pt_regs *regs, unsigned long addr)
@@ -1235,6 +1239,7 @@ __do_page_fault(struct pt_regs *regs, unsigned long error_code,
 
 	prefetchw(&mm->mmap_sem);
 
+    //处理操作用于MMIO引起的 page fault
 	if (unlikely(kmmio_fault(regs, address)))
 		return;
 
@@ -1304,12 +1309,12 @@ __do_page_fault(struct pt_regs *regs, unsigned long error_code,
 	 * User-mode registers count as a user access even for any
 	 * potential system fault or CPU buglet:
 	 */
-	if (user_mode(regs)) {
+	if (user_mode(regs)) { //用户态引发的page fault
 		local_irq_enable();
 		error_code |= X86_PF_USER;
 		flags |= FAULT_FLAG_USER;
 	} else {
-		if (regs->flags & X86_EFLAGS_IF)
+		if (regs->flags & X86_EFLAGS_IF)//需要开中断
 			local_irq_enable();
 	}
 
@@ -1348,7 +1353,7 @@ __do_page_fault(struct pt_regs *regs, unsigned long error_code,
 			return;
 		}
 retry:
-		down_read(&mm->mmap_sem);
+		down_read(&mm->mmap_sem);//再一次获取mmap_sem
 	} else {
 		/*
 		 * The above down_read_trylock() might have succeeded in

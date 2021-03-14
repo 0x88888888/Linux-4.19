@@ -71,15 +71,19 @@ static inline bool can_follow_write_pte(pte_t pte, unsigned int flags)
 }
 
 /*
- * mm_populate()
- *  __mm_populate()
- *   populate_vma_page_range()
- *    __get_user_pages()
- *     follow_page_mask()
- *      follow_p4d_mask()
- *       follow_pud_mask()
- *        follow_pmd_mask()
- *         follow_page_pte()
+ *
+ * SYSCALL_DEFINE6(mmap_pgoff)
+ *  ksys_mmap_pgoff()
+ *   vm_mmap_pgoff()
+ *    mm_populate()
+ *     __mm_populate()
+ *      populate_vma_page_range()
+ *       __get_user_pages(pages==NULL, vmas == NULL,)
+ *        follow_page_mask()
+ *         follow_p4d_mask()
+ *          follow_pud_mask()
+ *           follow_pmd_mask()
+ *            follow_page_pte()
  */
 static struct page *follow_page_pte(struct vm_area_struct *vma,
 		unsigned long address, pmd_t *pmd, unsigned int flags)
@@ -122,6 +126,7 @@ retry:
 		return NULL;
 	}
 
+    //这里
 	page = vm_normal_page(vma, address, pte);
 	if (!page && pte_devmap(pte) && (flags & FOLL_GET)) {
 		/*
@@ -173,6 +178,7 @@ retry:
 			pgmap = NULL;
 		}
 	}
+	
 	if (flags & FOLL_TOUCH) {
 		if ((flags & FOLL_WRITE) &&
 		    !pte_dirty(pte) && !PageDirty(page))
@@ -221,14 +227,18 @@ no_page:
 }
 
 /*
- * mm_populate()
- *  __mm_populate()
- *   populate_vma_page_range()
- *    __get_user_pages()
- *     follow_page_mask()
- *      follow_p4d_mask()
- *       follow_pud_mask()
- *        follow_pmd_mask()
+ *
+ * SYSCALL_DEFINE6(mmap_pgoff)
+ *  ksys_mmap_pgoff()
+ *   vm_mmap_pgoff()
+ *    mm_populate()
+ *     __mm_populate()
+ *      populate_vma_page_range()
+ *       __get_user_pages(pages==NULL, vmas == NULL,)
+ *        follow_page_mask()
+ *         follow_p4d_mask()
+ *          follow_pud_mask()
+ *           follow_pmd_mask()
  */
 static struct page *follow_pmd_mask(struct vm_area_struct *vma,
 				    unsigned long address, pud_t *pudp,
@@ -308,8 +318,10 @@ retry_locked:
 		pmd_migration_entry_wait(mm, pmd);
 		goto retry_locked;
 	}
-	if (unlikely(!pmd_trans_huge(*pmd))) {
+	
+	if (unlikely(!pmd_trans_huge(*pmd))) { //通常，走这里
 		spin_unlock(ptl);
+		//这里
 		return follow_page_pte(vma, address, pmd, flags);
 	}
 	if (flags & FOLL_SPLIT) {
@@ -342,13 +354,17 @@ retry_locked:
 }
 
 /*
- * mm_populate()
- *  __mm_populate()
- *   populate_vma_page_range()
- *    __get_user_pages()
- *     follow_page_mask()
- *      follow_p4d_mask()
- *       follow_pud_mask()
+ *
+ * SYSCALL_DEFINE6(mmap_pgoff)
+ *  ksys_mmap_pgoff()
+ *   vm_mmap_pgoff()
+ *    mm_populate()
+ *     __mm_populate()
+ *      populate_vma_page_range()
+ *       __get_user_pages(pages==NULL, vmas == NULL,)
+ *        follow_page_mask()
+ *         follow_p4d_mask()
+ *          follow_pud_mask()
  */
 static struct page *follow_pud_mask(struct vm_area_struct *vma,
 				    unsigned long address, p4d_t *p4dp,
@@ -386,16 +402,21 @@ static struct page *follow_pud_mask(struct vm_area_struct *vma,
 	if (unlikely(pud_bad(*pud)))
 		return no_page_table(vma, flags);
 
+    //这里
 	return follow_pmd_mask(vma, address, pud, flags, page_mask);
 }
 
 /*
- * mm_populate()
- *  __mm_populate()
- *   populate_vma_page_range()
- *    __get_user_pages()
- *     follow_page_mask()
- *      follow_p4d_mask()
+ *
+ * SYSCALL_DEFINE6(mmap_pgoff)
+ *  ksys_mmap_pgoff()
+ *   vm_mmap_pgoff()
+ *    mm_populate()
+ *     __mm_populate()
+ *      populate_vma_page_range()
+ *       __get_user_pages(pages==NULL, vmas == NULL,)
+ *        follow_page_mask()
+ *         follow_p4d_mask()
  */
 static struct page *follow_p4d_mask(struct vm_area_struct *vma,
 				    unsigned long address, pgd_t *pgdp,
@@ -419,6 +440,7 @@ static struct page *follow_p4d_mask(struct vm_area_struct *vma,
 			return page;
 		return no_page_table(vma, flags);
 	}
+	//这里
 	return follow_pud_mask(vma, address, p4d, flags, page_mask);
 }
 
@@ -435,11 +457,15 @@ static struct page *follow_p4d_mask(struct vm_area_struct *vma,
  * an error pointer if there is a mapping to something not represented
  * by a page descriptor (see also vm_normal_page()).
  *
- * mm_populate()
- *  __mm_populate()
- *   populate_vma_page_range()
- *    __get_user_pages()
- *     follow_page_mask()
+ *
+ * SYSCALL_DEFINE6(mmap_pgoff)
+ *  ksys_mmap_pgoff()
+ *   vm_mmap_pgoff()
+ *    mm_populate()
+ *     __mm_populate()
+ *      populate_vma_page_range()
+ *       __get_user_pages(pages==NULL, vmas == NULL,)
+ *        follow_page_mask()
  */
 struct page *follow_page_mask(struct vm_area_struct *vma,
 			      unsigned long address, unsigned int flags,
@@ -558,14 +584,19 @@ static int faultin_page(struct task_struct *tsk, struct vm_area_struct *vma,
 	/* mlock all present pages, but do not fault in new pages */
 	if ((*flags & (FOLL_POPULATE | FOLL_MLOCK)) == FOLL_MLOCK)
 		return -ENOENT;
+	
 	if (*flags & FOLL_WRITE)
 		fault_flags |= FAULT_FLAG_WRITE;
+	
 	if (*flags & FOLL_REMOTE)
 		fault_flags |= FAULT_FLAG_REMOTE;
+	
 	if (nonblocking)
 		fault_flags |= FAULT_FLAG_ALLOW_RETRY;
+	
 	if (*flags & FOLL_NOWAIT)
 		fault_flags |= FAULT_FLAG_ALLOW_RETRY | FAULT_FLAG_RETRY_NOWAIT;
+	
 	if (*flags & FOLL_TRIED) {
 		VM_WARN_ON_ONCE(fault_flags & FAULT_FLAG_ALLOW_RETRY);
 		fault_flags |= FAULT_FLAG_TRIED;
@@ -710,12 +741,19 @@ static int check_vma_flags(struct vm_area_struct *vma, unsigned long gup_flags)
  * instead of __get_user_pages. __get_user_pages should be used only if
  * you need some special @gup_flags.
  *
- * vm_mmap_pgoff()
  * SYSCALL_DEFINE1(brk)
  *  mm_populate()
  *   __mm_populate()
  *    populate_vma_page_range()
  *     __get_user_pages(pages==NULL, vmas == NULL,)
+ *
+ * SYSCALL_DEFINE6(mmap_pgoff)
+ *  ksys_mmap_pgoff()
+ *   vm_mmap_pgoff()
+ *    mm_populate()
+ *     __mm_populate()
+ *      populate_vma_page_range()
+ *       __get_user_pages(pages==NULL, vmas == NULL,)
  */
 static long __get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 		unsigned long start, unsigned long nr_pages,
@@ -777,6 +815,7 @@ retry:
 		cond_resched();
 		//获取一个page
 		page = follow_page_mask(vma, start, foll_flags, &page_mask);
+		
 		if (!page) {
 			int ret;
 			//这里去走handle_mm_fault了，去分配一个page
@@ -1255,6 +1294,13 @@ EXPORT_SYMBOL(get_user_pages_longterm);
  *   __mm_populate()
  *    populate_vma_page_range()
  *
+ * SYSCALL_DEFINE6(mmap_pgoff)
+ *  ksys_mmap_pgoff()
+ *   vm_mmap_pgoff()
+ *    mm_populate()
+ *     __mm_populate()
+ *      populate_vma_page_range()
+ *
  * 映射vma中的[start, end]到page去
  */
 long populate_vma_page_range(struct vm_area_struct *vma,
@@ -1309,6 +1355,12 @@ long populate_vma_page_range(struct vm_area_struct *vma,
  * SYSCALL_DEFINE1(brk)
  *  mm_populate()
  *   __mm_populate()
+ *
+ * SYSCALL_DEFINE6(mmap_pgoff)
+ *  ksys_mmap_pgoff()
+ *   vm_mmap_pgoff()
+ *    mm_populate()
+ *     __mm_populate()
  */
 int __mm_populate(unsigned long start, unsigned long len, int ignore_errors)
 {
@@ -1340,6 +1392,7 @@ int __mm_populate(unsigned long start, unsigned long len, int ignore_errors)
 		nend = min(end, vma->vm_end);
 		if (vma->vm_flags & (VM_IO | VM_PFNMAP))
 			continue;
+		
 		if (nstart < vma->vm_start)
 			nstart = vma->vm_start;
 		/*

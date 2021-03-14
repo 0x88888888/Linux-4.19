@@ -453,19 +453,22 @@ static void __lru_cache_activate_page(struct page *page)
  *
  * pagecache_get_page()
  * generic_file_buffered_read()
- * kvm_set_pfn_accessed()
- * try_to_merge_one_page()
- *  mark_page_accessed() 
+ * follow_page_pte()
+ * do_read_cache_page() [filemap.c]
  *
+ * kvm_set_pfn_accessed()  [kvm_main.c]
+ * try_to_merge_one_page() [ksm.c]
  *
- * ext2_lookup()
- *	ext2_inode_by_name() 
- *	 ext2_find_entry()
- *	  ext2_get_page()
- *     read_cache_page(filler==ext2_readpage)
- *      do_read_cache_page(filler==ext2_readpage)
- *       mark_page_accessed()
- *
+ * SYSCALL_DEFINE3(read)
+ *  ksys_read()
+ *   vfs_read()
+ *    __vfs_read()
+ *     new_sync_read()
+ *      call_read_iter()
+ *       ext4_file_read_iter()
+ *        generic_file_read_iter()
+ *         generic_file_buffered_read()
+ *          mark_page_accessed()
  */
 void mark_page_accessed(struct page *page)
 {
@@ -492,6 +495,15 @@ void mark_page_accessed(struct page *page)
 		if (page_is_file_cache(page))
 			workingset_activation(page);
 	} else if (!PageReferenced(page)) {
+	   /*
+	    * gup_pte_range()
+	    * __gup_device_huge()
+	    * gup_huge_pmd(),gup_huge_pud(),gup_huge_pgd()
+	    * __split_huge_pmd_locked()
+	    * migrate_page_states()
+	    * mark_page_accessed()
+	    * page_check_references()这些函数会调用SetPageReferenced()
+	    */
 		SetPageReferenced(page);
 	}
 	if (page_is_idle(page))

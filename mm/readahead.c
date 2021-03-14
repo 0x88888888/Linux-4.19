@@ -110,6 +110,37 @@ int read_cache_pages(struct address_space *mapping, struct list_head *pages,
 
 EXPORT_SYMBOL(read_cache_pages);
 
+/*
+ * SYSCALL_DEFINE3(read)
+ *  ksys_read()
+ *   vfs_read()
+ *    __vfs_read()
+ *     new_sync_read()
+ *      call_read_iter()
+ *       ext4_file_read_iter()
+ *        generic_file_read_iter()
+ *         generic_file_buffered_read()
+ *          page_cache_async_readahead()
+ *           ondemand_readahead()
+ *            __do_page_cache_readahead()
+ *             read_pages()
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_fault()   [mmap后，引发的缺页异常]
+ *       do_read_fault()
+ *        __do_fault()
+ *         ext4_filemap_fault()
+ *          filemap_fault()
+ *           do_sync_mmap_readahead()
+ *            ra_submit()
+ *             __do_page_cache_readahead()
+ *              read_pages()
+ *
+ */
 static int read_pages(struct address_space *mapping, struct file *filp,
 		struct list_head *pages, unsigned int nr_pages, gfp_t gfp)
 {
@@ -119,18 +150,25 @@ static int read_pages(struct address_space *mapping, struct file *filp,
 
 	blk_start_plug(&plug);
 
-	if (mapping->a_ops->readpages) {
+    //ext4_aops->readpages = ext4_readpages
+    //ext4_dax_aops->readpages == NULL
+	if (mapping->a_ops->readpages) { //走这里
 		ret = mapping->a_ops->readpages(filp, mapping, pages, nr_pages);
-		/* Clean up the remaining pages */
+		/* Clean up the remaining pages 
+	     */
 		put_pages_list(pages);
 		goto out;
 	}
 
+    //一个个的读取page，然后添加到 address_space和 lruvec中去
 	for (page_idx = 0; page_idx < nr_pages; page_idx++) {
 		struct page *page = lru_to_page(pages);
 		list_del(&page->lru);
+
+		//添加page到 address_space和 lruvec中去
 		if (!add_to_page_cache_lru(page, mapping, page->index, gfp))
 			mapping->a_ops->readpage(filp, page);
+		
 		put_page(page);
 	}
 	ret = 0;
@@ -148,6 +186,33 @@ out:
  * We really don't want to intermingle reads and writes like that.
  *
  * Returns the number of pages requested, or the maximum amount of I/O allowed.
+ *
+ * SYSCALL_DEFINE3(read)
+ *  ksys_read()
+ *   vfs_read()
+ *    __vfs_read()
+ *     new_sync_read()
+ *      call_read_iter()
+ *       ext4_file_read_iter()
+ *        generic_file_read_iter()
+ *         generic_file_buffered_read()
+ *          page_cache_async_readahead()
+ *           ondemand_readahead()
+ *            __do_page_cache_readahead()
+ *
+ * do_page_fault()
+ *  __do_page_fault()
+ *   handle_mm_fault()
+ *    __handle_mm_fault()
+ *     handle_pte_fault()
+ *      do_fault()   [mmap后，引发的缺页异常]
+ *       do_read_fault()
+ *        __do_fault()
+ *         ext4_filemap_fault()
+ *          filemap_fault()
+ *           do_sync_mmap_readahead()
+ *            ra_submit()
+ *             __do_page_cache_readahead()
  */
 unsigned int __do_page_cache_readahead(struct address_space *mapping,
 		struct file *filp, pgoff_t offset, unsigned long nr_to_read,
@@ -160,6 +225,7 @@ unsigned int __do_page_cache_readahead(struct address_space *mapping,
 	int page_idx;
 	unsigned int nr_pages = 0;
 	loff_t isize = i_size_read(inode);
+	
 	gfp_t gfp_mask = readahead_gfp_mask(mapping);
 
 	if (isize == 0)
@@ -177,9 +243,10 @@ unsigned int __do_page_cache_readahead(struct address_space *mapping,
 			break;
 
 		rcu_read_lock();
+		//先从address_space中查找
 		page = radix_tree_lookup(&mapping->i_pages, page_offset);
 		rcu_read_unlock();
-		if (page && !radix_tree_exceptional_entry(page)) {
+		if (page && !radix_tree_exceptional_entry(page)) { //找到
 			/*
 			 * Page already present?  Kick off the current batch of
 			 * contiguous pages before continuing with the next
@@ -192,6 +259,7 @@ unsigned int __do_page_cache_readahead(struct address_space *mapping,
 			continue;
 		}
 
+		//分配出物理page
 		page = __page_cache_alloc(gfp_mask);
 		if (!page)
 			break;
@@ -209,6 +277,7 @@ unsigned int __do_page_cache_readahead(struct address_space *mapping,
 	 */
 	if (nr_pages)
 		read_pages(mapping, filp, &page_pool, nr_pages, gfp_mask);
+	
 	BUG_ON(!list_empty(&page_pool));
 out:
 	return nr_pages;
@@ -378,6 +447,18 @@ static int try_context_readahead(struct address_space *mapping,
 
 /*
  * A minimal readahead algorithm for trivial sequential/random reads.
+ *
+ * SYSCALL_DEFINE3(read)
+ *  ksys_read()
+ *   vfs_read()
+ *    __vfs_read()
+ *     new_sync_read()
+ *      call_read_iter()
+ *       ext4_file_read_iter()
+ *        generic_file_read_iter()
+ *         generic_file_buffered_read()
+ *          page_cache_async_readahead()
+ *           ondemand_readahead()
  */
 static unsigned long
 ondemand_readahead(struct address_space *mapping,
@@ -506,6 +587,17 @@ readit:
  * it will submit the read.  The readahead logic may decide to piggyback more
  * pages onto the read request if access patterns suggest it will improve
  * performance.
+ *
+ * SYSCALL_DEFINE3(read)
+ *  ksys_read()
+ *   vfs_read()
+ *    __vfs_read()
+ *     new_sync_read()
+ *      call_read_iter()
+ *       ext4_file_read_iter()
+ *        generic_file_read_iter()
+ *         generic_file_buffered_read()
+ *          page_cache_sync_readahead()
  */
 void page_cache_sync_readahead(struct address_space *mapping,
 			       struct file_ra_state *ra, struct file *filp,
@@ -543,6 +635,17 @@ EXPORT_SYMBOL_GPL(page_cache_sync_readahead);
  * has the PG_readahead flag; this is a marker to suggest that the application
  * has used up enough of the readahead window that we should start pulling in
  * more pages.
+ *
+ * SYSCALL_DEFINE3(read)
+ *  ksys_read()
+ *   vfs_read()
+ *    __vfs_read()
+ *     new_sync_read()
+ *      call_read_iter()
+ *       ext4_file_read_iter()
+ *        generic_file_read_iter()
+ *         generic_file_buffered_read()
+ *          page_cache_async_readahead()
  */
 void
 page_cache_async_readahead(struct address_space *mapping,
