@@ -413,11 +413,13 @@ struct zone {
 	 * 内核怎么知道物理页的迁移类型？内存区域的zone结构体的成员pageblock_flags指向页块标志位图，
 	 * 页块的大小是分组阶数pageblock_order，我们把这种页块称为分组页块
 	 *
-	 *每个分组页块在位图中占用4位，其中3位用来存放页块的迁移类型。
+	 * 每个分组页块在位图中占用4位，其中3位用来存放页块的迁移类型。
 	 *
 	 * 函数set_pageblock_migratetype()用来在页块标志位图中设置页块的迁移类型
 	 *
 	 * 在setup_usemap()中分配
+	 *
+	 * 4个bit负责一个pageblock的migrate type
 	 */
 	unsigned long		*pageblock_flags;
 #endif /* CONFIG_SPARSEMEM */

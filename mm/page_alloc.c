@@ -463,6 +463,17 @@ void set_pfnblock_flags_mask(struct page *page, unsigned long flags,
  *        memmap_init()
  *         memmap_init_zone()
  *          set_pageblock_migratetype(migratetype==MIGRATE_MOVABLE)
+ *
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   __alloc_pages_nodemask()
+ *    get_page_from_freelist()
+ *     rmqueue()
+ *      __rmqueue()
+ *       __rmqueue_fallback()
+ *        steal_suitable_fallback()
+ *         change_pageblock_range()
+ *          set_pageblock_migratetype()
  */
 void set_pageblock_migratetype(struct page *page, int migratetype)
 {
@@ -2155,6 +2166,14 @@ static void prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags
  *      __rmqueue()
  *       __rmqueue_cma_fallback()
  *        __rmqueue_smallest(migratetype==MIGRATE_CMA)
+ *
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   __alloc_pages_nodemask()
+ *    get_page_from_freelist()
+ *     rmqueue()
+ *      __rmqueue()
+ *       __rmqueue_smallest()
  */
 static __always_inline
 struct page *__rmqueue_smallest(struct zone *zone, unsigned int order,
@@ -2170,13 +2189,15 @@ struct page *__rmqueue_smallest(struct zone *zone, unsigned int order,
 		area = &(zone->free_area[current_order]);
 		page = list_first_entry_or_null(&area->free_list[migratetype],
 							struct page, lru);
-		if (!page)
+		if (!page) //必须要够，才行
 			continue;
 		
 		list_del(&page->lru);
 		rmv_page_order(page);
 		area->nr_free--;
+		//切成两半
 		expand(zone, page, order, current_order, area, migratetype);
+		
 		set_pcppage_migratetype(page, migratetype);
 		return page;
 	}
@@ -2225,6 +2246,17 @@ static inline struct page *__rmqueue_cma_fallback(struct zone *zone,
  * Move the free pages in a range to the free lists of the requested type.
  * Note that start_page and end_pages are not aligned on a pageblock
  * boundary. If alignment is required, use move_freepages_block()
+ *
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   __alloc_pages_nodemask()
+ *    get_page_from_freelist()
+ *     rmqueue()
+ *      __rmqueue()
+ *       __rmqueue_fallback()
+ *        steal_suitable_fallback()
+ *         move_freepages_block()
+ *          move_freepages()
  */
 static int move_freepages(struct zone *zone,
 			  struct page *start_page, struct page *end_page,
@@ -2274,8 +2306,10 @@ static int move_freepages(struct zone *zone,
 		}
 
 		order = page_order(page);
+		//修改到相应的migratetype中去
 		list_move(&page->lru,
 			  &zone->free_area[order].free_list[migratetype]);
+		//下一个page 2^order
 		page += 1 << order;
 		pages_moved += 1 << order;
 	}
@@ -2283,6 +2317,17 @@ static int move_freepages(struct zone *zone,
 	return pages_moved;
 }
 
+/*
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   __alloc_pages_nodemask()
+ *    get_page_from_freelist()
+ *     rmqueue()
+ *      __rmqueue()
+ *       __rmqueue_fallback()
+ *        steal_suitable_fallback()
+ *         move_freepages_block()
+ */
 int move_freepages_block(struct zone *zone, struct page *page,
 				int migratetype, int *num_movable)
 {
@@ -2305,13 +2350,26 @@ int move_freepages_block(struct zone *zone, struct page *page,
 								num_movable);
 }
 
+/*
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   __alloc_pages_nodemask()
+ *    get_page_from_freelist()
+ *     rmqueue()
+ *      __rmqueue()
+ *       __rmqueue_fallback()
+ *        steal_suitable_fallback()
+ *         change_pageblock_range()
+ */ 
 static void change_pageblock_range(struct page *pageblock_page,
 					int start_order, int migratetype)
 {
+    //一共有多少个pageblock
 	int nr_pageblocks = 1 << (start_order - pageblock_order);
 
 	while (nr_pageblocks--) {
 		set_pageblock_migratetype(pageblock_page, migratetype);
+		//下一个pageblock
 		pageblock_page += pageblock_nr_pages;
 	}
 }
@@ -2356,6 +2414,15 @@ static bool can_steal_fallback(unsigned int order, int start_mt)
  * are there in the pageblock with a compatible migratetype. If at least half
  * of pages are free or compatible, we can change migratetype of the pageblock
  * itself, so pages freed in the future will be put on the correct free list.
+ *
+ * alloc_pages()
+ *  alloc_pages_current()
+ *   __alloc_pages_nodemask()
+ *    get_page_from_freelist()
+ *     rmqueue()
+ *      __rmqueue()
+ *       __rmqueue_fallback()
+ *        steal_suitable_fallback()
  */
 static void steal_suitable_fallback(struct zone *zone, struct page *page,
 					int start_type, bool whole_block)
@@ -2365,6 +2432,7 @@ static void steal_suitable_fallback(struct zone *zone, struct page *page,
 	int free_pages, movable_pages, alike_pages;
 	int old_block_type;
 
+    //记住原先的migrate type
 	old_block_type = get_pageblock_migratetype(page);
 
 	/*
@@ -2375,7 +2443,7 @@ static void steal_suitable_fallback(struct zone *zone, struct page *page,
 		goto single_page;
 
 	/* Take ownership for orders >= pageblock_order */
-	if (current_order >= pageblock_order) {
+	if (current_order >= pageblock_order) { //可以修改
 		change_pageblock_range(page, current_order, start_type);
 		goto single_page;
 	}
@@ -2622,6 +2690,7 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype)
 				--current_order) {
 					
 		area = &(zone->free_area[current_order]);
+		//在area中查找是否有合适的,可以修改migrate type的
 		fallback_mt = find_suitable_fallback(area, current_order,
 				start_migratetype, false, &can_steal);
 		if (fallback_mt == -1)
@@ -2634,6 +2703,8 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype)
 		 * largest available page, because even if the next movable
 		 * allocation falls back into a different pageblock than this
 		 * one, it won't cause permanent fragmentation.
+		 *
+		 * 只能steal部分的page
 		 */
 		if (!can_steal && start_migratetype == MIGRATE_MOVABLE
 					&& current_order > order)
@@ -2644,7 +2715,7 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype)
 
 	return false;
 
-find_smallest:
+find_smallest: //再次尝试
 	for (current_order = order; current_order < MAX_ORDER;
 							current_order++) {
 		area = &(zone->free_area[current_order]);
@@ -2664,6 +2735,9 @@ do_steal:
 	page = list_first_entry(&area->free_list[fallback_mt],
 							struct page, lru);
 
+    /*
+     * 从别的migratetype哪里迁移一些过来
+     */
 	steal_suitable_fallback(zone, page, start_migratetype, can_steal);
 
 	trace_mm_page_alloc_extfrag(page, order, current_order,
@@ -2692,7 +2766,7 @@ __rmqueue(struct zone *zone, unsigned int order, int migratetype)
 retry:
 	page = __rmqueue_smallest(zone, order, migratetype);
 	if (unlikely(!page)) {
-		if (migratetype == MIGRATE_MOVABLE)
+		if (migratetype == MIGRATE_MOVABLE) //首先从MIGRATE_CMA类型的去尝试
 			page = __rmqueue_cma_fallback(zone, order);
 
 		if (!page && __rmqueue_fallback(zone, order, migratetype))
@@ -6103,7 +6177,7 @@ not_early:
 		 * Please note that MEMMAP_HOTPLUG path doesn't clear memmap
 		 * because this is done early in sparse_add_one_section
 		 */
-		if (!(pfn & (pageblock_nr_pages - 1))) {
+		if (!(pfn & (pageblock_nr_pages - 1))) { //以pageblock个page为单位
 			//每个page都是MIGRATE_MOVABLE的迁移类型
 			set_pageblock_migratetype(page, MIGRATE_MOVABLE);
 			cond_resched();
@@ -6728,17 +6802,35 @@ static void __meminit calculate_node_totalpages(struct pglist_data *pgdat,
 static unsigned long __init usemap_size(unsigned long zone_start_pfn, unsigned long zonesize)
 {
 	unsigned long usemapsize;
-
+    /*
+     * 通常pageblock_order==10
+     * 通常pageblock_nr_pages == 1024 == 0B 10000000000
+     *                                      01111111111
+     */
 	zonesize += zone_start_pfn & (pageblock_nr_pages-1);
+	//zonesize要pageblock_nr_pages的整数倍
 	usemapsize = roundup(zonesize, pageblock_nr_pages);
+	//计算出一共有多少个pageblock
 	usemapsize = usemapsize >> pageblock_order;
-	usemapsize *= NR_PAGEBLOCK_BITS;
+	//4个BIT来负责一个pageblock的migrate type
+	usemapsize *= NR_PAGEBLOCK_BITS /* 4 */;
+	//对齐
 	usemapsize = roundup(usemapsize, 8 * sizeof(unsigned long));
 
+    //一共要多少个字节
 	return usemapsize / 8;
 }
 
 /*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   paging_init()
+ *    zone_sizes_init()
+ *     free_area_init_nodes()
+ *      free_area_init_node()
+ *       free_area_init_core()
+ *        setup_usemap()
+ *
  * size:page数量
  */
 static void __ref setup_usemap(struct pglist_data *pgdat,
@@ -6746,8 +6838,10 @@ static void __ref setup_usemap(struct pglist_data *pgdat,
 				unsigned long zone_start_pfn,
 				unsigned long zonesize)
 {
+    //4个bit负责一个pageblock的migrate type
 	unsigned long usemapsize = usemap_size(zone_start_pfn, zonesize);
 	zone->pageblock_flags = NULL;
+	
 	if (usemapsize)
 		zone->pageblock_flags =
 			memblock_virt_alloc_node_nopanic(usemapsize,
