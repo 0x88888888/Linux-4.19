@@ -47,6 +47,7 @@ void __kprobes arch_arm_kprobe(struct kprobe *p)
 
 void __kprobes arch_disarm_kprobe(struct kprobe *p)
 {
+    
 	*p->addr = p->opcode;
 
 	flush_icache_range((unsigned long)p->addr,

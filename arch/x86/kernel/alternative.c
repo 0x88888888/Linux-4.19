@@ -689,6 +689,14 @@ void *__init_or_module text_poke_early(void *addr, const void *opcode,
  * It means the size must be writable atomically and the address must be aligned
  * in a way that permits an atomic write. It also makes sure we fit on a single
  * page.
+ *
+ * register_kprobe()
+ *  prepare_kprobe()
+ *   arch_prepare_kprobe()
+ *    arch_copy_kprobe()
+ *     text_poke()
+ *
+ * 修改在addr处的二进制代码为 opcode
  */
 void *text_poke(void *addr, const void *opcode, size_t len)
 {
@@ -705,24 +713,30 @@ void *text_poke(void *addr, const void *opcode, size_t len)
 
 	lockdep_assert_held(&text_mutex);
 
-	if (!core_kernel_text((unsigned long)addr)) {
+    //根据addr的代码地址，得到相应的page
+	if (!core_kernel_text((unsigned long)addr)) {//内核vmalloc分配的地址
 		pages[0] = vmalloc_to_page(addr);
 		pages[1] = vmalloc_to_page(addr + PAGE_SIZE);
-	} else {
+	} else {//内核的代码地址
 		pages[0] = virt_to_page(addr);
 		WARN_ON(!PageReserved(pages[0]));
 		pages[1] = virt_to_page(addr + PAGE_SIZE);
 	}
+	
 	BUG_ON(!pages[0]);
 	local_irq_save(flags);
 	set_fixmap(FIX_TEXT_POKE0, page_to_phys(pages[0]));
 	if (pages[1])
 		set_fixmap(FIX_TEXT_POKE1, page_to_phys(pages[1]));
+
+	
 	vaddr = (char *)fix_to_virt(FIX_TEXT_POKE0);
+	//复制opcode到vaddr过来
 	memcpy(&vaddr[(unsigned long)addr & ~PAGE_MASK], opcode, len);
 	clear_fixmap(FIX_TEXT_POKE0);
 	if (pages[1])
 		clear_fixmap(FIX_TEXT_POKE1);
+	
 	local_flush_tlb();
 	sync_core();
 	/* Could also do a CLFLUSH here to speed up CPU recovery; but
@@ -741,6 +755,11 @@ static void do_sync_core(void *info)
 static bool bp_patching_in_progress;
 static void *bp_int3_handler, *bp_int3_addr;
 
+/*
+ * entry_64.S中掉用 do_int3()
+ *  do_int3()
+ *   poke_int3_handler()
+ */
 int poke_int3_handler(struct pt_regs *regs)
 {
 	/*

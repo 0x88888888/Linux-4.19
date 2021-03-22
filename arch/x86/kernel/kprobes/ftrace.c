@@ -68,6 +68,11 @@ void kprobe_ftrace_handler(unsigned long ip, unsigned long parent_ip,
 }
 NOKPROBE_SYMBOL(kprobe_ftrace_handler);
 
+/*
+ * register_kprobe()
+ *  prepare_kprobe()
+ *   arch_prepare_kprobe_ftrace()
+ */
 int arch_prepare_kprobe_ftrace(struct kprobe *p)
 {
 	p->ainsn.insn = NULL;

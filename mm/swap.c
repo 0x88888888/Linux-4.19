@@ -868,6 +868,15 @@ static DEFINE_PER_CPU(struct work_struct, lru_add_drain_work);
  * executed on the offlined cpu.
  * Calling this function with cpu hotplug locks held can actually lead
  * to obscure indirect dependencies via WQ context.
+ *
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    ksm_init() 创建ksm_scan_thread线程
+ *     ksm_scan_thread()
+ *      ksm_do_scan(scan_npages == ksm_thread_pages_to_scan)
+ *       scan_get_next_rmap_item()
+ *        lru_add_drain_all()
  */
 void lru_add_drain_all(void)
 {
@@ -893,6 +902,7 @@ void lru_add_drain_all(void)
 		    pagevec_count(&per_cpu(lru_deactivate_file_pvecs, cpu)) ||
 		    pagevec_count(&per_cpu(lru_lazyfree_pvecs, cpu)) ||
 		    need_activate_page_drain(cpu)) {
+		    
 			INIT_WORK(work, lru_add_drain_per_cpu);
 			queue_work_on(cpu, mm_percpu_wq, work);
 			cpumask_set_cpu(cpu, &has_work);

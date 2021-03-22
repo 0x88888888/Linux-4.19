@@ -347,6 +347,12 @@ static int is_IF_modifier(kprobe_opcode_t *insn)
  * addressing mode. Note that since @real will be the final place of copied
  * instruction, displacement must be adjust by @real, not @dest.
  * This returns the length of copied instruction, or 0 if it has an error.
+ *
+ * register_kprobe()
+ *  prepare_kprobe()
+ *   arch_prepare_kprobe()
+ *    arch_copy_kprobe()
+ *     __copy_instruction()
  */
 int __copy_instruction(u8 *dest, u8 *src, u8 *real, struct insn *insn)
 {
@@ -445,6 +451,13 @@ void free_insn_page(void *page)
 	module_memfree(page);
 }
 
+/*
+ * register_kprobe()
+ *  prepare_kprobe()
+ *   arch_prepare_kprobe()
+ *    arch_copy_kprobe()
+ *
+ */
 static int arch_copy_kprobe(struct kprobe *p)
 {
 	struct insn insn;
@@ -465,7 +478,10 @@ static int arch_copy_kprobe(struct kprobe *p)
 	/* Check whether the instruction modifies Interrupt Flag or not */
 	p->ainsn.if_modifier = is_IF_modifier(buf);
 
-	/* Also, displacement change doesn't affect the first byte */
+	/* Also, displacement change doesn't affect the first byte 
+	 *
+	 * 复制指令过来，保存起来
+	 */
 	p->opcode = buf[0];
 
 	/* OK, write back the instruction(s) into ROX insn buffer */
@@ -474,6 +490,11 @@ static int arch_copy_kprobe(struct kprobe *p)
 	return 0;
 }
 
+/*
+ * register_kprobe()
+ *  prepare_kprobe()
+ *   arch_prepare_kprobe()
+ */
 int arch_prepare_kprobe(struct kprobe *p)
 {
 	int ret;
@@ -497,13 +518,23 @@ int arch_prepare_kprobe(struct kprobe *p)
 	return ret;
 }
 
+/*
+ * register_kprobe()
+ *  arm_kprobe()
+ *   __arm_kprobe()
+ *    arch_arm_kprobe()
+ *
+ * 修改p->addr为0xcc
+ */
 void arch_arm_kprobe(struct kprobe *p)
 {
+    //改成0xcc
 	text_poke(p->addr, ((unsigned char []){BREAKPOINT_INSTRUCTION}), 1);
 }
 
 void arch_disarm_kprobe(struct kprobe *p)
-{
+{    
+    //恢复原先的指令
 	text_poke(p->addr, &p->opcode, 1);
 }
 
@@ -575,12 +606,21 @@ void arch_prepare_kretprobe(struct kretprobe_instance *ri, struct pt_regs *regs)
 }
 NOKPROBE_SYMBOL(arch_prepare_kretprobe);
 
+/*
+ * entry_64.S中掉用 do_int3()
+ *  do_int3()
+ *   kprobe_int3_handler()
+ *    setup_singlestep( reenter==false)
+ *
+ * 设置单步模式
+ */
 static void setup_singlestep(struct kprobe *p, struct pt_regs *regs,
 			     struct kprobe_ctlblk *kcb, int reenter)
 {
 	if (setup_detour_execution(p, regs, reenter))
 		return;
-
+	
+//没有定义
 #if !defined(CONFIG_PREEMPT)
 	if (p->ainsn.boostable && !p->post_handler) {
 		/* Boost up -- we can execute copied instructions directly */
@@ -595,6 +635,7 @@ static void setup_singlestep(struct kprobe *p, struct pt_regs *regs,
 		return;
 	}
 #endif
+
 	if (reenter) {
 		save_previous_kprobe(kcb);
 		set_current_kprobe(p, regs, kcb);
@@ -603,6 +644,7 @@ static void setup_singlestep(struct kprobe *p, struct pt_regs *regs,
 		kcb->kprobe_status = KPROBE_HIT_SS;
 	/* Prepare real single stepping */
 	clear_btf();
+	//设置单步模式，关闭中断
 	regs->flags |= X86_EFLAGS_TF;
 	regs->flags &= ~X86_EFLAGS_IF;
 	/* single step inline if the instruction is an int3 */
@@ -617,6 +659,11 @@ NOKPROBE_SYMBOL(setup_singlestep);
  * We have reentered the kprobe_handler(), since another probe was hit while
  * within the handler. We save the original kprobes variables and just single
  * step on the instruction of the new probe without calling any user handlers.
+ *
+ * entry_64.S中掉用 do_int3()
+ *  do_int3()
+ *   kprobe_int3_handler()
+ *    reenter_kprobe()
  */
 static int reenter_kprobe(struct kprobe *p, struct pt_regs *regs,
 			  struct kprobe_ctlblk *kcb)
@@ -651,6 +698,10 @@ NOKPROBE_SYMBOL(reenter_kprobe);
 /*
  * Interrupts are disabled on entry as trap3 is an interrupt gate and they
  * remain disabled throughout this function.
+ *
+ * entry_64.S中掉用 do_int3()
+ *  do_int3()
+ *   kprobe_int3_handler()
  */
 int kprobe_int3_handler(struct pt_regs *regs)
 {
@@ -669,9 +720,9 @@ int kprobe_int3_handler(struct pt_regs *regs)
 	 */
 
 	kcb = get_kprobe_ctlblk();
-	p = get_kprobe(addr);
-
-	if (p) {
+	p = get_kprobe(addr); //在kprobe_table中查找kprobe对象
+ 
+	if (p) {//如果找到了，说明这个int3是被kprobe设置的
 		if (kprobe_running()) {
 			if (reenter_kprobe(p, regs, kcb))
 				return 1;
@@ -685,9 +736,11 @@ int kprobe_int3_handler(struct pt_regs *regs)
 			 * pre-handler and it returned non-zero, that means
 			 * user handler setup registers to exit to another
 			 * instruction, we must skip the single stepping.
+			 *
+			 * 先调用一些pre_handler
 			 */
 			if (!p->pre_handler || !p->pre_handler(p, regs))
-				setup_singlestep(p, regs, kcb, 0);
+				setup_singlestep(p, regs, kcb, 0); //设置单步执行模式，执行完被修改的指令，然后就走到kprobe->fault_handler了
 			else
 				reset_current_kprobe();
 			return 1;
@@ -932,6 +985,10 @@ NOKPROBE_SYMBOL(resume_execution);
 /*
  * Interrupts are disabled on entry as trap1 is an interrupt gate and they
  * remain disabled throughout this function.
+ *
+ * entry_64.S 中调用 do_debug
+ *  do_debug()
+ *   kprobe_debug_handler()
  */
 int kprobe_debug_handler(struct pt_regs *regs)
 {
@@ -972,7 +1029,10 @@ NOKPROBE_SYMBOL(kprobe_debug_handler);
  * do_page_fault()
  *  __do_page_fault()
  *   kprobes_fault()
- *    kprobe_fault_handler()
+ *    kprobe_fault_handler(trapnr==14)
+ *
+ * kprobe_exceptions_notify()
+ *  kprobe_fault_handler()
  */
 int kprobe_fault_handler(struct pt_regs *regs, int trapnr)
 {
@@ -995,6 +1055,8 @@ int kprobe_fault_handler(struct pt_regs *regs, int trapnr)
 		 * Trap flag (TF) has been set here because this fault
 		 * happened where the single stepping will be done.
 		 * So clear it by resetting the current kprobe:
+		 *
+		 * 去掉单步执行
 		 */
 		regs->flags &= ~X86_EFLAGS_TF;
 
@@ -1023,6 +1085,8 @@ int kprobe_fault_handler(struct pt_regs *regs, int trapnr)
 		 * if handler tries to access user space by
 		 * copy_from_user(), get_user() etc. Let the
 		 * user-specified handler try to fix it first.
+		 *
+		 * 走起
 		 */
 		if (cur->fault_handler && cur->fault_handler(cur, regs, trapnr))
 			return 1;

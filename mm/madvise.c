@@ -51,6 +51,10 @@ static int madvise_need_mmap_write(int behavior)
 /*
  * We can potentially split a vm area into separate
  * areas, each area with its own behavior.
+ *
+ * SYSCALL_DEFINE3(madvise)
+ *  madvise_vma()
+ *   madvise_behavior()
  */
 static long madvise_behavior(struct vm_area_struct *vma,
 		     struct vm_area_struct **prev,
@@ -684,6 +688,10 @@ static int madvise_inject_error(int behavior,
 }
 #endif
 
+/*
+ * SYSCALL_DEFINE3(madvise)
+ *  madvise_vma()
+ */
 static long
 madvise_vma(struct vm_area_struct *vma, struct vm_area_struct **prev,
 		unsigned long start, unsigned long end, int behavior)
@@ -869,7 +877,10 @@ SYSCALL_DEFINE3(madvise, unsigned long, start, size_t, len_in, int, behavior)
 		if (end < tmp)
 			tmp = end;
 
-		/* Here vma->vm_start <= start < tmp <= (end|vma->vm_end). */
+		/* Here vma->vm_start <= start < tmp <= (end|vma->vm_end). 
+		 * 
+		 * KSM 走这里
+		 */
 		error = madvise_vma(vma, &prev, start, tmp, behavior);
 		if (error)
 			goto out;

@@ -270,6 +270,9 @@ static LIST_HEAD(migrate_nodes);
 #define MM_SLOTS_HASH_BITS 10
 static DEFINE_HASHTABLE(mm_slots_hash, MM_SLOTS_HASH_BITS);
 
+/*
+ * 在__ksm_enter()中添加 mm_slot
+ */
 static struct mm_slot ksm_mm_head = {
 	.mm_list = LIST_HEAD_INIT(ksm_mm_head.mm_list),
 };
@@ -667,6 +670,13 @@ static inline void free_stable_node_chain(struct stable_node *chain,
 	ksm_stable_node_chains--;
 }
 
+/*
+ * ksm_scan_thread()
+ *  ksm_do_scan(scan_npages == ksm_thread_pages_to_scan)
+ *   scan_get_next_rmap_item()
+ *    get_ksm_page()
+ *     remove_node_from_stable_tree()
+ */
 static void remove_node_from_stable_tree(struct stable_node *stable_node)
 {
 	struct rmap_item *rmap_item;
@@ -679,6 +689,7 @@ static void remove_node_from_stable_tree(struct stable_node *stable_node)
 			ksm_pages_sharing--;
 		else
 			ksm_pages_shared--;
+		
 		VM_BUG_ON(stable_node->rmap_hlist_len <= 0);
 		stable_node->rmap_hlist_len--;
 		put_anon_vma(rmap_item->anon_vma);
@@ -702,6 +713,7 @@ static void remove_node_from_stable_tree(struct stable_node *stable_node)
 		list_del(&stable_node->list);
 	else
 		stable_node_dup_del(stable_node);
+	
 	free_stable_node(stable_node);
 }
 
@@ -723,6 +735,17 @@ static void remove_node_from_stable_tree(struct stable_node *stable_node)
  * page to reset its page->mapping to NULL, and relies on no other use of
  * a page to put something that might look like our key in page->mapping.
  * is on its way to being freed; but it is an anomaly to bear in mind.
+ *
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    ksm_init() 创建ksm_scan_thread线程
+ *     ksm_scan_thread()
+ *      ksm_do_scan(scan_npages == ksm_thread_pages_to_scan)
+ *       scan_get_next_rmap_item()
+ *        get_ksm_page()
+ *
+ * 查找合适的ksm      page
  */
 static struct page *get_ksm_page(struct stable_node *stable_node, bool lock_it)
 {
@@ -786,6 +809,7 @@ stale:
 	smp_rmb();
 	if (READ_ONCE(stable_node->kpfn) != kpfn)
 		goto again;
+	
 	remove_node_from_stable_tree(stable_node);
 	return NULL;
 }
@@ -2108,6 +2132,9 @@ static void stable_tree_append(struct rmap_item *rmap_item,
  *     ksm_scan_thread()
  *      ksm_do_scan(scan_npages == ksm_thread_pages_to_scan)
  *       cmp_and_merge_page()
+ *
+ * 在KSM中的stable和unstable的两颗红黑树中查找是否有合适合并的对象
+ * 并且尝试合并它们 
  */
 static void cmp_and_merge_page(struct page *page, struct rmap_item *rmap_item)
 {
@@ -2305,9 +2332,11 @@ static struct rmap_item *scan_get_next_rmap_item(struct page **page)
 	struct rmap_item *rmap_item;
 	int nid;
 
+    //要遍历可以合并的mm_struct,必须不为NULL
 	if (list_empty(&ksm_mm_head.mm_list))
 		return NULL;
 
+    //从之前缓存的mm_struct开始
 	slot = ksm_scan.mm_slot;
 	if (slot == &ksm_mm_head) {
 		/*
@@ -2332,8 +2361,10 @@ static struct rmap_item *scan_get_next_rmap_item(struct page **page)
 			struct stable_node *stable_node, *next;
 			struct page *page;
 
+            //遍历stable表
 			list_for_each_entry_safe(stable_node, next,
 						 &migrate_nodes, list) {
+				//查找合适的ksm      page		 
 				page = get_ksm_page(stable_node, false);
 				if (page)
 					put_page(page);
@@ -2367,16 +2398,20 @@ next_mm:
 		vma = find_vma(mm, ksm_scan.address);
 
 	for (; vma; vma = vma->vm_next) {
+		//不能几个进程公用
 		if (!(vma->vm_flags & VM_MERGEABLE))
 			continue;
+		
 		if (ksm_scan.address < vma->vm_start)
 			ksm_scan.address = vma->vm_start;
+		
 		if (!vma->anon_vma)
 			ksm_scan.address = vma->vm_end;
 
 		while (ksm_scan.address < vma->vm_end) {
 			if (ksm_test_exit(mm))
 				break;
+			
 			*page = follow_page(vma, ksm_scan.address, FOLL_GET);
 			if (IS_ERR_OR_NULL(*page)) {
 				ksm_scan.address += PAGE_SIZE;
@@ -2473,10 +2508,15 @@ static void ksm_do_scan(unsigned int scan_npages)
 
 	while (scan_npages-- && likely(!freezing(current))) {
 		cond_resched();
+		//获取一个合适anon page
 		rmap_item = scan_get_next_rmap_item(&page);
 		if (!rmap_item)
 			return;
-		
+
+		/*
+		 * 在KSM中的stable和unstable的两颗红黑树中查找是否有合适合并的对象
+		 * 并且尝试合并它们
+		 */
 		cmp_and_merge_page(page, rmap_item);
 		put_page(page);
 	}
@@ -2503,7 +2543,7 @@ static int ksm_scan_thread(void *nothing)
 		mutex_lock(&ksm_thread_mutex);
 		wait_while_offlining();
 		if (ksmd_should_run())
-			ksm_do_scan(ksm_thread_pages_to_scan);
+			ksm_do_scan(ksm_thread_pages_to_scan);//开始查找ksm页面，并且合并他们
 		
 		mutex_unlock(&ksm_thread_mutex);
 
@@ -2520,6 +2560,12 @@ static int ksm_scan_thread(void *nothing)
 	return 0;
 }
 
+/*
+ * SYSCALL_DEFINE3(madvise)
+ *  madvise_vma()
+ *   madvise_behavior()
+ *    ksm_madvise()
+ */
 int ksm_madvise(struct vm_area_struct *vma, unsigned long start,
 		unsigned long end, int advice, unsigned long *vm_flags)
 {
@@ -2574,6 +2620,13 @@ int ksm_madvise(struct vm_area_struct *vma, unsigned long start,
 	return 0;
 }
 
+/*
+ * SYSCALL_DEFINE3(madvise)
+ *	madvise_vma()
+ *	 madvise_behavior()
+ *	  ksm_madvise()
+ *     __ksm_enter()
+ */
 int __ksm_enter(struct mm_struct *mm)
 {
 	struct mm_slot *mm_slot;
@@ -2607,7 +2660,7 @@ int __ksm_enter(struct mm_struct *mm)
 	set_bit(MMF_VM_MERGEABLE, &mm->flags);
 	mmgrab(mm);
 
-	if (needs_wakeup)
+	if (needs_wakeup)//唤醒ksm_scan_thread
 		wake_up_interruptible(&ksm_thread_wait);
 
 	return 0;

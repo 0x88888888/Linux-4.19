@@ -3404,6 +3404,7 @@ struct page *rmqueue(struct zone *preferred_zone,
 	spin_unlock(&zone->lock);
 	if (!page)
 		goto failed;
+	
 	__mod_zone_freepage_state(zone, -(1 << order),
 				  get_pcppage_migratetype(page));
 

@@ -1600,6 +1600,11 @@ unsigned long ftrace_location_range(unsigned long start, unsigned long end)
  * That is, the instruction that is either a NOP or call to
  * the function tracer. It checks the ftrace internal tables to
  * determine if the address belongs or not.
+ *
+ * register_kprobe()
+ *  check_kprobe_address_safe()
+ *   arch_check_ftrace_location()
+ *    ftrace_location()
  */
 unsigned long ftrace_location(unsigned long ip)
 {

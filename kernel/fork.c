@@ -626,6 +626,16 @@ fail_nomem:
 	goto out;
 }
 
+
+/*
+ * do_fork()
+ *	_do_fork()
+ *	 copy_process()
+ *	  copy_mm()
+ *	   dup_mm()
+ *		mm_init()
+ *       mm_alloc_pgd()
+ */
 static inline int mm_alloc_pgd(struct mm_struct *mm)
 {
 	mm->pgd = pgd_alloc(mm);
@@ -2251,6 +2261,9 @@ struct task_struct *fork_idle(int cpu)
  *
  * kernel_thread()
  *  _do_fork(flags|CLONE_VM|CLONE_UNTRACED, )
+ *
+ * SYSCALL_DEFINE0(fork)
+ *  _do_fork()
  */
 long _do_fork(unsigned long clone_flags,
 	      unsigned long stack_start,

@@ -376,6 +376,8 @@ static void pgd_prepopulate_user_pmd(struct mm_struct *mm,
  *
  * But kernel with PAE paging that is not running as a Xen domain
  * only needs to allocate 32 bytes for pgd instead of one page.
+ *
+ * 没有定义
  */
 #ifdef CONFIG_X86_PAE
 
@@ -433,6 +435,17 @@ static inline void _pgd_free(pgd_t *pgd)
 }
 #else
 
+/*
+ * do_fork()
+ *	_do_fork()
+ *	 copy_process()
+ *	  copy_mm()
+ *	   dup_mm()
+ *		mm_init()
+ *       mm_alloc_pgd()
+ *        pgd_alloc()
+ *         _pgd_alloc()
+ */
 static inline pgd_t *_pgd_alloc(void)
 {
 	return (pgd_t *)__get_free_pages(PGALLOC_GFP, PGD_ALLOCATION_ORDER);
@@ -444,6 +457,16 @@ static inline void _pgd_free(pgd_t *pgd)
 }
 #endif /* CONFIG_X86_PAE */
 
+/*
+ * do_fork()
+ *	_do_fork()
+ *	 copy_process()
+ *	  copy_mm()
+ *	   dup_mm()
+ *		mm_init()
+ *       mm_alloc_pgd()
+ *        pgd_alloc()
+ */
 pgd_t *pgd_alloc(struct mm_struct *mm)
 {
 	pgd_t *pgd;

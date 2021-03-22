@@ -115,6 +115,8 @@ struct page {
 			 * Used for swp_entry_t if PageSwapCache.
 			 * Indicates order in the buddy system if PageBuddy.
 			 *
+			 * 1.存放 page order
+			 * 2.存放
 			 * 
 			 * 可用于正在使用页的内核成分
 			 * (例如: 在缓冲页的情况下它是一个缓冲器头指针，
@@ -332,6 +334,9 @@ struct vm_area_struct {
 
 	struct mm_struct *vm_mm;	/* The address space we belong to. */
 	pgprot_t vm_page_prot;		/* Access permissions of this VMA. */
+	/*
+	 * VM_MERGEABLE, KSM是标记
+	 */
 	unsigned long vm_flags;		/* Flags, see mm.h. */
 
 	/*
@@ -478,6 +483,9 @@ struct mm_struct {
 		/* Architecture-specific MM context */
 		mm_context_t context;
 
+        /* 
+         * MMF_VM_MERGEABLE表示已经将这个mm_struct添加到KSM系统中(ksm_mm_head)
+         */
 		unsigned long flags; /* Must use atomic bitops to access */
 
 		struct core_state *core_state; /* coredumping support */

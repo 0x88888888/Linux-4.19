@@ -158,7 +158,12 @@ static unsigned long kallsyms_sym_address(int idx)
 	return kallsyms_relative_base - 1 - kallsyms_offsets[idx];
 }
 
-/* Lookup the address for this symbol. Returns 0 if not found. */
+/* Lookup the address for this symbol. Returns 0 if not found. 
+ *
+ * init_kprobes()
+ *  kprobe_lookup_name()
+ *   kallsyms_lookup_name()
+ */
 unsigned long kallsyms_lookup_name(const char *name)
 {
 	char namebuf[KSYM_NAME_LEN];

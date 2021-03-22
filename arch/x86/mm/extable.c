@@ -170,11 +170,19 @@ __visible bool ex_has_fault_handler(unsigned long ip)
 	return handler == ex_handler_fault;
 }
 
+/*
+ * do_page_fault()
+ *  __do_page_fault()
+ *   kprobes_fault()
+ *    kprobe_fault_handler()
+ *     fixup_exception()
+ */
 int fixup_exception(struct pt_regs *regs, int trapnr)
 {
 	const struct exception_table_entry *e;
 	ex_handler_t handler;
 
+//没有定义
 #ifdef CONFIG_PNPBIOS
 	if (unlikely(SEGMENT_IS_PNP_CODE(regs->cs))) {
 		extern u32 pnp_bios_fault_eip, pnp_bios_fault_esp;

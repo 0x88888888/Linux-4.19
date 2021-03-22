@@ -1175,10 +1175,13 @@ static void __init do_initcalls(void)
     /*
      * 会调用 populate_rootfs,
      *
+     * 1. 
      * 1. core_initcall(sock_init)
      * 1. core_initcall(init_zero_pfn)
      * 1. core_initcall(cgroup_wq_init)
      * 1. core_initcall(init_zero_pfn)
+     *
+     
      *
      * 4. subsys_initcall(init_user_reserve)
      * 4. subsys_initcall(mem_cgroup_init)
@@ -1190,8 +1193,11 @@ static void __init do_initcalls(void)
      * 
      * 6. __initcall(cpucache_init)
      * 6. __initcall(memblock_init_debugfs)
+     * 6. module_init(init_kprobes)
      * 6. rootfs_initcall(populate_rootfs)
-     * 
+     *  
+     *
+     * 7. late_initcall(debugfs_kprobe_init)
      */
 	for (level = 0; level < ARRAY_SIZE(initcall_levels) - 1; level++)
 		do_initcall_level(level);

@@ -42,6 +42,7 @@
 #include <linux/ftrace.h>
 #include <asm/kprobes.h>
 
+//有定义
 #ifdef CONFIG_KPROBES
 
 /* kprobe_status settings */
@@ -88,15 +89,23 @@ struct kprobe {
 	/* Offset into the symbol */
 	unsigned int offset;
 
-	/* Called before addr is executed. */
+	/* Called before addr is executed. 
+	 *
+	 * 在 kprobe_int3_handler(), kprobe_ftrace_handler()中调用
+	 */
 	kprobe_pre_handler_t pre_handler;
 
-	/* Called after addr is executed, unless... */
+	/* Called after addr is executed, unless...
+	 *
+	 * 在kprobe_debug_handler()
+	 */
 	kprobe_post_handler_t post_handler;
 
 	/*
 	 * ... called if executing addr causes a fault (eg. page fault).
 	 * Return 1 if it handled fault, otherwise kernel will see it.
+	 *
+	 * 在kprobe_fault_handler()中调用
 	 */
 	kprobe_fault_handler_t fault_handler;
 
@@ -109,6 +118,9 @@ struct kprobe {
 	/*
 	 * Indicates various status flags.
 	 * Protected by kprobe_mutex after this kprobe is registered.
+	 *
+	 * KPROBE_FLAG_GONE, KPROBE_FLAG_DISABLED
+	 * KPROBE_FLAG_OPTIMIZED, KPROBE_FLAG_FTRACE
 	 */
 	u32 flags;
 };
@@ -187,6 +199,7 @@ struct kprobe_blacklist_entry {
 	unsigned long end_addr;
 };
 
+//有定义
 #ifdef CONFIG_KPROBES
 DECLARE_PER_CPU(struct kprobe *, current_kprobe);
 DECLARE_PER_CPU(struct kprobe_ctlblk, kprobe_ctlblk);
@@ -199,6 +212,7 @@ static inline int kprobes_built_in(void)
 	return 1;
 }
 
+//有定义
 #ifdef CONFIG_KRETPROBES
 extern void arch_prepare_kretprobe(struct kretprobe_instance *ri,
 				   struct pt_regs *regs);
@@ -226,6 +240,7 @@ static inline void kretprobe_assert(struct kretprobe_instance *ri,
 	}
 }
 
+//没有定义
 #ifdef CONFIG_KPROBES_SANITY_TEST
 extern int init_test_probes(void);
 #else
@@ -256,6 +271,7 @@ struct kprobe_insn_cache {
 	int nr_garbage;
 };
 
+//在include/asm/kprobes.h中有定义
 #ifdef __ARCH_WANT_KPROBES_INSN_SLOT
 extern kprobe_opcode_t *__get_insn_slot(struct kprobe_insn_cache *c);
 extern void __free_insn_slot(struct kprobe_insn_cache *c,
@@ -354,6 +370,12 @@ static inline void reset_current_kprobe(void)
 	__this_cpu_write(current_kprobe, NULL);
 }
 
+/*
+ * entry_64.S中掉用 do_int3()
+ *  do_int3()
+ *   kprobe_int3_handler()
+ *    get_kprobe_ctlblk()
+ */
 static inline struct kprobe_ctlblk *get_kprobe_ctlblk(void)
 {
 	return this_cpu_ptr(&kprobe_ctlblk);

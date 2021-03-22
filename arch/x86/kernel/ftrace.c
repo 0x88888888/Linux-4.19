@@ -283,6 +283,10 @@ static int is_ftrace_caller(unsigned long ip)
  * We are either changing a nop into a trace call, or a trace
  * call to a nop. While the change is taking place, we treat
  * it just like it was a nop.
+ *
+ * entry_64.S中掉用 do_int3()
+ *  do_int3()
+ *   ftrace_int3_handler()
  */
 int ftrace_int3_handler(struct pt_regs *regs)
 {

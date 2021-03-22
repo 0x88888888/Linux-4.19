@@ -188,6 +188,12 @@ int fixup_bug(struct pt_regs *regs, int trapnr)
 	return 0;
 }
 
+/*
+ * entry_64.S中掉用 do_int3()
+ *	do_int3()
+ *   do_trap()
+ *    do_trap_no_signal()
+ */
 static nokprobe_inline int
 do_trap_no_signal(struct task_struct *tsk, int trapnr, char *str,
 		  struct pt_regs *regs,	long error_code)
@@ -248,6 +254,11 @@ static siginfo_t *fill_trap_info(struct pt_regs *regs, int signr, int trapnr,
 	return info;
 }
 
+/*
+ * entry_64.S中掉用 do_int3()
+ *	do_int3()
+ *   do_trap()
+ */
 static void
 do_trap(int trapnr, int signr, char *str, struct pt_regs *regs,
 	long error_code, siginfo_t *info)
@@ -578,6 +589,10 @@ do_general_protection(struct pt_regs *regs, long error_code)
 }
 NOKPROBE_SYMBOL(do_general_protection);
 
+/*
+ * entry_64.S中掉用 do_int3()
+ *  do_int3()
+ */
 dotraplinkage void notrace do_int3(struct pt_regs *regs, long error_code)
 {
 #ifdef CONFIG_DYNAMIC_FTRACE
@@ -589,7 +604,8 @@ dotraplinkage void notrace do_int3(struct pt_regs *regs, long error_code)
 	    ftrace_int3_handler(regs))
 		return;
 #endif
-	if (poke_int3_handler(regs))
+
+	if (poke_int3_handler(regs)) //设置regs->ip == bp_int3_handler
 		return;
 
 	/*
@@ -601,14 +617,16 @@ dotraplinkage void notrace do_int3(struct pt_regs *regs, long error_code)
 	 */
 	ist_enter(regs);
 	RCU_LOCKDEP_WARN(!rcu_is_watching(), "entry code didn't wake RCU");
+	
 #ifdef CONFIG_KGDB_LOW_LEVEL_TRAP
 	if (kgdb_ll_trap(DIE_INT3, "int3", regs, error_code, X86_TRAP_BP,
 				SIGTRAP) == NOTIFY_STOP)
 		goto exit;
 #endif /* CONFIG_KGDB_LOW_LEVEL_TRAP */
 
+//处理被kprobe修改为int3的在内核中的断点,用户态的不会被kprobe处理
 #ifdef CONFIG_KPROBES
-	if (kprobe_int3_handler(regs))
+	if (kprobe_int3_handler(regs)) //如果被kprobe处理了，就返回
 		goto exit;
 #endif
 
@@ -717,6 +735,9 @@ static bool is_sysenter_singlestep(struct pt_regs *regs)
  * by user code)
  *
  * May run on IST stack.
+ *
+ * entry_64.S 中调用 do_debug
+ *  do_debug()
  */
 dotraplinkage void do_debug(struct pt_regs *regs, long error_code)
 {
@@ -774,6 +795,7 @@ dotraplinkage void do_debug(struct pt_regs *regs, long error_code)
 	/* Store the virtualized DR6 value */
 	tsk->thread.debugreg6 = dr6;
 
+//有定义
 #ifdef CONFIG_KPROBES
 	if (kprobe_debug_handler(regs))
 		goto exit;
