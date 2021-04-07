@@ -80,13 +80,19 @@ struct kprobe {
 	/*count the number of times this probe was temporarily disarmed */
 	unsigned long nmissed;
 
-	/* location of the probe point */
+	/* location of the probe point 
+	 *
+	 * addr为进程内的绝对虚拟地址
+	 */
 	kprobe_opcode_t *addr;
 
 	/* Allow user to indicate symbol name of the probe point */
 	const char *symbol_name;
 
-	/* Offset into the symbol */
+	/* Offset into the symbol 
+	 *
+	 * offset 为距离symbol_name的距离offset
+	 */
 	unsigned int offset;
 
 	/* Called before addr is executed. 
@@ -105,7 +111,7 @@ struct kprobe {
 	 * ... called if executing addr causes a fault (eg. page fault).
 	 * Return 1 if it handled fault, otherwise kernel will see it.
 	 *
-	 * 在kprobe_fault_handler()中调用
+	 * 在 kprobe_fault_handler()中调用
 	 */
 	kprobe_fault_handler_t fault_handler;
 

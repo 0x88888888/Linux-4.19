@@ -1031,8 +1031,12 @@ NOKPROBE_SYMBOL(kprobe_debug_handler);
  *   kprobes_fault()
  *    kprobe_fault_handler(trapnr==14)
  *
- * kprobe_exceptions_notify()
- *  kprobe_fault_handler()
+ * entry_64.S中掉用 do_int3()
+ *  do_int3()
+ *   notify_die() 在这里会去调用kprobe的 kprobe_exceptions_notify
+ *    ......
+ *     kprobe_exceptions_notify()
+ *      kprobe_fault_handler()
  */
 int kprobe_fault_handler(struct pt_regs *regs, int trapnr)
 {
@@ -1110,6 +1114,12 @@ NOKPROBE_SYMBOL(kprobe_fault_handler);
 
 /*
  * Wrapper routine for handling exceptions.
+ *
+ * entry_64.S中掉用 do_int3()
+ *  do_int3()
+ *   notify_die() 在这里会去调用kprobe的 kprobe_exceptions_notify
+ *    ......
+ *     kprobe_exceptions_notify()
  */
 int kprobe_exceptions_notify(struct notifier_block *self, unsigned long val,
 			     void *data)

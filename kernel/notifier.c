@@ -533,6 +533,12 @@ EXPORT_SYMBOL_GPL(srcu_init_notifier_head);
 
 static ATOMIC_NOTIFIER_HEAD(die_chain);
 
+/*
+ * entry_64.S中掉用 do_int3()
+ *  do_int3()
+ *   notify_die() 在这里会去调用kprobe的 kprobe_exceptions_notify
+ *
+ */
 int notrace notify_die(enum die_val val, const char *str,
 	       struct pt_regs *regs, long err, int trap, int sig)
 {
@@ -550,6 +556,10 @@ int notrace notify_die(enum die_val val, const char *str,
 }
 NOKPROBE_SYMBOL(notify_die);
 
+/*
+ * init_kprobes()
+ *  register_die_notifier(nb==kprobe_exceptions_nb)
+ */
 int register_die_notifier(struct notifier_block *nb)
 {
 	vmalloc_sync_all();

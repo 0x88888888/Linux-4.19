@@ -1869,6 +1869,7 @@ int register_kprobes(struct kprobe **kps, int num)
 
 	if (num <= 0)
 		return -EINVAL;
+	
 	for (i = 0; i < num; i++) {
 		ret = register_kprobe(kps[i]);
 		if (ret < 0) {
@@ -1984,6 +1985,13 @@ bool __weak arch_kprobe_on_func_entry(unsigned long offset)
 	return !offset;
 }
 
+/*
+ * register_kretprobe()
+ *  kprobe_on_func_entry()
+ *
+ * trace_kprobe_on_func_entry()
+ *  kprobe_on_func_entry()
+ */
 bool kprobe_on_func_entry(kprobe_opcode_t *addr, const char *sym, unsigned long offset)
 {
 	kprobe_opcode_t *kp_addr = _kprobe_addr(addr, sym, offset);
@@ -2360,6 +2368,7 @@ static int __init init_kprobes(void)
 	err = arch_init_kprobes();
 	if (!err)//notifier应该是singlestep时会调用的
 		err = register_die_notifier(&kprobe_exceptions_nb);
+	
 	if (!err)
 		err = register_module_notifier(&kprobe_module_nb);
 
