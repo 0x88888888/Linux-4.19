@@ -536,8 +536,32 @@ static ATOMIC_NOTIFIER_HEAD(die_chain);
 /*
  * entry_64.S中掉用 do_int3()
  *  do_int3()
- *   notify_die() 在这里会去调用kprobe的 kprobe_exceptions_notify
+ *   notify_die(val==DIE_INT3) 在这里会去调用kprobe的 kprobe_exceptions_notify
  *
+ * entry_64.S 中调用 do_debug
+ *  do_debug()
+ *   notify_die(val==DIE_DEBUG)
+ *
+ * do_general_protection()
+ *  notify_die(val==DIE_GPF)
+ *
+ * do_bounds()
+ *  notify_die(val==DIE_TRAP)
+ *
+ * do_double_fault()
+ *  notify_die(val==DIE_TRAP)
+ *
+ * do_error_trap()
+ *  notify_die(val==DIE_TRAP)
+ *
+ * math_error()
+ *  notify_die(val==DIE_TRAP)
+ *
+ * do_iret_error()
+ *  notify_die(val==DIE_TRAP)
+ *
+ * __die()
+ *  notify_die(val== DIE_OOPS)
  */
 int notrace notify_die(enum die_val val, const char *str,
 	       struct pt_regs *regs, long err, int trap, int sig)

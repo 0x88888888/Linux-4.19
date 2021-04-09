@@ -80,6 +80,8 @@ static struct {
  *  kprobe_addr()
  *   _kprobe_addr()
  *    kprobe_lookup_name()
+ *
+ * 根据函数名称查找函数地址
  */
 kprobe_opcode_t * __weak kprobe_lookup_name(const char *name,
 					unsigned int __unused)

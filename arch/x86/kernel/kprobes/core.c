@@ -740,7 +740,11 @@ int kprobe_int3_handler(struct pt_regs *regs)
 			 * 先调用一些pre_handler
 			 */
 			if (!p->pre_handler || !p->pre_handler(p, regs))
-				setup_singlestep(p, regs, kcb, 0); //设置单步执行模式，执行完被修改的指令，然后就走到kprobe->fault_handler了
+				/*
+				 * 设置单步执行模式
+				 * single step 的处理函数应该是do_debug,在do_debug的调用链中会调用kprobe->post_handler()
+				 */
+				setup_singlestep(p, regs, kcb, 0); 
 			else
 				reset_current_kprobe();
 			return 1;
@@ -803,6 +807,9 @@ STACK_FRAME_NON_STANDARD(kretprobe_trampoline);
 
 /*
  * Called from kretprobe_trampoline
+ *
+ * kretprobe_trampoline()
+ *  trampoline_handler()
  */
 __visible __used void *trampoline_handler(struct pt_regs *regs)
 {
@@ -918,6 +925,11 @@ NOKPROBE_SYMBOL(trampoline_handler);
  * this probepoint, and the instruction is boostable, boost it: add a
  * jump instruction after the copied instruction, that jumps to the next
  * instruction after the probepoint.
+ *
+ * entry_64.S 中调用 do_debug
+ *  do_debug()
+ *   kprobe_debug_handler()
+ *    resume_execution()
  */
 static void resume_execution(struct kprobe *p, struct pt_regs *regs,
 			     struct kprobe_ctlblk *kcb)

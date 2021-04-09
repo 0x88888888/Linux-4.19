@@ -103,7 +103,8 @@ struct kprobe {
 
 	/* Called after addr is executed, unless...
 	 *
-	 * 在kprobe_debug_handler()
+	 * 在kprobe_debug_handler(),kprobe_ftrace_handler()
+	 *   aggr_post_handler()中调用
 	 */
 	kprobe_post_handler_t post_handler;
 

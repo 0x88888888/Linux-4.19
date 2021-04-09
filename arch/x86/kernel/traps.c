@@ -469,6 +469,7 @@ dotraplinkage void do_bounds(struct pt_regs *regs, long error_code)
 	siginfo_t *info;
 
 	RCU_LOCKDEP_WARN(!rcu_is_watching(), "entry code didn't wake RCU");
+	
 	if (notify_die(DIE_TRAP, "bounds", regs, error_code,
 			X86_TRAP_BR, SIGSEGV) == NOTIFY_STOP)
 		return;
@@ -567,6 +568,7 @@ do_general_protection(struct pt_regs *regs, long error_code)
 
 		tsk->thread.error_code = error_code;
 		tsk->thread.trap_nr = X86_TRAP_GP;
+		
 		if (notify_die(DIE_GPF, "general protection fault", regs, error_code,
 			       X86_TRAP_GP, SIGSEGV) != NOTIFY_STOP)
 			die("general protection fault", regs, error_code);
@@ -626,11 +628,16 @@ dotraplinkage void notrace do_int3(struct pt_regs *regs, long error_code)
 
 //处理被kprobe修改为int3的在内核中的断点,用户态的不会被kprobe处理
 #ifdef CONFIG_KPROBES
-	if (kprobe_int3_handler(regs)) //如果被kprobe处理了，就返回
+     /*
+      * 如果被kprobe处理了，就返回
+      *
+      * 调用kprobe->pre_handler(),然后设置eflag |= X86_EFLAGS+TF
+      */
+	if (kprobe_int3_handler(regs)) 
 		goto exit;
 #endif
 
-    //这里调用kprobe的函数
+    //这里调用kprobe的函数 kprobe->fault_handler
 	if (notify_die(DIE_INT3, "int3", regs, error_code, X86_TRAP_BP,
 			SIGTRAP) == NOTIFY_STOP)
 		goto exit;
@@ -739,6 +746,8 @@ static bool is_sysenter_singlestep(struct pt_regs *regs)
  *
  * entry_64.S 中调用 do_debug
  *  do_debug()
+ *
+ * 这里应该是设置了single step标记才会走到这里
  */
 dotraplinkage void do_debug(struct pt_regs *regs, long error_code)
 {
@@ -961,6 +970,7 @@ dotraplinkage void do_iret_error(struct pt_regs *regs, long error_code)
 	info.si_errno = 0;
 	info.si_code = ILL_BADSTK;
 	info.si_addr = NULL;
+	
 	if (notify_die(DIE_TRAP, "iret exception", regs, error_code,
 			X86_TRAP_IRET, SIGILL) != NOTIFY_STOP) {
 		do_trap(X86_TRAP_IRET, SIGILL, "iret exception", regs, error_code,
