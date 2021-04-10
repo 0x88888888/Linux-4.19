@@ -359,6 +359,7 @@ static int __register_ftrace_function(struct ftrace_ops *ops)
 	if (!core_kernel_data((unsigned long)ops))
 		ops->flags |= FTRACE_OPS_FL_DYNAMIC;
 
+    //添加到ftrace_ops_list链表上去
 	add_ftrace_ops(&ftrace_ops_list, ops);
 
 	/* Always save the function, and reset at unregistering */
@@ -2687,6 +2688,13 @@ static void ftrace_startup_all(int command)
 	update_all_ops = false;
 }
 
+/*
+ * register_kprobe()
+ *  arm_kprobe()
+ *   arm_kprobe_ftrace()
+ *    register_ftrace_function()
+ *     ftrace_startup( cmd==0)
+ */
 static int ftrace_startup(struct ftrace_ops *ops, int command)
 {
 	int ret;
@@ -6701,6 +6709,11 @@ int ftrace_is_dead(void)
  * Note: @ops->func and all the functions it calls must be labeled
  *       with "notrace", otherwise it will go into a
  *       recursive loop.
+ *
+ * register_kprobe()
+ *  arm_kprobe()
+ *   arm_kprobe_ftrace()
+ *    register_ftrace_function()
  */
 int register_ftrace_function(struct ftrace_ops *ops)
 {

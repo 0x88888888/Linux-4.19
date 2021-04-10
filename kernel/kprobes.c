@@ -1060,7 +1060,12 @@ static int prepare_kprobe(struct kprobe *p)
 	return arch_prepare_kprobe_ftrace(p);
 }
 
-/* Caller must lock kprobe_mutex */
+/* Caller must lock kprobe_mutex 
+ *
+ * register_kprobe()
+ *  arm_kprobe()
+ *   arm_kprobe_ftrace()
+ */
 static int arm_kprobe_ftrace(struct kprobe *p)
 {
 	int ret = 0;

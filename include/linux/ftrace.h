@@ -190,6 +190,11 @@ static inline void ftrace_free_mem(struct module *mod, void *start, void *end) {
  * ftrace_ops must perform a schedule_on_each_cpu() before freeing it.
  */
 struct ftrace_ops {
+   /*
+    * 在ftrace_ops_assist_func,__ftrace_ops_list_func中调用
+    *
+    * func可以有 kprobe_ftrace_handler,function_trace_call
+    */
 	ftrace_func_t			func;
 	struct ftrace_ops __rcu		*next;
 	unsigned long			flags;
