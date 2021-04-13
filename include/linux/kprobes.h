@@ -71,6 +71,9 @@ typedef int (*kprobe_fault_handler_t) (struct kprobe *, struct pt_regs *,
 typedef int (*kretprobe_handler_t) (struct kretprobe_instance *,
 				    struct pt_regs *);
 
+/*
+ * jprobe在2017年 october的时候被abolish了
+ */
 struct kprobe {
 	struct hlist_node hlist;
 
@@ -113,13 +116,21 @@ struct kprobe {
 	 * Return 1 if it handled fault, otherwise kernel will see it.
 	 *
 	 * 在 kprobe_fault_handler()中调用
+	 *
+	 * 在执行pre_handler、post_handler或单步执行被探测指令时出现内存异常则会调用该回调函数；
 	 */
 	kprobe_fault_handler_t fault_handler;
 
-	/* Saved opcode (which has been replaced with breakpoint) */
+	/* Saved opcode (which has been replaced with breakpoint) 
+	 *
+	 * 保存的被探测点原始指令
+	 */
 	kprobe_opcode_t opcode;
 
-	/* copy of the original instruction */
+	/* copy of the original instruction 
+	 *
+	 * 被复制的被探测点的原始指令，用于单步执行，架构强相关（可能包含指令模拟函数）
+	 */
 	struct arch_specific_insn ainsn;
 
 	/*
@@ -175,11 +186,31 @@ static inline int kprobe_ftrace(struct kprobe *p)
  * nmissed - tracks the number of times the probed function's return was
  * ignored, due to maxactive being too low.
  *
+ *
+ * 在arch_prepare_kretprobe()中设置被kprobe函数的返回地址为 kretprobe_trampoline,实现ret hook
  */
 struct kretprobe {
 	struct kprobe kp;
+	/*
+	 * handler在被探测函数返回后被调用
+	 *
+	 * 在trampoline_handler()中被调用
+	 */
 	kretprobe_handler_t handler;
+	/*
+	 * entry_handler会在被探测函数执行之前被调用
+	 *
+	 * 在pre_handler_kretprobe中被调用
+	 */
 	kretprobe_handler_t entry_handler;
+	/*
+	 * 同时支持并行探测的上限，因为kretprobe会跟踪一个函数从开始到结束，
+	 * 因此对于一些调用比较频繁的被探测函数，在探测的时间段内重入的概率比较高，
+	 * 这个maxactive字段值表示在重入情况发生时，
+	 * 支持同时检测的进程数（执行流数）的上限，
+	 * 若并行触发的数量超过了这个上限，则kretprobe不会进行跟踪探测，
+	 * 仅仅增加nmissed字段的值以作提示
+	 */
 	int maxactive;
 	int nmissed;
 	size_t data_size;
@@ -187,10 +218,20 @@ struct kretprobe {
 	raw_spinlock_t lock;
 };
 
+/*
+ * 被探测函数在跟踪期间可能存在并发执行的现象，
+ * 因此kretprobe使用一个kretprobe_instance来跟踪一个执行流，
+ * 支持的上限为maxactive。在没有触发探测时，
+ * 所有的kretprobe_instance实例都保存在free_instances表中，
+ * 每当有执行流触发一次kretprobe探测，
+ * 都会从该表中取出一个空闲的kretprobe_instance实例用来跟踪
+ */
 struct kretprobe_instance {
 	struct hlist_node hlist;
 	struct kretprobe *rp;
+	// 保存原始被探测函数的返回地址
 	kprobe_opcode_t *ret_addr;
+	//task用于绑定其跟踪的进程
 	struct task_struct *task;
 	char data[0];
 };

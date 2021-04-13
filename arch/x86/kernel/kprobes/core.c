@@ -595,13 +595,25 @@ static nokprobe_inline void restore_btf(void)
 	}
 }
 
+/*
+ * entry_64.S中掉用 do_int3()
+ *  do_int3()
+ *   kprobe_int3_handler()
+ *    pre_handler_kretprobe()
+ *     arch_prepare_kretprobe()
+ *
+ * 设置被kprobe函数的返回地址为 kretprobe_trampoline
+ */
 void arch_prepare_kretprobe(struct kretprobe_instance *ri, struct pt_regs *regs)
 {
 	unsigned long *sara = stack_addr(regs);
 
 	ri->ret_addr = (kprobe_opcode_t *) *sara;
 
-	/* Replace the return addr with trampoline addr */
+	/* Replace the return addr with trampoline addr 
+	 *
+	 * kretprobe_trampoline是本文件一个汇编写的函数名称，搜一下
+	 */
 	*sara = (unsigned long) &kretprobe_trampoline;
 }
 NOKPROBE_SYMBOL(arch_prepare_kretprobe);

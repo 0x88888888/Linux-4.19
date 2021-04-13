@@ -1624,6 +1624,9 @@ static int check_kprobe_address_safe(struct kprobe *p,
 {
 	int ret;
 
+    /*
+     * 探测地址是否已经被ftrace跟踪
+     */
 	ret = arch_check_ftrace_location(p);
 	if (ret)
 		return ret;
@@ -1668,6 +1671,10 @@ out:
 	return ret;
 }
 
+/*
+ * register_kretprobe()
+ *  register_kprobe()
+ */
 int register_kprobe(struct kprobe *p)
 {
 	int ret;
@@ -1675,7 +1682,10 @@ int register_kprobe(struct kprobe *p)
 	struct module *probed_mod;
 	kprobe_opcode_t *addr;
 
-	/* Adjust probe address from symbol */
+	/* Adjust probe address from symbol 
+	 *
+	 * 这个返回的addr是函数symbol_name的地址+ offset值的
+	 */
 	addr = kprobe_addr(p); //根据 kprobe->symbol_name ,kprobe->offset查找 probe的位置
 	if (IS_ERR(addr))
 		return PTR_ERR(addr);
@@ -1935,6 +1945,11 @@ unsigned long __weak arch_deref_entry_point(void *entry)
 /*
  * This kprobe pre_handler is registered with every kretprobe. When probe
  * hits it will set up the return probe.
+ *
+ * entry_64.S中掉用 do_int3()
+ *  do_int3()
+ *   kprobe_int3_handler()
+ *    pre_handler_kretprobe()
  */
 static int pre_handler_kretprobe(struct kprobe *p, struct pt_regs *regs)
 {
@@ -2013,6 +2028,9 @@ bool kprobe_on_func_entry(kprobe_opcode_t *addr, const char *sym, unsigned long 
 	return true;
 }
 
+/*
+ * 注册一个kretprobe到
+ */
 int register_kretprobe(struct kretprobe *rp)
 {
 	int ret = 0;
@@ -2020,6 +2038,9 @@ int register_kretprobe(struct kretprobe *rp)
 	int i;
 	void *addr;
 
+    /*
+     * 必须是一个函数的首地址地址
+     */
 	if (!kprobe_on_func_entry(rp->kp.addr, rp->kp.symbol_name, rp->kp.offset))
 		return -EINVAL;
 
@@ -2034,6 +2055,7 @@ int register_kretprobe(struct kretprobe *rp)
 		}
 	}
 
+    //设定retkprobe特定的handler
 	rp->kp.pre_handler = pre_handler_kretprobe;
 	rp->kp.post_handler = NULL;
 	rp->kp.fault_handler = NULL;
@@ -2048,6 +2070,8 @@ int register_kretprobe(struct kretprobe *rp)
 	}
 	raw_spin_lock_init(&rp->lock);
 	INIT_HLIST_HEAD(&rp->free_instances);
+
+	//分配rp->maxactive个kretprobe_instace
 	for (i = 0; i < rp->maxactive; i++) {
 		inst = kmalloc(sizeof(struct kretprobe_instance) +
 			       rp->data_size, GFP_KERNEL);
@@ -2336,6 +2360,12 @@ static int __init init_kprobes(void)
 		raw_spin_lock_init(&(kretprobe_table_locks[i].lock));
 	}
 
+
+	/*
+	 * _kprobe_blacklist段中保存了实现kprobes的关键代码路径，
+	 * 这些代码是不可以被kprobe自己所探测的，
+	 * 在源码定义相关函数时使用NOKPROBE_SYMBOL宏将函数放到这个段中
+	 */
 	err = populate_kprobe_blacklist(__start_kprobe_blacklist,
 					__stop_kprobe_blacklist);
 	if (err) {

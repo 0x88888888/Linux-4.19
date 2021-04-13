@@ -200,6 +200,7 @@ struct ftrace_ops {
 	unsigned long			flags;
 	void				*private;
 	ftrace_func_t			saved_func;
+//有定义	
 #ifdef CONFIG_DYNAMIC_FTRACE
 	struct ftrace_ops_hash		local_hash;
 	struct ftrace_ops_hash		*func_hash;
