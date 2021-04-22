@@ -23,6 +23,14 @@
 
 /*
  * VMX functions:
+ *
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops) vmx_x86_ops定义在vmx.c文件中
+ *   kvm_arch_init(opaque==&vmx_x86_ops)
+ *    cpu_has_kvm_support()
+ *     cpu_has_vmx()
+ *
+ * 是否支持VMX功能
  */
 
 static inline int cpu_has_vmx(void)

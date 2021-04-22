@@ -4044,7 +4044,7 @@ static void kvm_sched_out(struct preempt_notifier *pn,
 
 /*
  * vmx_init()
- *  kvm_init(opaque==&vmx_x86_ops)
+ *  kvm_init(opaque==&vmx_x86_ops) vmx_x86_ops定义在vmx.c文件中
  */
 int kvm_init(void *opaque, unsigned vcpu_size, unsigned vcpu_align,
 		  struct module *module)
@@ -4052,6 +4052,10 @@ int kvm_init(void *opaque, unsigned vcpu_size, unsigned vcpu_align,
 	int r;
 	int cpu;
 
+    /*
+     * 检查是否支持vmx之类的
+     * x86体系结构相关的初始化,比如开启CR4.VMXE(这个应该是在创建的哥VM的时候设置)
+     */
 	r = kvm_arch_init(opaque);
 	if (r)
 		goto out_fail;

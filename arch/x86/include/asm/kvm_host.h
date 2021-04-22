@@ -1150,6 +1150,8 @@ struct kvm_arch_async_pf {
 
 /*
  * 在kvm_arch_init中设置 kvm_x86_ops==vmx_x86_ops
+ *
+ * vmx_x86_ops定义在vmx.c文件中
  */
 extern struct kvm_x86_ops *kvm_x86_ops;
 

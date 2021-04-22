@@ -56,6 +56,11 @@ struct linux_binprm;
 
 /*
  * ptrace report for syscall entry and exit looks identical.
+ *
+ * do_syscall_64()
+ *  syscall_trace_enter()
+ *   tracehook_report_syscall_entry()
+ *    ptrace_report_syscall()
  */
 static inline int ptrace_report_syscall(struct pt_regs *regs)
 {
@@ -95,6 +100,10 @@ static inline int ptrace_report_syscall(struct pt_regs *regs)
  * is unspecified, but should be something harmless like an %ENOSYS error
  * return.  It should preserve enough information so that syscall_rollback()
  * can work (see asm-generic/syscall.h).
+ *
+ * do_syscall_64()
+ *  syscall_trace_enter()
+ *   tracehook_report_syscall_entry()
  *
  * Called without locks, just after entering kernel mode.
  */

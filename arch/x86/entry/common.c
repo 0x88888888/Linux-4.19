@@ -63,6 +63,9 @@ static void do_audit_syscall_entry(struct pt_regs *regs, u32 arch)
 /*
  * Returns the syscall nr to run (which should match regs->orig_ax) or -1
  * to skip the syscall.
+ *
+ * do_syscall_64()
+ *  syscall_trace_enter()
  */
 static long syscall_trace_enter(struct pt_regs *regs)
 {
@@ -243,6 +246,9 @@ static void syscall_slow_exit_work(struct pt_regs *regs, u32 cached_flags)
 /*
  * Called with IRQs on and fully valid regs.  Returns with IRQs off in a
  * state such that we can immediately switch to user mode.
+ *
+ * do_syscall_64()
+ *  syscall_return_slowpath()
  */
 __visible inline void syscall_return_slowpath(struct pt_regs *regs)
 {

@@ -6769,8 +6769,9 @@ static struct notifier_block pvclock_gtod_notifier = {
 
 /*
  * vmx_init()
- *  kvm_init(opaque==&vmx_x86_ops)
+ *  kvm_init(opaque==&vmx_x86_ops) vmx_x86_ops定义在vmx.c文件中
  *   kvm_arch_init(opaque==&vmx_x86_ops)
+ * 
  */
 int kvm_arch_init(void *opaque)
 {
@@ -6783,11 +6784,16 @@ int kvm_arch_init(void *opaque)
 		goto out;
 	}
 
+    //cpu_has_kvm_support
+    //cpu是否支持vmx功能
 	if (!ops->cpu_has_kvm_support()) {
 		printk(KERN_ERR "kvm: no hardware support\n");
 		r = -EOPNOTSUPP;
 		goto out;
 	}
+
+	//vmx_disabled_by_bios
+	//是否在bios中关闭了vmx功能了
 	if (ops->disabled_by_bios()) {
 		printk(KERN_ERR "kvm: disabled by bios\n");
 		r = -EOPNOTSUPP;
@@ -8869,13 +8875,14 @@ void kvm_arch_hardware_disable(void)
 
 /*
  * vmx_init()
- *  kvm_init(opaque==&vmx_x86_ops)
+ *  kvm_init(opaque==&vmx_x86_ops) vmx_x86_ops定义在vmx.c文件中
  *   kvm_arch_hardware_setup()
  */
 int kvm_arch_hardware_setup(void)
 {
 	int r;
 
+    //hardware_setup
 	r = kvm_x86_ops->hardware_setup();
 	if (r != 0)
 		return r;

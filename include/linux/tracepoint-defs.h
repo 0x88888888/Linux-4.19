@@ -32,6 +32,7 @@ struct tracepoint {
 	struct static_key key;
 	int (*regfunc)(void);
 	void (*unregfunc)(void);
+	//有多个tracepoint_func
 	struct tracepoint_func __rcu *funcs;
 };
 

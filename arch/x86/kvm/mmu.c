@@ -5876,7 +5876,7 @@ static void mmu_destroy_caches(void)
 
 /*
  * vmx_init()
- *  kvm_init(opaque==&vmx_x86_ops)
+ *  kvm_init(opaque==&vmx_x86_ops)  vmx_x86_ops定义在vmx.c文件中
  *   kvm_arch_init(opaque==&vmx_x86_ops)
  *    kvm_mmu_module_init()
  */

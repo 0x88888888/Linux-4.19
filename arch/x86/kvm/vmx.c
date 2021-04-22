@@ -4410,11 +4410,25 @@ static void vmx_cache_reg(struct kvm_vcpu *vcpu, enum kvm_reg reg)
 	}
 }
 
+/*
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops) vmx_x86_ops定义在vmx.c文件中
+ *   kvm_arch_init(opaque==&vmx_x86_ops)
+ *    cpu_has_kvm_support()
+ */
 static __init int cpu_has_kvm_support(void)
 {
 	return cpu_has_vmx();
 }
 
+/*
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops) vmx_x86_ops定义在vmx.c文件中
+ *   kvm_arch_init(opaque==&vmx_x86_ops)
+ *    vmx_disabled_by_bios()
+ *
+ * 是否在bios中关闭了虚拟化功能了
+ */
 static __init int vmx_disabled_by_bios(void)
 {
 	u64 msr;
@@ -7955,6 +7969,12 @@ static void vmx_enable_tdp(void)
 	kvm_enable_tdp();
 }
 
+/*
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops) vmx_x86_ops定义在vmx.c文件中
+ *   kvm_arch_hardware_setup()
+ *    hardware_setup()
+ */
 static __init int hardware_setup(void)
 {
 	unsigned long host_bndcfgs;
@@ -7991,6 +8011,7 @@ static __init int hardware_setup(void)
 		!(cpu_has_vmx_invvpid_single() || cpu_has_vmx_invvpid_global()))
 		enable_vpid = 0;
 
+    // 任何一个出现问题，都不能开启ept了
 	if (!cpu_has_vmx_ept() ||
 	    !cpu_has_vmx_ept_4levels() ||
 	    !cpu_has_vmx_ept_mt_wb() ||
@@ -14508,7 +14529,7 @@ static int __init vmx_init(void)
 		enlightened_vmcs = false;
 	}
 #endif
-
+        //vmx_x86_ops定义在vmx.c文件中
 	r = kvm_init(&vmx_x86_ops, sizeof(struct vcpu_vmx),
 		     __alignof__(struct vcpu_vmx), THIS_MODULE);
 	if (r)

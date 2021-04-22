@@ -151,15 +151,16 @@ func_add(struct tracepoint_func **funcs, struct tracepoint_func *tp_func,
 
 	debug_print_probes(*funcs);
 	old = *funcs;
-	if (old) {
+	if (old) { //如果已经有tracepoint->funcs[]了
 		/* (N -> N+1), (N != 0, 1) probes */
 		for (nr_probes = 0; old[nr_probes].func; nr_probes++) {
 			/* Insert before probes of lower priority */
 			if (pos < 0 && old[nr_probes].prio < prio)
 				pos = nr_probes;
+			
 			if (old[nr_probes].func == tp_func->func &&
 			    old[nr_probes].data == tp_func->data)
-				return ERR_PTR(-EEXIST);
+				return ERR_PTR(-EEXIST); //同样的func和data不能插入两次
 		}
 	}
 	/* + 2 : one for new probe, one for NULL func */
@@ -179,6 +180,7 @@ func_add(struct tracepoint_func **funcs, struct tracepoint_func *tp_func,
 		}
 	} else
 		pos = 0;
+		
 	new[pos] = *tp_func;
 	new[nr_probes + 1].func = NULL;
 	*funcs = new;
