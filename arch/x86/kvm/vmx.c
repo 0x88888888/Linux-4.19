@@ -8119,6 +8119,7 @@ static __init int hardware_setup(void)
 
 	kvm_mce_cap_supported |= MCG_LMCE_P;
 
+    //给每个cpu分配一个VMCS
 	return alloc_kvm_area();
 
 out:

@@ -3973,6 +3973,11 @@ static void kvm_uevent_notify_change(unsigned int type, struct kvm *kvm)
 	kfree(env);
 }
 
+/*
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops) vmx_x86_ops定义在vmx.c文件中
+ *   kvm_init_debug()
+ */
 static void kvm_init_debug(void)
 {
 	struct kvm_stats_debugfs_item *p;
@@ -4066,6 +4071,8 @@ int kvm_init(void *opaque, unsigned vcpu_size, unsigned vcpu_align,
 	 * like intel and amd on x86.
 	 * kvm_arch_init must be called before kvm_irqfd_init to avoid creating
 	 * conflicts in case kvm is already setup for another implementation.
+	 *
+	 * 创建kvm-irqfd-cleanup队列
 	 */
 	r = kvm_irqfd_init();
 	if (r)
