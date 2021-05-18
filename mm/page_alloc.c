@@ -3681,7 +3681,7 @@ get_page_from_freelist(gfp_t gfp_mask, unsigned int order, int alloc_flags,
 	 * Scan zonelist, looking for a zone with enough free.
 	 * See also __cpuset_node_allowed() comment in kernel/cpuset.c.
 	 *
-	 * 遍历zonelist
+	 * 遍历zonelist,确定适合的zone
 	 */
 	for_next_zone_zonelist_nodemask(zone, z, ac->zonelist, ac->high_zoneidx,
 								ac->nodemask) {
@@ -3774,7 +3774,7 @@ get_page_from_freelist(gfp_t gfp_mask, unsigned int order, int alloc_flags,
 			    //回收了足够的page,重新检查water mark
 				if (zone_watermark_ok(zone, order, mark,
 						ac_classzone_idx(ac), alloc_flags))
-					goto try_this_zone;
+					goto try_this_zone;//跳出循环，分配page
 
 				continue;
 			}
@@ -4913,7 +4913,7 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order, int preferred_nid,
 	finalise_ac(gfp_mask, &ac);
 
 	/* First allocation attempt */
-	//快速路径，没有reclaim步骤
+	//快速路径，可是有reclaim步骤
 	page = get_page_from_freelist(alloc_mask, order, alloc_flags, &ac);
 	if (likely(page))
 		goto out;
@@ -4934,6 +4934,7 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order, int preferred_nid,
 	if (unlikely(ac.nodemask != nodemask))
 		ac.nodemask = nodemask;
 
+    //有wake up kswapd步骤,也有compact步骤,也有reclaim步骤
 	page = __alloc_pages_slowpath(alloc_mask, order, &ac);
 
 out:
@@ -5647,8 +5648,10 @@ static int build_zonerefs_node(pg_data_t *pgdat, struct zoneref *zonerefs)
 
 	do {
 		zone_type--;
+		//遍历pgdat中的zones,从MAX_NR_ZONES开始，向下走
 		zone = pgdat->node_zones + zone_type;
 		if (managed_zone(zone)) {
+			//设置zoneref->zone_idx = zone - (zone)->zone_pgdat->node_zones
 			zoneref_set_zone(zone, &zonerefs[nr_zones++]);
 			check_highest_zone(zone_type);
 		}
