@@ -60,6 +60,7 @@ int cgroup_attach_task_all(struct task_struct *from, struct task_struct *tsk)
 
 	mutex_lock(&cgroup_mutex);
 	percpu_down_write(&cgroup_threadgroup_rwsem);
+	//遍历cgroup_roots
 	for_each_root(root) {
 		struct cgroup *from_cgrp;
 
@@ -1109,6 +1110,10 @@ struct kernfs_syscall_ops cgroup1_kf_syscall_ops = {
 	.show_path		= cgroup_show_path,
 };
 
+/*
+ * cgroup_mount()
+ *  cgroup1_mount(fs_type==cgroup_fs_type)
+ */
 struct dentry *cgroup1_mount(struct file_system_type *fs_type, int flags,
 			     void *data, unsigned long magic,
 			     struct cgroup_namespace *ns)
@@ -1149,6 +1154,7 @@ struct dentry *cgroup1_mount(struct file_system_type *fs_type, int flags,
 		cgroup_put(&ss->root->cgrp);
 	}
 
+    //遍历cgroup_roots
 	for_each_root(root) {
 		bool name_match = false;
 
@@ -1224,6 +1230,7 @@ struct dentry *cgroup1_mount(struct file_system_type *fs_type, int flags,
 		goto out_unlock;
 	}
 
+	//分配一个cgroup_root对象出来
 	root = kzalloc(sizeof(*root), GFP_KERNEL);
 	if (!root) {
 		ret = -ENOMEM;

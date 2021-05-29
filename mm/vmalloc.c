@@ -1377,6 +1377,13 @@ static void clear_vm_uninitialized_flag(struct vm_struct *vm)
 	vm->flags &= ~VM_UNINITIALIZED;
 }
 
+/*
+ * vmalloc()
+ *  __vmalloc_node_flags(node == NUMA_NO_NODE, flags==GFP_KERNEL)
+ *   __vmalloc_node( prot ==PAGE_KERNEL)
+ *    __vmalloc_node_range(start=VMALLOC_START, end=VMALLOC_END)
+ *     __get_vm_area_node(flags == VM_ALLOC | VM_UNINITIALIZED | ,...)
+ */
 static struct vm_struct *__get_vm_area_node(unsigned long size,
 		unsigned long align, unsigned long flags, unsigned long start,
 		unsigned long end, int node, gfp_t gfp_mask, const void *caller)
@@ -1393,6 +1400,7 @@ static struct vm_struct *__get_vm_area_node(unsigned long size,
 		align = 1ul << clamp_t(int, get_count_order_long(size),
 				       PAGE_SHIFT, IOREMAP_MAX_ORDER);
 
+    //分配一个vm_struct对象
 	area = kzalloc_node(sizeof(*area), gfp_mask & GFP_RECLAIM_MASK, node);
 	if (unlikely(!area))
 		return NULL;
@@ -1400,12 +1408,14 @@ static struct vm_struct *__get_vm_area_node(unsigned long size,
 	if (!(flags & VM_NO_GUARD))
 		size += PAGE_SIZE;
 
+    //分配一个vmap_area
 	va = alloc_vmap_area(size, align, start, end, node, gfp_mask);
 	if (IS_ERR(va)) {
 		kfree(area);
 		return NULL;
 	}
 
+    //设置vmap_area->vm == vm_struct
 	setup_vmalloc_vm(area, va, flags, caller);
 
 	return area;
@@ -1657,6 +1667,14 @@ EXPORT_SYMBOL(vmap);
 static void *__vmalloc_node(unsigned long size, unsigned long align,
 			    gfp_t gfp_mask, pgprot_t prot,
 			    int node, const void *caller);
+
+/*
+ * vmalloc()
+ *  __vmalloc_node_flags(node == NUMA_NO_NODE, flags==GFP_KERNEL)
+ *   __vmalloc_node( prot ==PAGE_KERNEL)
+ *    __vmalloc_node_range(start=VMALLOC_START, end=VMALLOC_END)
+ *     __vmalloc_area_node()
+ */
 static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 				 pgprot_t prot, int node)
 {
@@ -1686,6 +1704,7 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 		return NULL;
 	}
 
+    //逐个page分配，不必物理上连续
 	for (i = 0; i < area->nr_pages; i++) {
 		struct page *page;
 
@@ -1699,11 +1718,13 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 			area->nr_pages = i;
 			goto fail;
 		}
+		//记录下所有的page
 		area->pages[i] = page;
 		if (gfpflags_allow_blocking(gfp_mask|highmem_mask))
 			cond_resched();
 	}
 
+    //设置page到页表中
 	if (map_vm_area(area, prot, pages))
 		goto fail;
 	return area->addr;
@@ -1731,6 +1752,11 @@ fail:
  *	Allocate enough pages to cover @size from the page level
  *	allocator with @gfp_mask flags.  Map them into contiguous
  *	kernel virtual space, using a pagetable protection of @prot.
+ *
+ * vmalloc()
+ *  __vmalloc_node_flags(node == NUMA_NO_NODE, flags==GFP_KERNEL)
+ *   __vmalloc_node( prot ==PAGE_KERNEL)
+ *    __vmalloc_node_range(start=VMALLOC_START, end=VMALLOC_END)
  */
 void *__vmalloc_node_range(unsigned long size, unsigned long align,
 			unsigned long start, unsigned long end, gfp_t gfp_mask,
@@ -1745,6 +1771,7 @@ void *__vmalloc_node_range(unsigned long size, unsigned long align,
 	if (!size || (size >> PAGE_SHIFT) > totalram_pages)
 		goto fail;
 
+    //分配vmap_area,vm_struct
 	area = __get_vm_area_node(size, align, VM_ALLOC | VM_UNINITIALIZED |
 				vm_flags, start, end, node, gfp_mask, caller);
 	if (!area)
@@ -1790,6 +1817,9 @@ fail:
  *	Any use of gfp flags outside of GFP_KERNEL should be consulted
  *	with mm people.
  *
+ * vmalloc()
+ *  __vmalloc_node_flags(node == NUMA_NO_NODE, flags==GFP_KERNEL)
+ *   __vmalloc_node( prot ==PAGE_KERNEL)
  */
 static void *__vmalloc_node(unsigned long size, unsigned long align,
 			    gfp_t gfp_mask, pgprot_t prot,
@@ -1806,6 +1836,10 @@ void *__vmalloc(unsigned long size, gfp_t gfp_mask, pgprot_t prot)
 }
 EXPORT_SYMBOL(__vmalloc);
 
+/*
+ * vmalloc()
+ *  __vmalloc_node_flags(node == NUMA_NO_NODE, flags==GFP_KERNEL)
+ */
 static inline void *__vmalloc_node_flags(unsigned long size,
 					int node, gfp_t flags)
 {

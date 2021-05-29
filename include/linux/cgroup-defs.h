@@ -149,6 +149,8 @@ struct cgroup_file {
  * pids_cgrp_subsys -> struct cgroup_subsys_state{}
  * rdma_cgrp_subsys -> struct cgroup_subsys_state{}
  * debug_cgrp_subsys-> struct cgroup_subsys_state{}
+ *
+ * cgroup_subsys_state内嵌到task_group对象中
  */
 struct cgroup_subsys_state {
 	/* PI: the cgroup that this css is attached to */
@@ -215,6 +217,8 @@ struct cgroup_subsys_state {
  * set for a task.
  *
  * task_struct->cgroups成员
+ *
+ * 所有的css_set对象都会添加到css_set_table中
  */
 struct css_set {
 	/*
@@ -282,6 +286,8 @@ struct css_set {
 	 * slot. Protected by css_set_lock
 	 *
 	 * 用于把所有的css_set组成一个hash表，这样内核可以快速查找特定的css_set
+	 *
+	 * 链接到css_set_table中
 	 */
 	struct hlist_node hlist;
 
@@ -444,13 +450,17 @@ struct cgroup {
 	/* Private pointers for each registered subsystem */
 	struct cgroup_subsys_state __rcu *subsys[CGROUP_SUBSYS_COUNT];
 
+    /* 
+     * 指向了一个cgroupfs_root的结构，就是cgroup所在的层级对应的结构体
+     */
 	struct cgroup_root *root;
 
 	/*
 	 * List of cgrp_cset_links pointing at css_sets with tasks in this
 	 * cgroup.  Protected by css_set_lock.
 	 *
-	 * 链接到cgroup->cset_link,形成链表
+	 * link_css_set中设置
+	 * 链接到cgrp_cset_links->cset_link,形成链表
 	 */
 	struct list_head cset_links;
 
@@ -509,6 +519,8 @@ struct cgroup {
  * A cgroup_root represents the root of a cgroup hierarchy, and may be
  * associated with a kernfs_root to form an active hierarchy.  This is
  * internal to cgroup core.  Don't access directly from controllers.
+ *
+ * 这个东西就是所谓的hierarchy了
  */
 struct cgroup_root {
 	struct kernfs_root *kf_root;
@@ -543,6 +555,8 @@ struct cgroup_root {
 	/* A list running through the active hierarchies
 	 *
 	 * 是一个嵌入的list_head，用于将系统所有的层级连成链表
+	 *
+	 * 在函数cgroup_setup_root()中链接到cgroup_roots
 	 */
 	struct list_head root_list;
 
@@ -565,6 +579,24 @@ struct cgroup_root {
  * When reading/writing to a file:
  *	- the cgroup to use is file->f_path.dentry->d_parent->d_fsdata
  *	- the 'cftype' of the file is file->f_path.dentry->d_fsdata
+ *
+ * bfq_blkcg_legacy_files[], bfq_blkg_files[]
+ * bfq_blkg_files[], blkcg_files[]
+ * blkcg_legacy_files[], iolatency_files[]
+ * throtl_legacy_files[], throtl_files[]
+ * cfq_blkcg_legacy_files[], cfq_blkcg_files[]
+ * cgroup1_base_files[], cgroup_base_files[]
+ * files[] cpuacct.c中
+ * files[] cpuset.c中
+ * dev_cgroup_files[]
+ * files[] freezer.c中
+ * mem_cgroup_legacy_files[] memcontrol.c中
+ * memory_files[] memcontrol.c中
+ * swap_files[]  memcontrol.c中
+ * memsw_cgroup_files[] memcontrol.c中
+ * ss_files[] netclassid_cgroup.c中
+ * pids_files[] pids.c中
+ * rdmacg_files[] rdma.c中
  */
 struct cftype {
 	/*
@@ -598,6 +630,9 @@ struct cftype {
 	 */
 	struct cgroup_subsys *ss;	/* NULL for cgroup core files */
 	struct list_head node;		/* anchored at ss->cfts */
+	/*
+	 * 在cgroup_init_cftypes()中设置
+	 */
 	struct kernfs_ops *kf_ops;
 
 	int (*open)(struct kernfs_open_file *of);
@@ -606,14 +641,21 @@ struct cftype {
 	/*
 	 * read_u64() is a shortcut for the common case of returning a
 	 * single integer. Use it in place of read()
+	 *
+	 *  在cgroup_seqfile_show()中调用
 	 */
 	u64 (*read_u64)(struct cgroup_subsys_state *css, struct cftype *cft);
 	/*
 	 * read_s64() is a signed version of read_u64()
+	 *
+	 *  在cgroup_seqfile_show()中调用
 	 */
 	s64 (*read_s64)(struct cgroup_subsys_state *css, struct cftype *cft);
 
-	/* generic seq_file read interface */
+	/* generic seq_file read interface 
+	 *
+	 * 在cgroup_seqfile_show()中调用
+	 */
 	int (*seq_show)(struct seq_file *sf, void *v);
 
 	/* optional ops, implement all or none */
@@ -625,11 +667,15 @@ struct cftype {
 	 * write_u64() is a shortcut for the common case of accepting
 	 * a single integer (as parsed by simple_strtoull) from
 	 * userspace. Use in place of write(); return 0 or error.
+	 *
+	 * 在cgroup_file_write()中调用
 	 */
 	int (*write_u64)(struct cgroup_subsys_state *css, struct cftype *cft,
 			 u64 val);
 	/*
 	 * write_s64() is a signed version of write_u64()
+	 *
+	 * 在cgroup_file_write()中调用
 	 */
 	int (*write_s64)(struct cgroup_subsys_state *css, struct cftype *cft,
 			 s64 val);
@@ -639,6 +685,10 @@ struct cftype {
 	 * kernfs write operation and overrides all other operations.
 	 * Maximum write size is determined by ->max_write_len.  Use
 	 * of_css/cft() to access the associated css and cft.
+	 *
+	 * 在cgroup_file_write()中调用
+	 *
+	 * hugetlb_cgroup_write或者 hugetlb_cgroup_reset
 	 */
 	ssize_t (*write)(struct kernfs_open_file *of,
 			 char *buf, size_t nbytes, loff_t off);
@@ -651,6 +701,21 @@ struct cftype {
 /*
  * Control Group subsystem type.
  * See Documentation/cgroup-v1/cgroups.txt for details
+ *
+ * cpuset_cgrp_subsys
+ * cpu_cgrp_subsys
+ * cpuacct_cgrp_subsys
+ * io_cgrp_subsys
+ * memory_cgrp_subsys
+ * devices_cgrp_subsys
+ * freezer_cgrp_subsys
+ * net_cls_cgrp_subsys
+ * perf_event_cgrp_subsys
+ * net_prio_cgrp_subsys
+ * hugetlb_cgrp_subsys
+ * pids_cgrp_subsys
+ * rdma_cgrp_subsys
+ * debug_cgrp_subsys 
  */
 struct cgroup_subsys {
 	struct cgroup_subsys_state *(*css_alloc)(struct cgroup_subsys_state *parent_css);

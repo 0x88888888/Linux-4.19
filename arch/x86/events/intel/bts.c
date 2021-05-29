@@ -577,6 +577,13 @@ static void bts_event_read(struct perf_event *event)
 {
 }
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    ...
+ *     bts_init()
+ */
 static __init int bts_init(void)
 {
 	if (!boot_cpu_has(X86_FEATURE_DTES64) || !x86_pmu.bts)

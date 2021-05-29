@@ -238,10 +238,17 @@ static const struct attribute_group kernel_attr_group = {
 	.attrs = kernel_attrs,
 };
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    ksysfs_init()
+ */
 static int __init ksysfs_init(void)
 {
 	int error;
 
+    //创建 /sys/kerenl
 	kernel_kobj = kobject_create_and_add("kernel", NULL);
 	if (!kernel_kobj) {
 		error = -ENOMEM;

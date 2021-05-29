@@ -159,12 +159,16 @@ static void kernfs_seq_stop(struct seq_file *sf, void *v)
 	mutex_unlock(&of->mutex);
 }
 
+/*
+ * 通过vfs调用到 kernfs_seq_show()
+ */
 static int kernfs_seq_show(struct seq_file *sf, void *v)
 {
 	struct kernfs_open_file *of = sf->private;
 
 	of->event = atomic_read(&of->kn->attr.open->event);
 
+    // cgroup_seqfile_show
 	return of->kn->attr.ops->seq_show(sf, v);
 }
 
@@ -269,6 +273,8 @@ static ssize_t kernfs_fop_read(struct file *file, char __user *user_buf,
  * the first write.  Hint: if you're writing a value, first read the file,
  * modify only the the value you're changing, then write entire buffer
  * back.
+ *
+ * 通过vfs走到kernfs_fop_write()
  */
 static ssize_t kernfs_fop_write(struct file *file, const char __user *user_buf,
 				size_t count, loff_t *ppos)
@@ -312,7 +318,7 @@ static ssize_t kernfs_fop_write(struct file *file, const char __user *user_buf,
 	}
 
 	ops = kernfs_ops(of->kn);
-	if (ops->write)
+	if (ops->write)//走起
 		len = ops->write(of, buf, len, *ppos);
 	else
 		len = -EINVAL;
@@ -614,6 +620,9 @@ static void kernfs_put_open_node(struct kernfs_node *kn,
 	kfree(on);
 }
 
+/*
+ * 通过vfs走到kernfs_fop_open
+ */
 static int kernfs_fop_open(struct inode *inode, struct file *file)
 {
 	struct kernfs_node *kn = inode->i_private;
@@ -626,6 +635,7 @@ static int kernfs_fop_open(struct inode *inode, struct file *file)
 	if (!kernfs_get_active(kn))
 		return -ENODEV;
 
+    //得到kernfs_ops,通过这个对象上的函数指针，进入cgroup file操作
 	ops = kernfs_ops(kn);
 
 	has_read = ops->seq_show || ops->read || ops->mmap;
@@ -645,6 +655,7 @@ static int kernfs_fop_open(struct inode *inode, struct file *file)
 
 	/* allocate a kernfs_open_file for the file */
 	error = -ENOMEM;
+	//分配出一个kernfs_open_file对象来
 	of = kzalloc(sizeof(struct kernfs_open_file), GFP_KERNEL);
 	if (!of)
 		goto err_out;
@@ -686,6 +697,7 @@ static int kernfs_fop_open(struct inode *inode, struct file *file)
 	 */
 	if (ops->prealloc && ops->seq_show)
 		goto err_free;
+	
 	if (ops->prealloc) {
 		int len = of->atomic_write_len ?: PAGE_SIZE;
 		of->prealloc_buf = kmalloc(len + 1, GFP_KERNEL);
@@ -700,7 +712,7 @@ static int kernfs_fop_open(struct inode *inode, struct file *file)
 	 * seq_file or is not requested.  This unifies private data access
 	 * and readable regular files are the vast majority anyway.
 	 */
-	if (ops->seq_show)
+	if (ops->seq_show) 
 		error = seq_open(file, &kernfs_seq_ops);
 	else
 		error = seq_open(file, NULL);
@@ -719,7 +731,8 @@ static int kernfs_fop_open(struct inode *inode, struct file *file)
 	if (error)
 		goto err_seq_release;
 
-	if (ops->open) {
+    //走这里
+	if (ops->open) { //cgroup_kf_single_ops->open, cgroup_kf_ops->open ==cgroup_file_open
 		/* nobody has access to @of yet, skip @of->mutex */
 		error = ops->open(of);
 		if (error)

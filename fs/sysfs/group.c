@@ -166,6 +166,18 @@ static int internal_create_group(struct kobject *kobj, int update,
  * warn and error if any of the attribute files being created already exist.
  *
  * Returns 0 on success or error code on failure.
+ *
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    cgroup_sysfs_init()
+ *     sysfs_create_group(kobj=kernel_kobj, attribute_group=cgroup_sysfs_attr_group) //创建 
+ *
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    ksysfs_init()
+ *     sysfs_create_group(kobj=kernel_kobj, attribute_group=&kernel_attr_group)
  */
 int sysfs_create_group(struct kobject *kobj,
 		       const struct attribute_group *grp)

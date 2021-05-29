@@ -215,6 +215,9 @@ struct kernfs_open_file {
 	const struct vm_operations_struct *vm_ops;
 };
 
+/*
+ * cgroup_kf_single_ops, cgroup_kf_ops
+ */
 struct kernfs_ops {
 	/*
 	 * Optional open/release methods.  Both are called with
@@ -233,6 +236,8 @@ struct kernfs_ops {
 	 *
 	 * read() is bounced through kernel buffer and a read larger than
 	 * PAGE_SIZE results in partial operation of PAGE_SIZE.
+	 *
+	 * cgroup_seqfile_show
 	 */
 	int (*seq_show)(struct seq_file *sf, void *v);
 
@@ -258,6 +263,11 @@ struct kernfs_ops {
 	 * ->prealloc.  Provide ->read and ->write with ->prealloc.
 	 */
 	bool prealloc;
+	/*
+	 * cgroup_file_write
+	 *
+	 * 通过kernfs_fop_write来盗用
+	 **/
 	ssize_t (*write)(struct kernfs_open_file *of, char *buf, size_t bytes,
 			 loff_t off);
 
@@ -545,6 +555,11 @@ static inline int kernfs_rename(struct kernfs_node *kn,
 	return kernfs_rename_ns(kn, new_parent, new_name, NULL);
 }
 
+/*
+ * cgroup_mount()
+ *	cgroup_do_mount(fs_type==cgroup2_fs_type, root==cgrp_dfl_root)
+ *   kernfs_mount(fs_type==cgroup2_fs_type, root==cgrp_dfl_root->kf_root)
+ */
 static inline struct dentry *
 kernfs_mount(struct file_system_type *fs_type, int flags,
 		struct kernfs_root *root, unsigned long magic,

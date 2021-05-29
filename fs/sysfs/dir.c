@@ -130,6 +130,10 @@ int sysfs_move_dir_ns(struct kobject *kobj, struct kobject *new_parent_kobj,
  * sysfs_create_mount_point - create an always empty directory
  * @parent_kobj:  kobject that will contain this always empty directory
  * @name: The name of the always empty directory to add
+ *
+ * start_kernel()  [init/main.c]
+ *  cgroup_init()
+ *   sysfs_create_mount_point(fs_kobj, "cgroup") //创建 /sys/fs/cgroup
  */
 int sysfs_create_mount_point(struct kobject *parent_kobj, const char *name)
 {

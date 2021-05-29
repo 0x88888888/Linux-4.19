@@ -1122,6 +1122,16 @@ static int allocate_cgrp_cset_links(int count, struct list_head *tmp_links)
  * @tmp_links: cgrp_cset_link objects allocated by allocate_cgrp_cset_links()
  * @cset: the css_set to be linked
  * @cgrp: the destination cgroup
+ *
+ * cgroup1_mount()
+ *  cgroup_setup_root()
+ *   link_css_set()
+ *
+ * cgroup_procs_write()
+ *  cgroup_attach_task()
+ *   cgroup_migrate_prepare_dst()
+ *    find_css_set()
+ *     link_css_set()
  */
 static void link_css_set(struct list_head *tmp_links, struct css_set *cset,
 			 struct cgroup *cgrp)
@@ -1133,6 +1143,9 @@ static void link_css_set(struct list_head *tmp_links, struct css_set *cset,
 	if (cgroup_on_dfl(cgrp))
 		cset->dfl_cgrp = cgrp;
 
+    /*
+     * cgrp_cset_link->cset_link
+     */
 	link = list_first_entry(tmp_links, struct cgrp_cset_link, cset_link);
 	link->cset = cset;
 	link->cgrp = cgrp;
@@ -1155,6 +1168,11 @@ static void link_css_set(struct list_head *tmp_links, struct css_set *cset,
  *
  * Return a new css_set that's equivalent to @old_cset, but with @cgrp
  * substituted into the appropriate hierarchy.
+ *
+ * cgroup_procs_write()
+ *  cgroup_attach_task()
+ *   cgroup_migrate_prepare_dst()
+ *    find_css_set()
  */
 static struct css_set *find_css_set(struct css_set *old_cset,
 				    struct cgroup *cgrp)
@@ -1172,6 +1190,7 @@ static struct css_set *find_css_set(struct css_set *old_cset,
 	/* First see if we already have a cgroup group that matches
 	 * the desired set */
 	spin_lock_irq(&css_set_lock);
+	//查找已经存在的css_set对象
 	cset = find_existing_css_set(old_cset, cgrp, template);
 	if (cset)
 		get_css_set(cset);
@@ -1180,6 +1199,7 @@ static struct css_set *find_css_set(struct css_set *old_cset,
 	if (cset)
 		return cset;
 
+    //重新分配
 	cset = kzalloc(sizeof(*cset), GFP_KERNEL);
 	if (!cset)
 		return NULL;
@@ -1212,6 +1232,7 @@ static struct css_set *find_css_set(struct css_set *old_cset,
 
 		if (c->root == cgrp->root)
 			c = cgrp;
+		
 		link_css_set(&tmp_links, cset, c);
 	}
 
@@ -1657,6 +1678,12 @@ static void css_clear_dir(struct cgroup_subsys_state *css)
  * @css: target css
  *
  * On failure, no file is added.
+ *
+ * start_kernel()  [init/main.c]
+ *  cgroup_init()
+ *   css_populate_dir()
+ *
+ * 给subsys创建文件
  */
 static int css_populate_dir(struct cgroup_subsys_state *css)
 {
@@ -1912,6 +1939,10 @@ out_unlock:
  *  cgroup_init_early()
  *   init_cgroup_root()
  *    init_cgroup_housekeeping()
+ *
+ * cgroup_mkdir()
+ *  cgroup_create()
+ *   init_cgroup_housekeeping()
  */
 static void init_cgroup_housekeeping(struct cgroup *cgrp)
 {
@@ -1941,7 +1972,7 @@ static void init_cgroup_housekeeping(struct cgroup *cgrp)
 /*
  * start_kernel()  [init/main.c]
  *  cgroup_init_early()
- *   init_cgroup_root()
+ *   init_cgroup_root(root == cgrp_dfl_root)
  *
  * cgroup1_mount()
  *  init_cgroup_root()
@@ -1976,7 +2007,7 @@ void init_cgroup_root(struct cgroup_root *root, struct cgroup_sb_opts *opts)
  *   cgroup_setup_root(root == cgrp_dfl_root)
  *
  * cgroup1_mount()
- *  cgroup_setup_root()
+ *  cgroup_setup_root(root == cgrp_dfl_root)
  */
 int cgroup_setup_root(struct cgroup_root *root, u16 ss_mask, int ref_flags)
 {
@@ -2044,6 +2075,8 @@ int cgroup_setup_root(struct cgroup_root *root, u16 ss_mask, int ref_flags)
 	 * There must be no failure case after here, since rebinding takes
 	 * care of subsystems' refcounts, which are explicitly dropped in
 	 * the failure exit path.
+	 *
+	 * 所有的cgroup_roots链接起来
 	 */
 	list_add(&root->root_list, &cgroup_roots);
 	cgroup_root_count++;
@@ -2079,6 +2112,14 @@ out:
 	return ret;
 }
 
+/*
+ * cgroup_mount()
+ *  cgroup_do_mount(fs_type==cgroup2_fs_type, root==cgrp_dfl_root)
+ *
+ * cgroup_mount()
+ *  cgroup1_mount(fs_type==cgroup_fs_type)
+ *   cgroup_do_mount(fs_type==cgroup_fs_type)
+ */
 struct dentry *cgroup_do_mount(struct file_system_type *fs_type, int flags,
 			       struct cgroup_root *root, unsigned long magic,
 			       struct cgroup_namespace *ns)
@@ -2138,7 +2179,7 @@ static struct dentry *cgroup_mount(struct file_system_type *fs_type,
 	if (!use_task_css_set_links)
 		cgroup_enable_task_cg_lists();
 
-	if (fs_type == &cgroup2_fs_type) {
+	if (fs_type == &cgroup2_fs_type) { //新版本
 		unsigned int root_flags;
 
 		ret = parse_cgroup_root_flags(data, &root_flags);
@@ -2154,7 +2195,8 @@ static struct dentry *cgroup_mount(struct file_system_type *fs_type,
 					 CGROUP2_SUPER_MAGIC, ns);
 		if (!IS_ERR(dentry))
 			apply_cgroup_root_flags(root_flags);
-	} else {
+	} else {//老版本
+	
 		dentry = cgroup1_mount(&cgroup_fs_type, flags, data,
 				       CGROUP_SUPER_MAGIC, ns);
 	}
@@ -2573,6 +2615,10 @@ void cgroup_migrate_finish(struct cgroup_mgctx *mgctx)
  * but as long as cgroup_mutex is not dropped, no new css_set can be put
  * into play and the preloaded css_sets are guaranteed to cover all
  * migrations.
+ *
+ * cgroup_procs_write()
+ *  cgroup_attach_task()
+ *   cgroup_migrate_add_src()
  */
 void cgroup_migrate_add_src(struct css_set *src_cset,
 			    struct cgroup *dst_cgrp,
@@ -2620,6 +2666,10 @@ void cgroup_migrate_add_src(struct css_set *src_cset,
  * called on each migration source css_set.  After migration is performed
  * using cgroup_migrate(), cgroup_migrate_finish() must be called on
  * @mgctx.
+ *
+ * cgroup_procs_write()
+ *  cgroup_attach_task()
+ *   cgroup_migrate_prepare_dst()
  */
 int cgroup_migrate_prepare_dst(struct cgroup_mgctx *mgctx)
 {
@@ -2634,6 +2684,7 @@ int cgroup_migrate_prepare_dst(struct cgroup_mgctx *mgctx)
 		struct cgroup_subsys *ss;
 		int ssid;
 
+        //找到dst
 		dst_cset = find_css_set(src_cset, src_cset->mg_dst_cgrp);
 		if (!dst_cset)
 			goto err;
@@ -2749,6 +2800,8 @@ int cgroup_migrate(struct task_struct *leader, bool threadgroup,
  *  cgroup_attach_task()
  *
  * __cgroup1_procs_write()
+ *
+ * 将leader中所有的task_struct移动到dst_cgrp中去
  */
 int cgroup_attach_task(struct cgroup *dst_cgrp, struct task_struct *leader,
 		       bool threadgroup)
@@ -2757,6 +2810,7 @@ int cgroup_attach_task(struct cgroup *dst_cgrp, struct task_struct *leader,
 	struct task_struct *task;
 	int ret;
 
+    //验证一下，dst_cgrp是否可以接受
 	ret = cgroup_migrate_vet_dst(dst_cgrp);
 	if (ret)
 		return ret;
@@ -2765,17 +2819,21 @@ int cgroup_attach_task(struct cgroup *dst_cgrp, struct task_struct *leader,
 	spin_lock_irq(&css_set_lock);
 	rcu_read_lock();
 	task = leader;
+	
 	do {
+		//弄到mgctx中去
 		cgroup_migrate_add_src(task_css_set(task), dst_cgrp, &mgctx);
 		if (!threadgroup)
 			break;
+		//遍历进程中的每个task_struct
 	} while_each_thread(leader, task);
 	rcu_read_unlock();
 	spin_unlock_irq(&css_set_lock);
 
 	/* prepare dst csets and commit */
+	//这一步很重要
 	ret = cgroup_migrate_prepare_dst(&mgctx);
-	if (!ret)
+	if (!ret)//走起了
 		ret = cgroup_migrate(leader, threadgroup, &mgctx);
 
 	cgroup_migrate_finish(&mgctx);
@@ -3560,11 +3618,15 @@ static int cpu_stat_show(struct seq_file *seq, void *v)
 	return ret;
 }
 
+/*
+ * kernfs_fop_open()
+ *  cgroup_file_open()
+ */
 static int cgroup_file_open(struct kernfs_open_file *of)
 {
 	struct cftype *cft = of->kn->priv;
 
-	if (cft->open)
+	if (cft->open) //走各个subsystem的open了,不过这个open基本上都是NULL
 		return cft->open(of);
 	return 0;
 }
@@ -3577,6 +3639,10 @@ static void cgroup_file_release(struct kernfs_open_file *of)
 		cft->release(of);
 }
 
+/*
+ * 通过vfs走到kernfs_fop_write()
+ *  cgroup_file_write()
+ */
 static ssize_t cgroup_file_write(struct kernfs_open_file *of, char *buf,
 				 size_t nbytes, loff_t off)
 {
@@ -3643,6 +3709,10 @@ static void cgroup_seqfile_stop(struct seq_file *seq, void *v)
 		seq_cft(seq)->seq_stop(seq, v);
 }
 
+/*
+ * 通过vfs调用到 kernfs_seq_show()
+ *  cgroup_seqfile_show()
+ */
 static int cgroup_seqfile_show(struct seq_file *m, void *arg)
 {
 	struct cftype *cft = seq_cft(m);
@@ -3699,6 +3769,13 @@ static void cgroup_file_notify_timer(struct timer_list *timer)
 					notify_timer));
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  cgroup_init()
+ *   css_populate_dir()
+ *    cgroup_addrm_files()
+ *     cgroup_add_file()
+ */
 static int cgroup_add_file(struct cgroup_subsys_state *css, struct cgroup *cgrp,
 			   struct cftype *cft)
 {
@@ -3710,6 +3787,7 @@ static int cgroup_add_file(struct cgroup_subsys_state *css, struct cgroup *cgrp,
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
 	key = &cft->lockdep_key;
 #endif
+    //创建
 	kn = __kernfs_create_file(cgrp->kn, cgroup_file_name(cgrp, cft, name),
 				  cgroup_file_mode(cft),
 				  GLOBAL_ROOT_UID, GLOBAL_ROOT_GID,
@@ -3746,6 +3824,11 @@ static int cgroup_add_file(struct cgroup_subsys_state *css, struct cgroup *cgrp,
  *
  * Depending on @is_add, add or remove files defined by @cfts on @cgrp.
  * For removals, this function never fails.
+ *
+ * start_kernel()  [init/main.c]
+ *  cgroup_init()
+ *   css_populate_dir()
+ *    cgroup_addrm_files()
  */
 static int cgroup_addrm_files(struct cgroup_subsys_state *css,
 			      struct cgroup *cgrp, struct cftype cfts[],
@@ -3768,7 +3851,7 @@ restart:
 		if ((cft->flags & CFTYPE_ONLY_ON_ROOT) && cgroup_parent(cgrp))
 			continue;
 
-		if (is_add) {
+		if (is_add) { //添加文件
 			ret = cgroup_add_file(css, cgrp, cft);
 			if (ret) {
 				pr_warn("%s: failed to add %s, err=%d\n",
@@ -3777,7 +3860,7 @@ restart:
 				is_add = false;
 				goto restart;
 			}
-		} else {
+		} else { //删除文件
 			cgroup_rm_file(cgrp, cft);
 		}
 	}
@@ -3826,15 +3909,23 @@ static void cgroup_exit_cftypes(struct cftype *cfts)
 	}
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  cgroup_init(NULL, cgroup_base_files)
+ *  cgroup_init(NULL, cgroup1_base_files)
+ *
+ */
 static int cgroup_init_cftypes(struct cgroup_subsys *ss, struct cftype *cfts)
 {
 	struct cftype *cft;
 
+    //遍历cgroup所有的cftypes
 	for (cft = cfts; cft->name[0] != '\0'; cft++) {
 		struct kernfs_ops *kf_ops;
 
 		WARN_ON(cft->ss || cft->kf_ops);
 
+        //设置kernfs_ops
 		if (cft->seq_start)
 			kf_ops = &cgroup_kf_ops;
 		else
@@ -3853,6 +3944,7 @@ static int cgroup_init_cftypes(struct cgroup_subsys *ss, struct cftype *cfts)
 			kf_ops->atomic_write_len = cft->max_write_len;
 		}
 
+        //将cgroup_subsys和kernfs_ops关联起来
 		cft->kf_ops = kf_ops;
 		cft->ss = ss;
 	}
@@ -4983,6 +5075,7 @@ err_free_css:
  */
 static struct cgroup *cgroup_create(struct cgroup *parent)
 {
+    //得到所在的root
 	struct cgroup_root *root = parent->root;
 	struct cgroup *cgrp, *tcgrp;
 	int level = parent->level + 1;
@@ -4998,6 +5091,7 @@ static struct cgroup *cgroup_create(struct cgroup *parent)
 	if (ret)
 		goto out_free_cgrp;
 
+    //parent是cgrp_dfl_root的子节点
 	if (cgroup_on_dfl(parent)) {
 		ret = cgroup_rstat_init(cgrp);
 		if (ret)
@@ -5039,6 +5133,7 @@ static struct cgroup *cgroup_create(struct cgroup *parent)
 	cgrp->self.serial_nr = css_serial_nr_next++;
 
 	/* allocation complete, commit to creation */
+	//添加到parent->children中去
 	list_add_tail_rcu(&cgrp->self.sibling, &cgroup_parent(cgrp)->self.children);
 	atomic_inc(&root->nr_cgrps);
 	cgroup_get_live(parent);
@@ -5080,6 +5175,7 @@ static bool cgroup_check_hierarchy_limits(struct cgroup *parent)
 
 	lockdep_assert_held(&cgroup_mutex);
 
+    //层数不嫩超过cgroup->max_depth
 	for (cgroup = parent; cgroup; cgroup = cgroup_parent(cgroup)) {
 		if (cgroup->nr_descendants >= cgroup->max_descendants)
 			goto fail;
@@ -5114,6 +5210,7 @@ int cgroup_mkdir(struct kernfs_node *parent_kn, const char *name, umode_t mode)
 		goto out_unlock;
 	}
 
+    //创建cgroup对象
 	cgrp = cgroup_create(parent);
 	if (IS_ERR(cgrp)) {
 		ret = PTR_ERR(cgrp);
@@ -5491,6 +5588,8 @@ int __init cgroup_init(void)
 	/*
 	 * Add init_css_set to the hash table so that dfl_root can link to
 	 * it during init.
+	 *
+	 *
 	 */
 	hash_add(css_set_table, &init_css_set.hlist,
 		 css_set_hash(init_css_set.subsys));
@@ -5499,6 +5598,7 @@ int __init cgroup_init(void)
 
 	mutex_unlock(&cgroup_mutex);
 
+    //遍历cgroup_subsys[]
 	for_each_subsys(ss, ssid) {
 		if (ss->early_init) {
 			struct cgroup_subsys_state *css =
@@ -5511,6 +5611,7 @@ int __init cgroup_init(void)
 			cgroup_init_subsys(ss, false);
 		}
 
+        //将subsys添加到cgrp_dfl_root.cgrp.e_csets[]
 		list_add_tail(&init_css_set.e_cset_node[ssid],
 			      &cgrp_dfl_root.cgrp.e_csets[ssid]);
 
@@ -5554,6 +5655,7 @@ int __init cgroup_init(void)
 			ss->bind(init_css_set.subsys[ssid]);
 
 		mutex_lock(&cgroup_mutex);
+		
 		css_populate_dir(init_css_set.subsys[ssid]);
 		mutex_unlock(&cgroup_mutex);
 	}
@@ -5563,14 +5665,23 @@ int __init cgroup_init(void)
 	hash_add(css_set_table, &init_css_set.hlist,
 		 css_set_hash(init_css_set.subsys));
 
+    //创建 /sys/fs/cgroup
 	WARN_ON(sysfs_create_mount_point(fs_kobj, "cgroup"));
+	//注册cgroup v1和 cgroup v2
 	WARN_ON(register_filesystem(&cgroup_fs_type));
 	WARN_ON(register_filesystem(&cgroup2_fs_type));
+	//创建/proc/cgroups
 	WARN_ON(!proc_create_single("cgroups", 0, NULL, proc_cgroupstats_show));
 
 	return 0;
 }
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    cgroup_wq_init()
+ */
 static int __init cgroup_wq_init(void)
 {
 	/*
@@ -6162,8 +6273,15 @@ static const struct attribute_group cgroup_sysfs_attr_group = {
 	.name = "cgroup",
 };
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    cgroup_sysfs_init()
+ */
 static int __init cgroup_sysfs_init(void)
 {
+    //创建 /sys/cgroup
 	return sysfs_create_group(kernel_kobj, &cgroup_sysfs_attr_group);
 }
 subsys_initcall(cgroup_sysfs_init);

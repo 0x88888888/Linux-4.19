@@ -301,6 +301,11 @@ const void *kernfs_super_ns(struct super_block *sb)
  * and @ns, respectively.
  *
  * The return value can be passed to the vfs layer verbatim.
+ *
+ * cgroup_mount()
+ *	cgroup_do_mount(fs_type==cgroup2_fs_type, root==cgrp_dfl_root)
+ *   kernfs_mount(fs_type==cgroup2_fs_type, root==cgrp_dfl_root->kf_root)
+ *    kernfs_mount_ns(fs_type==cgroup2_fs_type, root==cgrp_dfl_root->kf_root, ns=NULL)
  */
 struct dentry *kernfs_mount_ns(struct file_system_type *fs_type, int flags,
 				struct kernfs_root *root, unsigned long magic,
@@ -322,6 +327,7 @@ struct dentry *kernfs_mount_ns(struct file_system_type *fs_type, int flags,
 			 &init_user_ns, info);
 	if (IS_ERR(sb) || sb->s_fs_info != info)
 		kfree(info);
+	
 	if (IS_ERR(sb))
 		return ERR_CAST(sb);
 

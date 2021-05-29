@@ -1175,14 +1175,15 @@ static void __init do_initcalls(void)
     /*
      * 会调用 populate_rootfs,
      *
-     * 1. 
+     * 1. core_initcall(ksysfs_init)
      * 1. core_initcall(sock_init)
      * 1. core_initcall(init_zero_pfn)
      * 1. core_initcall(cgroup_wq_init)
      * 1. core_initcall(init_zero_pfn)
      *
-     
+     * 3. arch_initcall(bts_init) perf性能监控使用
      *
+     * 4. subsys_initcall(cgroup_sysfs_init)
      * 4. subsys_initcall(init_user_reserve)
      * 4. subsys_initcall(mem_cgroup_init)
      * 4. subsys_initcall(mem_cgroup_swap_init)
@@ -1198,6 +1199,8 @@ static void __init do_initcalls(void)
      *  
      *
      * 7. late_initcall(debugfs_kprobe_init)
+     *
+     * 
      */
 	for (level = 0; level < ARRAY_SIZE(initcall_levels) - 1; level++)
 		do_initcall_level(level);

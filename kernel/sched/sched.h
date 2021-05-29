@@ -361,6 +361,8 @@ struct cfs_bandwidth {
  *   那么还需要遍历tg中的就绪队列，从中选择一个进程来运行
  *
  * 看sched_create_group
+ *
+ * 从task_group_cache中分配task_group对象
  */
 struct task_group {
 	struct cgroup_subsys_state css;

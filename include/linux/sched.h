@@ -1009,13 +1009,16 @@ struct task_struct {
 #ifdef CONFIG_CGROUPS
 	/* Control Group info protected by css_set_lock: 
 	 *
-	 * css_set存储了与进程相关的cgroups信息
+	 * css_set存储了与进程相关的所有的cgroups信息
      */
 	struct css_set __rcu		*cgroups;
 	/* cg_list protected by css_set_lock and tsk->alloc_lock:
 	 *
-	 * 链接到task_struct->cg_list,
 	 * cg_list将使用同一个css_set的进程链接在一起
+	 *
+	 * 从函数css_set_move_task()中可知
+	 * 链接到css_set->mg_tasks或者css_set->tasks
+	 * 
 	 */
 	struct list_head		cg_list;
 #endif

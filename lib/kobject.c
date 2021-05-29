@@ -762,6 +762,12 @@ struct kobject *kobject_create(void)
  *   vfs_caches_init()
  *    mnt_init()
  *     kobject_create_and_add("fs", NULL)
+ *
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    ksysfs_init()
+ *     kobject_create_and_add("kernel", NULL)
  */
 struct kobject *kobject_create_and_add(const char *name, struct kobject *parent)
 {
