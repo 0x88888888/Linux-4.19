@@ -5,6 +5,9 @@
 #include <linux/ns_common.h>
 #include <linux/fs_pin.h>
 
+/*
+ * 在alloc_mnt_ns()中分配这个对象
+ */
 struct mnt_namespace {
 	atomic_t		count;
 	struct ns_common	ns;
@@ -31,6 +34,9 @@ struct mountpoint {
 	int m_count;
 };
 
+/*
+ * 在do_add_mount()中构建mount树
+ */
 struct mount {
 	struct hlist_node mnt_hash;
 	struct mount *mnt_parent;

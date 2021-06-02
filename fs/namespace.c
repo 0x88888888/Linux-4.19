@@ -949,6 +949,8 @@ static struct mount *skip_mnt_tree(struct mount *p)
  *	  mnt_init()
  *     init_mount_tree()
  *      vfs_kern_mount(rootfs_fs_type, 0, "rootfs", NULL);
+ *
+ * 创建出mount结构，返回vfsmount,mount树用mount结构来实现
  */
 struct vfsmount *
 vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void *data)
@@ -985,6 +987,7 @@ vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void 
     //mount对象放到super_block->s_mounts上去
 	list_add_tail(&mnt->mnt_instance, &root->d_sb->s_mounts);
 	unlock_mount_hash();
+	//返回vfsmount
 	return &mnt->mnt;
 }
 EXPORT_SYMBOL_GPL(vfs_kern_mount);
@@ -1715,6 +1718,15 @@ static bool mnt_ns_loop(struct dentry *dentry)
 	return current->nsproxy->mnt_ns->seq >= mnt_ns->seq;
 }
 
+/*
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
+ *    copy_namespaces()
+ *     create_new_namespaces()
+ *      copy_mnt_ns()
+ *       copy_tree()
+ */
 struct mount *copy_tree(struct mount *mnt, struct dentry *dentry,
 					int flag)
 {
@@ -1951,6 +1963,12 @@ int count_mounts(struct mnt_namespace *ns, struct mount *mnt)
  * applied to each mount in the tree.
  * Must be called without spinlocks held, since this function can sleep
  * in allocations.
+ *
+ * do_mount()
+ *  do_new_mount()
+ *   do_add_mount() 
+ *    graft_tree()
+ *     attach_recursive_mnt()
  */
 static int attach_recursive_mnt(struct mount *source_mnt,
 			struct mount *dest_mnt,
@@ -1991,6 +2009,7 @@ static int attach_recursive_mnt(struct mount *source_mnt,
 	} else {
 		lock_mount_hash();
 	}
+	
 	if (parent_path) {
 		detach_mnt(source_mnt, parent_path);
 		attach_mnt(source_mnt, dest_mnt, dest_mp);
@@ -2073,6 +2092,12 @@ static void unlock_mount(struct mountpoint *where)
 	inode_unlock(dentry->d_inode);
 }
 
+/*
+ * do_mount()
+ *  do_new_mount()
+ *   do_add_mount() 
+ *    graft_tree()
+ */
 static int graft_tree(struct mount *mnt, struct mount *p, struct mountpoint *mp)
 {
 	if (mnt->mnt.mnt_sb->s_flags & SB_NOUSER)
@@ -2405,6 +2430,10 @@ static struct vfsmount *fs_set_subtype(struct vfsmount *mnt, const char *fstype)
 
 /*
  * add a mount into a namespace's mount tree
+ *
+ * do_mount()
+ *  do_new_mount()
+ *   do_add_mount()
  */
 static int do_add_mount(struct mount *newmnt, struct path *path, int mnt_flags)
 {
@@ -2418,6 +2447,7 @@ static int do_add_mount(struct mount *newmnt, struct path *path, int mnt_flags)
 	if (IS_ERR(mp))
 		return PTR_ERR(mp);
 
+    //父mount
 	parent = real_mount(path->mnt);
 	err = -EINVAL;
 	if (unlikely(!check_mnt(parent))) {
@@ -2440,6 +2470,7 @@ static int do_add_mount(struct mount *newmnt, struct path *path, int mnt_flags)
 		goto unlock;
 
 	newmnt->mnt.mnt_flags = mnt_flags;
+	//构建父子mount关系树
 	err = graft_tree(newmnt, parent, mp);
 
 unlock:
@@ -2452,6 +2483,9 @@ static bool mount_too_revealing(struct vfsmount *mnt, int *new_mnt_flags);
 /*
  * create a new mount for userspace and request it to be added into the
  * namespace's tree
+ *
+ * do_mount()
+ *  do_new_mount()
  */
 static int do_new_mount(struct path *path, const char *fstype, int sb_flags,
 			int mnt_flags, const char *name, void *data)
@@ -2467,6 +2501,7 @@ static int do_new_mount(struct path *path, const char *fstype, int sb_flags,
 	if (!type)
 		return -ENODEV;
 
+    //创建出mount结构，返回vfsmount
 	mnt = vfs_kern_mount(type, sb_flags, name, data);
 	if (!IS_ERR(mnt) && (type->fs_flags & FS_HAS_SUBTYPE) &&
 	    !mnt->mnt_sb->s_subtype)
@@ -2717,10 +2752,26 @@ char *copy_mount_string(const void __user *data)
  * to have the magic value 0xC0ED, and this remained so until 2.4.0-test9.
  * Therefore, if this magic number is present, it carries no information
  * and must be discarded.
+ *
+ * COMPAT_SYSCALL_DEFINE5(mount) [compat.c]
+ *  do_mount()
+ *
+ * ksys_mount()
+ *  do_mount()
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      prepare_namespace()
+ *       ksys_mount(dev_name=".", dir_name="/",type= NULL, flags=MS_MOVE,data= NULL)
+ *        do_mount(dev_name=".", dir_name="/",type_page=NULL, flags=MS_MOVE,data_page=NULL) 
  */
 long do_mount(const char *dev_name, const char __user *dir_name,
 		const char *type_page, unsigned long flags, void *data_page)
 {
+    //局部变量，目前path中的东西不可测,在哪里初始化path对象呢？
 	struct path path;
 	unsigned int mnt_flags = 0, sb_flags;
 	int retval = 0;
@@ -2736,7 +2787,10 @@ long do_mount(const char *dev_name, const char __user *dir_name,
 	if (flags & MS_NOUSER)
 		return -EINVAL;
 
-	/* ... and get the mountpoint */
+	/* ... and get the mountpoint,
+	 * 解析出dirname到path,也就是挂载点entry point
+	 * 用dir_name去初始化path
+	 */
 	retval = user_path(dir_name, &path);
 	if (retval)
 		return retval;
@@ -2831,6 +2885,24 @@ static void free_mnt_ns(struct mnt_namespace *ns)
  */
 static atomic64_t mnt_ns_seq = ATOMIC64_INIT(1);
 
+
+/*
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
+ *    copy_namespaces()
+ *     create_new_namespaces()
+ *      copy_mnt_ns()
+ *       alloc_mnt_ns()
+ *
+ * start_kernel()  [init/main.c]
+ *	buffer_init()
+ *	 vfs_caches_init()
+ *	  mnt_init()
+ *     init_mount_tree()
+ *      create_mnt_ns()
+ *       alloc_mnt_ns(user_ns==init_user_ns)
+ */
 static struct mnt_namespace *alloc_mnt_ns(struct user_namespace *user_ns)
 {
 	struct mnt_namespace *new_ns;
@@ -2841,17 +2913,20 @@ static struct mnt_namespace *alloc_mnt_ns(struct user_namespace *user_ns)
 	if (!ucounts)
 		return ERR_PTR(-ENOSPC);
 
+    //分配一个mnt_namespace出来
 	new_ns = kmalloc(sizeof(struct mnt_namespace), GFP_KERNEL);
 	if (!new_ns) {
 		dec_mnt_namespaces(ucounts);
 		return ERR_PTR(-ENOMEM);
 	}
+	
 	ret = ns_alloc_inum(&new_ns->ns);
 	if (ret) {
 		kfree(new_ns);
 		dec_mnt_namespaces(ucounts);
 		return ERR_PTR(ret);
 	}
+	
 	new_ns->ns.ops = &mntns_operations;
 	new_ns->seq = atomic64_add_return(1, &mnt_ns_seq);
 	atomic_set(&new_ns->count, 1);
@@ -2863,9 +2938,18 @@ static struct mnt_namespace *alloc_mnt_ns(struct user_namespace *user_ns)
 	new_ns->ucounts = ucounts;
 	new_ns->mounts = 0;
 	new_ns->pending_mounts = 0;
+	
 	return new_ns;
 }
 
+/*
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
+ *    copy_namespaces()
+ *     create_new_namespaces()
+ *      copy_mnt_ns()
+ */
 __latent_entropy
 struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
 		struct user_namespace *user_ns, struct fs_struct *new_fs)
@@ -2886,6 +2970,7 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
 
 	old = ns->root;
 
+    //分配一个mnt_namespace
 	new_ns = alloc_mnt_ns(user_ns);
 	if (IS_ERR(new_ns))
 		return new_ns;
@@ -2895,6 +2980,7 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
 	copy_flags = CL_COPY_UNBINDABLE | CL_EXPIRE;
 	if (user_ns != ns->user_ns)
 		copy_flags |= CL_SHARED_TO_SLAVE | CL_UNPRIVILEGED;
+	
 	new = copy_tree(old, old->mnt.mnt_root, copy_flags);
 	if (IS_ERR(new)) {
 		namespace_unlock();
@@ -2999,6 +3085,15 @@ struct dentry *mount_subtree(struct vfsmount *mnt, const char *name)
 }
 EXPORT_SYMBOL(mount_subtree);
 
+/* 
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      prepare_namespace()
+ *       ksys_mount(dev_name=".", dir_name="/",type= NULL, flags=MS_MOVE,data= NULL)
+ */
 int ksys_mount(char __user *dev_name, char __user *dir_name, char __user *type,
 	       unsigned long flags, void __user *data)
 {
@@ -3201,16 +3296,18 @@ static void __init init_mount_tree(void)
 	struct path root;
 	struct file_system_type *type;
 
+    //返回是root_fs_type对象
 	type = get_fs_type("rootfs");
 	if (!type)
 		panic("Can't find rootfs type");
 	
-	//挂载rootfs_fs_type
+	//挂载root_fs_type
 	mnt = vfs_kern_mount(type, 0, "rootfs", NULL);
 	put_filesystem(type);
 	if (IS_ERR(mnt))
 		panic("Can't create rootfs");
 
+    //创建mnt_namespace
 	ns = create_mnt_ns(mnt);
 	if (IS_ERR(ns))
 		panic("Can't allocate initial namespace");
@@ -3218,6 +3315,7 @@ static void __init init_mount_tree(void)
 	init_task.nsproxy->mnt_ns = ns;
 	get_mnt_ns(ns);
 
+    //设置当前进程(0号进程)的pwd和root信息了
 	root.mnt = mnt;
 	root.dentry = mnt->mnt_root;
 	mnt->mnt_flags |= MNT_LOCKED;
@@ -3279,6 +3377,7 @@ void put_mnt_ns(struct mnt_namespace *ns)
 {
 	if (!atomic_dec_and_test(&ns->count))
 		return;
+	
 	drop_collected_mounts(&ns->root->mnt);
 	free_mnt_ns(ns);
 }

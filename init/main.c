@@ -594,7 +594,8 @@ asmlinkage __visible void __init start_kernel(void)
 	char *command_line;
 	char *after_dashes;
 
-	
+
+	//设置init_task的内核态stack
 	set_task_stack_end_magic(&init_task);
 
 	//x64中为空函数
@@ -1184,10 +1185,12 @@ static void __init do_initcalls(void)
      * 3. arch_initcall(bts_init) perf性能监控使用
      *
      * 4. subsys_initcall(cgroup_sysfs_init)
-     * 4. subsys_initcall(init_user_reserve)
+     * 4. subsys_initcall(cgroup_namespaces_init)     
      * 4. subsys_initcall(mem_cgroup_init)
-     * 4. subsys_initcall(mem_cgroup_swap_init)
+     * 4. subsys_initcall(mem_cgroup_swap_init)     
+     * 4. subsys_initcall(init_user_reserve)
      * 4. subsys_initcall(ksm_init)
+     *
      *
      * 5. fs_initcall(inet_init)
      * 
@@ -1260,6 +1263,16 @@ static void __init do_pre_smp_initcalls(void)
  *    kernel_init()
  *     kernel_init_freeable()
  *      load_default_modules()
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      prepare_namespace()
+ *       initrd_load()
+ *        handle_initrd()
+ *         load_default_modules()
  */
 void __init load_default_modules(void)
 {
@@ -1461,6 +1474,8 @@ static noinline void __init kernel_init_freeable(void)
 	if (ksys_access((const char __user *)
 			ramdisk_execute_command, 0) != 0) {
 		ramdisk_execute_command = NULL;
+
+		//挂载根文件系统，特别注意mount namespace,这个对容器很重要
 		prepare_namespace();
 	}
 

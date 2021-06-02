@@ -41,6 +41,11 @@ extern char trace_cgroup_path[TRACE_CGROUP_PATH_LEN];
  * This M:N relationship is represented by the following link structure
  * which exists for each association and allows traversing the associations
  * from both sides.
+ *
+ * cgroup和css_set是一个多对多的关系，必须添加一个中间结构cgrp_cset_link来将两者联系起来。
+ * 结构体中cset_link连入到cgroup->cset_links指向的链表，
+ * cgrp_link连入到ccs_set->cgrp_links指向的链表，
+ * 使得不管从cgroup还是从css_set都可以进行遍历查询。
  */
 struct cgrp_cset_link {
 	/* the cgroup and css_set this link associates */

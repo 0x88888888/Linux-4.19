@@ -868,7 +868,9 @@ static void css_set_move_task(struct task_struct *task,
 			if (it->task_pos == &task->cg_list)
 				css_task_iter_advance(it);
 
+        //先从原来的地方删除
 		list_del_init(&task->cg_list);
+			
 		if (!css_set_populated(from_cset))
 			css_set_update_populated(from_cset, false);
 	} else {
@@ -885,6 +887,7 @@ static void css_set_move_task(struct task_struct *task,
 		WARN_ON_ONCE(task->flags & PF_EXITING);
 
 		rcu_assign_pointer(task->cgroups, to_cset);
+	    //链接到目标目标css_set
 		list_add_tail(&task->cg_list, use_mg_tasks ? &to_cset->mg_tasks :
 							     &to_cset->tasks);
 	}
@@ -1145,6 +1148,8 @@ static void link_css_set(struct list_head *tmp_links, struct css_set *cset,
 
     /*
      * cgrp_cset_link->cset_link
+     *
+     * 将tmp_links转成cgrp_cset_link
      */
 	link = list_first_entry(tmp_links, struct cgrp_cset_link, cset_link);
 	link->cset = cset;
@@ -1155,6 +1160,7 @@ static void link_css_set(struct list_head *tmp_links, struct css_set *cset,
 	 * in choronological order.
 	 */
 	list_move_tail(&link->cset_link, &cgrp->cset_links);
+	
 	list_add_tail(&link->cgrp_link, &cset->cgrp_links);
 
 	if (cgroup_parent(cgrp))
@@ -1205,6 +1211,7 @@ static struct css_set *find_css_set(struct css_set *old_cset,
 		return NULL;
 
 	/* Allocate all the cgrp_cset_link objects that we'll need */
+	//分配对应的cgrp_cset_link对象
 	if (allocate_cgrp_cset_links(cgroup_root_count, &tmp_links) < 0) {
 		kfree(cset);
 		return NULL;
@@ -1227,15 +1234,20 @@ static struct css_set *find_css_set(struct css_set *old_cset,
 
 	spin_lock_irq(&css_set_lock);
 	/* Add reference counts and links from the new css_set. */
+
+	//遍历old_cset->cgrp_links，放到link中
+	//cgrp_cset_link一头连着cgroup，一头连着css_set
 	list_for_each_entry(link, &old_cset->cgrp_links, cgrp_link) {
+	    
 		struct cgroup *c = link->cgrp;
 
 		if (c->root == cgrp->root)
 			c = cgrp;
-		
+		//链结构好css_set, cgrp_cset_link,cgroup三者
 		link_css_set(&tmp_links, cset, c);
 	}
 
+    //必须是empty的
 	BUG_ON(!list_empty(&tmp_links));
 
 	css_set_count++;
@@ -1626,6 +1638,14 @@ struct cgroup *cgroup_kn_lock_live(struct kernfs_node *kn, bool drain_offline)
 	return NULL;
 }
 
+/*
+ * cgroup_rmdir()
+ *  cgroup_destroy_locked()
+ *  kill_css()
+ *    css_clear_dir()
+ *     cgroup_addrm_files(is_add=false)
+ *      cgroup_rm_file()
+ */
 static void cgroup_rm_file(struct cgroup *cgrp, const struct cftype *cft)
 {
 	char name[CGROUP_FILE_NAME_MAX];
@@ -1649,6 +1669,13 @@ static void cgroup_rm_file(struct cgroup *cgrp, const struct cftype *cft)
 /**
  * css_clear_dir - remove subsys files in a cgroup directory
  * @css: taget css
+ *
+ * cgroup_rmdir()
+ *  cgroup_destroy_locked()
+ *  kill_css()
+ *    css_clear_dir()
+ *
+ * 删除subsys目录中的文件
  */
 static void css_clear_dir(struct cgroup_subsys_state *css)
 {
@@ -2160,6 +2187,7 @@ static struct dentry *cgroup_mount(struct file_system_type *fs_type,
 			 int flags, const char *unused_dev_name,
 			 void *data)
 {
+    //得到当前的cgroup namespace
 	struct cgroup_namespace *ns = current->nsproxy->cgroup_ns;
 	struct dentry *dentry;
 	int ret;
@@ -2336,16 +2364,19 @@ static void cgroup_migrate_add_task(struct task_struct *task,
 	if (list_empty(&task->cg_list))
 		return;
 
+    //返回task->cgroups
 	cset = task_css_set(task);
 	if (!cset->mg_src_cgrp)
 		return;
 
 	mgctx->tset.nr_tasks++;
 
+    //加到css_set->mg_tasks，等待migrate
 	list_move_tail(&task->cg_list, &cset->mg_tasks);
 	if (list_empty(&cset->mg_node))
 		list_add_tail(&cset->mg_node,
 			      &mgctx->tset.src_csets);
+	
 	if (list_empty(&cset->mg_dst_cset->mg_node))
 		list_add_tail(&cset->mg_dst_cset->mg_node,
 			      &mgctx->tset.dst_csets);
@@ -2477,6 +2508,7 @@ static int cgroup_migrate_execute(struct cgroup_mgctx *mgctx)
 
 			get_css_set(to_cset);
 			to_cset->nr_tasks++;
+			//移动到目标css_set中去
 			css_set_move_task(task, from_cset, to_cset, true);
 			put_css_set_locked(from_cset);
 			from_cset->nr_tasks--;
@@ -2696,7 +2728,7 @@ int cgroup_migrate_prepare_dst(struct cgroup_mgctx *mgctx)
 		 * cgroup_migrate() will skip the cset too.  Note that we
 		 * can't handle src == dst as some nodes are used by both.
 		 */
-		if (src_cset == dst_cset) {
+		if (src_cset == dst_cset) { //自己移动到自己，搞个球
 			src_cset->mg_src_cgrp = NULL;
 			src_cset->mg_dst_cgrp = NULL;
 			list_del_init(&src_cset->mg_preload_node);
@@ -2705,6 +2737,7 @@ int cgroup_migrate_prepare_dst(struct cgroup_mgctx *mgctx)
 			continue;
 		}
 
+        //确定好dst css_set对象
 		src_cset->mg_dst_cset = dst_cset;
 
 		if (list_empty(&dst_cset->mg_preload_node))
@@ -2793,13 +2826,16 @@ int cgroup_migrate(struct task_struct *leader, bool threadgroup,
  *   cgroup_attach_task_all()
  *    cgroup_attach_task()
  *
- * cgroup_procs_write()
- *  cgroup_attach_task()
  *
  * cgroup_threads_write()
  *  cgroup_attach_task()
  *
  * __cgroup1_procs_write()
+ *
+ * 通过vfs走到kernfs_fop_write()
+ *  cgroup_file_write()
+ *   cgroup_procs_write()
+ *    cgroup_attach_task() 
  *
  * 将leader中所有的task_struct移动到dst_cgrp中去
  */
@@ -2821,7 +2857,7 @@ int cgroup_attach_task(struct cgroup *dst_cgrp, struct task_struct *leader,
 	task = leader;
 	
 	do {
-		//弄到mgctx中去
+		//将进程中的所有task_struct对象都弄到mgctx(mgctx->preloaded_src_csets)中去
 		cgroup_migrate_add_src(task_css_set(task), dst_cgrp, &mgctx);
 		if (!threadgroup)
 			break;
@@ -2831,8 +2867,9 @@ int cgroup_attach_task(struct cgroup *dst_cgrp, struct task_struct *leader,
 	spin_unlock_irq(&css_set_lock);
 
 	/* prepare dst csets and commit */
-	//这一步很重要
+	//这一步很重要,给每个task_struct确定dst css_set
 	ret = cgroup_migrate_prepare_dst(&mgctx);
+	
 	if (!ret)//走起了
 		ret = cgroup_migrate(leader, threadgroup, &mgctx);
 
@@ -3461,6 +3498,11 @@ static int cgroup_type_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
+/*
+ * 通过vfs走到kernfs_fop_write()
+ *  cgroup_file_write()
+ *   cgroup_type_write()
+ */
 static ssize_t cgroup_type_write(struct kernfs_open_file *of, char *buf,
 				 size_t nbytes, loff_t off)
 {
@@ -3663,7 +3705,7 @@ static ssize_t cgroup_file_write(struct kernfs_open_file *of, char *buf,
 	    ns != &init_cgroup_ns && ns->root_cset->dfl_cgrp == cgrp)
 		return -EPERM;
 
-	if (cft->write)
+	if (cft->write) //cgroup_proc_write
 		return cft->write(of, buf, nbytes, off);
 
 	/*
@@ -3829,6 +3871,12 @@ static int cgroup_add_file(struct cgroup_subsys_state *css, struct cgroup *cgrp,
  *  cgroup_init()
  *   css_populate_dir()
  *    cgroup_addrm_files()
+ *
+ * cgroup_rmdir()
+ *  cgroup_destroy_locked()
+ *  kill_css()
+ *    css_clear_dir()
+ *     cgroup_addrm_files(is_add=false)
  */
 static int cgroup_addrm_files(struct cgroup_subsys_state *css,
 			      struct cgroup *cgrp, struct cftype cfts[],
@@ -4635,6 +4683,11 @@ static int cgroup_procs_write_permission(struct cgroup *src_cgrp,
 	return 0;
 }
 
+/*
+ * 通过vfs走到kernfs_fop_write()
+ *  cgroup_file_write()
+ *   cgroup_procs_write()
+ */
 static ssize_t cgroup_procs_write(struct kernfs_open_file *of,
 				  char *buf, size_t nbytes, loff_t off)
 {
@@ -4646,6 +4699,7 @@ static ssize_t cgroup_procs_write(struct kernfs_open_file *of,
 	if (!dst_cgrp)
 		return -ENODEV;
 
+    //这一步得到task_struct,并且确定task_struct是可以cgroup migration的
 	task = cgroup_procs_write_start(buf, true);
 	ret = PTR_ERR_OR_ZERO(task);
 	if (ret)
@@ -4653,17 +4707,21 @@ static ssize_t cgroup_procs_write(struct kernfs_open_file *of,
 
 	/* find the source cgroup */
 	spin_lock_irq(&css_set_lock);
+	//得到src cgroups
 	src_cgrp = task_cgroup_from_root(task, &cgrp_dfl_root);
 	spin_unlock_irq(&css_set_lock);
 
+    //权限检查
 	ret = cgroup_procs_write_permission(src_cgrp, dst_cgrp,
 					    of->file->f_path.dentry->d_sb);
 	if (ret)
 		goto out_finish;
 
+    //将task attach到目标cgroup中去
 	ret = cgroup_attach_task(dst_cgrp, task, true);
 
 out_finish:
+	//调用各个sys system的post_attach()通知到sub system
 	cgroup_procs_write_finish(task);
 out_unlock:
 	cgroup_kn_unlock(of->kn);
@@ -5072,6 +5130,8 @@ err_free_css:
  *
  * cgroup_mkdir()
  *  cgroup_create()
+ *
+ * 创建cgroup对象
  */
 static struct cgroup *cgroup_create(struct cgroup *parent)
 {
@@ -5300,6 +5360,10 @@ static void css_killed_ref_fn(struct percpu_ref *ref)
  * files and putting its base reference.  ->css_offline() will be invoked
  * asynchronously once css_tryget_online() is guaranteed to fail and when
  * the reference count reaches zero, @css will be released.
+ *
+ * cgroup_rmdir()
+ *  cgroup_destroy_locked()
+ *   kill_css()
  */
 static void kill_css(struct cgroup_subsys_state *css)
 {
@@ -5308,6 +5372,7 @@ static void kill_css(struct cgroup_subsys_state *css)
 	if (css->flags & CSS_DYING)
 		return;
 
+    //标记上正在dying，要去见马克思了
 	css->flags |= CSS_DYING;
 
 	/*
@@ -5358,6 +5423,10 @@ static void kill_css(struct cgroup_subsys_state *css)
  * the userland is concerned and a new cgroup with the same name may be
  * created.  As cgroup doesn't care about the names internally, this
  * doesn't cause any problem.
+ *
+ * cgroup_rmdir()
+ *  cgroup_destroy_locked()
+ *
  */
 static int cgroup_destroy_locked(struct cgroup *cgrp)
 	__releases(&cgroup_mutex) __acquires(&cgroup_mutex)
@@ -5380,10 +5449,13 @@ static int cgroup_destroy_locked(struct cgroup *cgrp)
 	 * Make sure there's no live children.  We can't test emptiness of
 	 * ->self.children as dead children linger on it while being
 	 * drained; otherwise, "rmdir parent/child parent" may fail.
+	 *
+	 * 还有子cgroup，不能remove了
 	 */
 	if (css_has_online_children(&cgrp->self))
 		return -EBUSY;
 
+    //下面开始remove动作了
 	/*
 	 * Mark @cgrp and the associated csets dead.  The former prevents
 	 * further task migration and child creation by disabling
@@ -5398,6 +5470,7 @@ static int cgroup_destroy_locked(struct cgroup *cgrp)
 	spin_unlock_irq(&css_set_lock);
 
 	/* initiate massacre of all css's */
+	//和这个cgroup关联的cgroup_subsys_state
 	for_each_css(css, ssid, cgrp)
 		kill_css(css);
 
@@ -5405,6 +5478,7 @@ static int cgroup_destroy_locked(struct cgroup *cgrp)
 	css_clear_dir(&cgrp->self);
 	kernfs_remove(cgrp->kn);
 
+    //parent cgroup统计信息减一下
 	if (parent && cgroup_is_threaded(cgrp))
 		parent->nr_threaded_children--;
 

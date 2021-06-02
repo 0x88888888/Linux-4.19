@@ -2165,9 +2165,11 @@ static int link_path_walk(const char *name, struct nameidata *nd)
 
 	if (IS_ERR(name))
 		return PTR_ERR(name);
+	
 	while (*name=='/')
 		name++;
-	if (!*name)
+	
+	if (!*name)//所以如果只有"/"就直接返回了
 		return 0;
 
 	/* At this point we know we have a real path component. */
@@ -2280,6 +2282,7 @@ static const char *path_init(struct nameidata *nd, unsigned flags)
 		struct inode *inode = root->d_inode;
 		if (*s && unlikely(!d_can_lookup(root)))
 			return ERR_PTR(-ENOTDIR);
+		
 		nd->path = nd->root;
 		nd->inode = inode;
 		if (flags & LOOKUP_RCU) {
@@ -2408,6 +2411,7 @@ static int handle_lookup_down(struct nameidata *nd)
  */
 static int path_lookupat(struct nameidata *nd, unsigned flags, struct path *path)
 {
+    //初始化nameidata
 	const char *s = path_init(nd, flags);
 	int err;
 
@@ -2419,6 +2423,7 @@ static int path_lookupat(struct nameidata *nd, unsigned flags, struct path *path
 
 	while (!(err = link_path_walk(s, nd))
 		&& ((err = lookup_last(nd)) > 0)) {
+		
 		s = trailing_symlink(nd);
 	}
 	if (!err)
@@ -2427,6 +2432,8 @@ static int path_lookupat(struct nameidata *nd, unsigned flags, struct path *path
 	if (!err && nd->flags & LOOKUP_DIRECTORY)
 		if (!d_can_lookup(nd->path.dentry))
 			err = -ENOTDIR;
+
+	//解析成功，就从nameidata中获取path
 	if (!err) {
 		*path = nd->path;
 		nd->path.mnt = NULL;
@@ -2436,10 +2443,24 @@ static int path_lookupat(struct nameidata *nd, unsigned flags, struct path *path
 	return err;
 }
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      prepare_namespace()
+ *	     ksys_mount(dev_name=".", dir_name="/",type= NULL, flags=MS_MOVE,data= NULL)
+ *        do_mount(dev_name=".", dir_name="/",type_page=NULL, flags=MS_MOVE,data_page=NULL) 
+ *         user_path(name="/", path为未初始化的局部变量)
+ *          user_path_at_empty(dfd=AT_FDCWD, name="/", flags=LOOKUP_FOLLOW, path为未初始化的局部变量, empty=NULL)
+ *           filename_lookup(root=NULL)
+ */
 static int filename_lookup(int dfd, struct filename *name, unsigned flags,
 			   struct path *path, struct path *root)
 {
 	int retval;
+	//局部变量，nd中的数据不可测
 	struct nameidata nd;
 	if (IS_ERR(name))
 		return PTR_ERR(name);
@@ -2447,10 +2468,16 @@ static int filename_lookup(int dfd, struct filename *name, unsigned flags,
 		nd.root = *root;
 		flags |= LOOKUP_ROOT;
 	}
+
+	//设置name到nameidata
 	set_nameidata(&nd, dfd, name);
+
+	//用nameidata开始解析
 	retval = path_lookupat(&nd, flags | LOOKUP_RCU, path);
+	
 	if (unlikely(retval == -ECHILD))
 		retval = path_lookupat(&nd, flags, path);
+	
 	if (unlikely(retval == -ESTALE))
 		retval = path_lookupat(&nd, flags | LOOKUP_REVAL, path);
 
@@ -2705,6 +2732,18 @@ int path_pts(struct path *path)
 }
 #endif
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      prepare_namespace()
+ *	     ksys_mount(dev_name=".", dir_name="/",type= NULL, flags=MS_MOVE,data= NULL)
+ *        do_mount(dev_name=".", dir_name="/",type_page=NULL, flags=MS_MOVE,data_page=NULL) 
+ *         user_path(name="/", path为未初始化的局部变量)
+ *          user_path_at_empty(dfd=AT_FDCWD, name="/", flags=LOOKUP_FOLLOW, path为未初始化的局部变量, empty=NULL)
+ */
 int user_path_at_empty(int dfd, const char __user *name, unsigned flags,
 		 struct path *path, int *empty)
 {

@@ -1014,7 +1014,7 @@ struct task_struct {
 	struct css_set __rcu		*cgroups;
 	/* cg_list protected by css_set_lock and tsk->alloc_lock:
 	 *
-	 * cg_list将使用同一个css_set的进程链接在一起
+	 * cg_list将使用同一个css_set的task_struct链接在一起
 	 *
 	 * 从函数css_set_move_task()中可知
 	 * 链接到css_set->mg_tasks或者css_set->tasks

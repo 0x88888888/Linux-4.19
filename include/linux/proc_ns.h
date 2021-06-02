@@ -45,6 +45,7 @@ enum {
 	PROC_CGROUP_INIT_INO	= 0xEFFFFFFBU,
 };
 
+//有定义
 #ifdef CONFIG_PROC_FS
 
 extern int pid_ns_prepare_proc(struct pid_namespace *ns);
@@ -66,6 +67,7 @@ static inline void proc_free_inum(unsigned int inum) {}
 
 #endif /* CONFIG_PROC_FS */
 
+//分配inode number
 static inline int ns_alloc_inum(struct ns_common *ns)
 {
 	atomic_long_set(&ns->stashed, 0);

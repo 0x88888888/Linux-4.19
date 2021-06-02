@@ -6807,6 +6807,12 @@ static struct cftype memsw_cgroup_files[] = {
 	{ },	/* terminate */
 };
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    mem_cgroup_swap_init()
+ */
 static int __init mem_cgroup_swap_init(void)
 {
 	if (!mem_cgroup_disabled() && really_do_swap_account) {

@@ -498,8 +498,20 @@ void __init change_floppy(char *fmt, ...)
 }
 #endif
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      prepare_namespace()
+ *       initrd_load()
+ *        handle_initrd()
+ *         mount_root()
+ */
 void __init mount_root(void)
 {
+//没有定义
 #ifdef CONFIG_ROOT_NFS
 	if (ROOT_DEV == Root_NFS) {
 		if (mount_nfs_root())
@@ -509,6 +521,8 @@ void __init mount_root(void)
 		ROOT_DEV = Root_FD0;
 	}
 #endif
+
+//定义成CONFIG_BLK_DEV_FD=m
 #ifdef CONFIG_BLK_DEV_FD
 	if (MAJOR(ROOT_DEV) == FLOPPY_MAJOR) {
 		/* rd_doload is 2 for a dual initrd/ramload setup */
@@ -521,6 +535,8 @@ void __init mount_root(void)
 			change_floppy("root floppy");
 	}
 #endif
+
+//有定义
 #ifdef CONFIG_BLOCK
 	{
 		int err = create_dev("/dev/root", ROOT_DEV);
@@ -534,6 +550,14 @@ void __init mount_root(void)
 
 /*
  * Prepare the namespace - decide what/where to mount, load ramdisks, etc.
+ *
+ * 
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      prepare_namespace()
  */
 void __init prepare_namespace(void)
 {
@@ -568,6 +592,7 @@ void __init prepare_namespace(void)
 			root_device_name += 5;
 	}
 
+    //这个很重要了
 	if (initrd_load())
 		goto out;
 
@@ -589,6 +614,8 @@ void __init prepare_namespace(void)
 	mount_root();
 out:
 	devtmpfs_mount("dev");
+
+	//根文件系统?
 	ksys_mount(".", "/", NULL, MS_MOVE, NULL);
 	ksys_chroot(".");
 }

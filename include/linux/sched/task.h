@@ -23,6 +23,7 @@ extern rwlock_t tasklist_lock;
 extern spinlock_t mmlist_lock;
 
 extern union thread_union init_thread_union;
+//定义在init_task.c中
 extern struct task_struct init_task;
 
 #ifdef CONFIG_PROVE_RCU

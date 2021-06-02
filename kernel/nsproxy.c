@@ -36,7 +36,7 @@ struct nsproxy init_nsproxy = {
 #if defined(CONFIG_POSIX_MQUEUE) || defined(CONFIG_SYSVIPC)
 	.ipc_ns			= &init_ipc_ns,
 #endif
-	.mnt_ns			= NULL,
+	.mnt_ns			= NULL, //这个在init_mount_tree()中初始化
 	.pid_ns_for_children	= &init_pid_ns,
 #ifdef CONFIG_NET
 	.net_ns			= &init_net,
@@ -60,6 +60,14 @@ static inline struct nsproxy *create_nsproxy(void)
  * Create new nsproxy and all of its the associated namespaces.
  * Return the newly created nsproxy.  Do not attach this to the task,
  * leave it to the caller to do proper locking and attach it to task.
+ *
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
+ *    copy_namespaces()
+ *     create_new_namespaces()
+ *
+ * 复制命名空间
  */
 static struct nsproxy *create_new_namespaces(unsigned long flags,
 	struct task_struct *tsk, struct user_namespace *user_ns,
@@ -68,10 +76,12 @@ static struct nsproxy *create_new_namespaces(unsigned long flags,
 	struct nsproxy *new_nsp;
 	int err;
 
+    //创建nsproxy对象
 	new_nsp = create_nsproxy();
 	if (!new_nsp)
 		return ERR_PTR(-ENOMEM);
 
+    //mount namespace
 	new_nsp->mnt_ns = copy_mnt_ns(flags, tsk->nsproxy->mnt_ns, user_ns, new_fs);
 	if (IS_ERR(new_nsp->mnt_ns)) {
 		err = PTR_ERR(new_nsp->mnt_ns);
@@ -134,6 +144,11 @@ out_ns:
 /*
  * called from clone.  This now handles copy for nsproxy and all
  * namespaces therein.
+ *
+ * do_fork()
+ *  _do_fork()
+ *   copy_process()
+ *    copy_namespaces()
  */
 int copy_namespaces(unsigned long flags, struct task_struct *tsk)
 {
@@ -143,7 +158,7 @@ int copy_namespaces(unsigned long flags, struct task_struct *tsk)
 
 	if (likely(!(flags & (CLONE_NEWNS | CLONE_NEWUTS | CLONE_NEWIPC |
 			      CLONE_NEWPID | CLONE_NEWNET |
-			      CLONE_NEWCGROUP)))) {
+			      CLONE_NEWCGROUP)))) { //共享全部
 		get_nsproxy(old_ns);
 		return 0;
 	}

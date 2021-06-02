@@ -158,6 +158,17 @@ __setup("elevator=", elevator_setup);
  *     kernel_init_freeable()
  *      load_default_modules()
  *       load_default_elevator_module()
+ *
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      prepare_namespace()
+ *       initrd_load()
+ *        handle_initrd()
+ *         load_default_modules()
+ *          load_default_elevator_module()
  */
 void __init load_default_elevator_module(void)
 {

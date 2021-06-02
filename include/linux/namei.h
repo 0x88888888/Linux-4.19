@@ -57,6 +57,17 @@ static inline int user_path_at(int dfd, const char __user *name, unsigned flags,
 	return user_path_at_empty(dfd, name, flags, path, NULL);
 }
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      prepare_namespace()
+ *	     ksys_mount(dev_name=".", dir_name="/",type= NULL, flags=MS_MOVE,data= NULL)
+ *        do_mount(dev_name=".", dir_name="/",type_page=NULL, flags=MS_MOVE,data_page=NULL) 
+ *         user_path(name="/", path为未初始化的局部变量)
+ */  
 static inline int user_path(const char __user *name, struct path *path)
 {
 	return user_path_at_empty(AT_FDCWD, name, LOOKUP_FOLLOW, path, NULL);

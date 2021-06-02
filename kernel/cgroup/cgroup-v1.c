@@ -1230,7 +1230,7 @@ struct dentry *cgroup1_mount(struct file_system_type *fs_type, int flags,
 		goto out_unlock;
 	}
 
-	//分配一个cgroup_root对象出来
+	//分配一个cgroup_root(hierarchy)对象出来
 	root = kzalloc(sizeof(*root), GFP_KERNEL);
 	if (!root) {
 		ret = -ENOMEM;
@@ -1240,6 +1240,7 @@ struct dentry *cgroup1_mount(struct file_system_type *fs_type, int flags,
 
 	init_cgroup_root(root, &opts);
 
+    //创建cgroup hierarchy的根目录
 	ret = cgroup_setup_root(root, opts.subsys_mask, PERCPU_REF_INIT_DEAD);
 	if (ret)
 		cgroup_free_root(root);
@@ -1278,6 +1279,12 @@ out_free:
 	return dentry;
 }
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    cgroup1_wq_init()
+ */
 static int __init cgroup1_wq_init(void)
 {
 	/*

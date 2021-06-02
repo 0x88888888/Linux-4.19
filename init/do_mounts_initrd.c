@@ -24,6 +24,17 @@ static int __init no_initrd(char *str)
 
 __setup("noinitrd", no_initrd);
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      prepare_namespace()
+ *       initrd_load()
+ *        handle_initrd()
+ *         init_linuxrc()
+ */
 static int init_linuxrc(struct subprocess_info *info, struct cred *new)
 {
 	ksys_unshare(CLONE_FS | CLONE_FILES);
@@ -39,6 +50,16 @@ static int init_linuxrc(struct subprocess_info *info, struct cred *new)
 	return 0;
 }
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      prepare_namespace()
+ *       initrd_load()
+ *        handle_initrd()
+ */
 static void __init handle_initrd(void)
 {
 	struct subprocess_info *info;
@@ -62,10 +83,12 @@ static void __init handle_initrd(void)
 	 */
 	current->flags |= PF_FREEZER_SKIP;
 
+    //调用用户空间程序,1号进程,也就是用户空间的init进程
 	info = call_usermodehelper_setup("/linuxrc", argv, envp_init,
 					 GFP_KERNEL, init_linuxrc, NULL, NULL);
 	if (!info)
 		return;
+	//开始调用了
 	call_usermodehelper_exec(info, UMH_WAIT_PROC);
 
 	current->flags &= ~PF_FREEZER_SKIP;
@@ -82,6 +105,7 @@ static void __init handle_initrd(void)
 
 	ksys_chdir("/");
 	ROOT_DEV = new_decode_dev(real_root_dev);
+	
 	mount_root();
 
 	printk(KERN_NOTICE "Trying to move old root to /initrd ... ");
@@ -107,6 +131,15 @@ static void __init handle_initrd(void)
 	}
 }
 
+/*
+ * start_kernle() [init/main.c]
+ *  rest_init()
+ *   ......
+ *    kernel_init()
+ *     kernel_init_freeable()
+ *      prepare_namespace()
+ *       initrd_load()
+ */
 bool __init initrd_load(void)
 {
 	if (mount_initrd) {
@@ -119,6 +152,7 @@ bool __init initrd_load(void)
 		 */
 		if (rd_load_image("/initrd.image") && ROOT_DEV != Root_RAM0) {
 			ksys_unlink("/initrd.image");
+			
 			handle_initrd();
 			return true;
 		}

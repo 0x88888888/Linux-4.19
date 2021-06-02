@@ -134,7 +134,7 @@ struct cgroup_file {
  * Fields marked with "PI:" are public and immutable and may be accessed
  * directly without synchronization.
  *
- * cgroup_subsys_state是
+ * cgroup_subsys_state内嵌到一下对象的第一个成员
  * cpuset_cgrp_subsys -> struct cgroup_subsys_state{}
  * cpu_cgrp_subsys-> struct task_group{}
  * cpuacct_cgrp_subsys -> struct cgroup_subsys_state{}
@@ -219,6 +219,11 @@ struct cgroup_subsys_state {
  * task_struct->cgroups成员
  *
  * 所有的css_set对象都会添加到css_set_table中
+ *
+ * cgroup和css_set是一个多对多的关系，必须添加一个中间结构cgrp_cset_link来将两者联系起来。
+ * 结构体中cset_link连入到cgroup->cset_links指向的链表，
+ * cgrp_link连入到ccs_set->cgrp_links指向的链表，
+ * 使得不管从cgroup还是从css_set都可以进行遍历查询。 
  */
 struct css_set {
 	/*
@@ -258,6 +263,8 @@ struct css_set {
 	 * process of being migrated out or in.  Protected by
 	 * css_set_rwsem, but, during migration, once tasks are moved to
 	 * mg_tasks, it can be read safely while holding cgroup_mutex.
+	 *
+	 * 下面两个链接到task_struct->cg_list
 	 *
 	 * tasks是将所有引用此css_set的进程连接成链表
 	 */
@@ -377,6 +384,13 @@ struct cgroup_rstat_cpu {
 	struct cgroup *updated_next;		/* NULL iff not on the list */
 };
 
+/*
+ * cgroup和css_set是一个多对多的关系，必须添加一个中间结构cgrp_cset_link来将两者联系起来。
+ * 结构体中cset_link连入到cgroup->cset_links指向的链表，
+ * cgrp_link连入到ccs_set->cgrp_links指向的链表，
+ * 使得不管从cgroup还是从css_set都可以进行遍历查询。
+ *
+ */
 struct cgroup {
 	/* self css with NULL ->ss, points back to this cgroup */
 	struct cgroup_subsys_state self;
@@ -716,6 +730,8 @@ struct cftype {
  * pids_cgrp_subsys
  * rdma_cgrp_subsys
  * debug_cgrp_subsys 
+ *
+ * 这个类只有上面的这些静态对象，这些对象作为指针嵌入到cgroup_subsys_state中
  */
 struct cgroup_subsys {
 	struct cgroup_subsys_state *(*css_alloc)(struct cgroup_subsys_state *parent_css);
