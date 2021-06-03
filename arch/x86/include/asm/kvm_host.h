@@ -346,8 +346,14 @@ struct kvm_mmu {
 	void (*set_cr3)(struct kvm_vcpu *vcpu, unsigned long root);
 	unsigned long (*get_cr3)(struct kvm_vcpu *vcpu);
 	u64 (*get_pdptr)(struct kvm_vcpu *vcpu, int index);
+	/*
+	 * tdp_page_fault,nonpaging_page_fault,
+	 * paging64_page_fault, paging32_page_fault
+	 * ept_page_fault
+	 */
 	int (*page_fault)(struct kvm_vcpu *vcpu, gva_t gva, u32 err,
 			  bool prefault);
+	//kvm_inject_page_fault
 	void (*inject_page_fault)(struct kvm_vcpu *vcpu,
 				  struct x86_exception *fault);
 	gpa_t (*gva_to_gpa)(struct kvm_vcpu *vcpu, gva_t gva, u32 access,
@@ -940,7 +946,7 @@ struct kvm_lapic_irq {
 };
 
 /*
- * 在vmx.c中定义了struct kvm_x86_ops vmx_x86_ops对象
+ * 在vmx.c中定义了struct kvm_x86_ops vmx_x86_ops[在vmx.c中]对象
  */
 struct kvm_x86_ops {
 	int (*cpu_has_kvm_support)(void);          /* __init */

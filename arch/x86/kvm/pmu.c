@@ -45,6 +45,9 @@
  *        * Intel: [0 .. INTEL_PMC_MAX_GENERIC-1] <=> gp counters
  *                 [INTEL_PMC_IDX_FIXED .. INTEL_PMC_IDX_FIXED + 2] <=> fixed
  *        * AMD:   [0 .. AMD64_NUM_COUNTERS-1] <=> gp counters
+ *
+ * performace counter中断处理函数
+ *
  */
 
 static void kvm_pmi_trigger_fn(struct irq_work *irq_work)
@@ -299,6 +302,10 @@ int kvm_pmu_rdpmc(struct kvm_vcpu *vcpu, unsigned idx, u64 *data)
 	return 0;
 }
 
+/*
+ * kvm_pmi_trigger_fn()
+ *  kvm_pmu_deliver_pmi()
+ */
 void kvm_pmu_deliver_pmi(struct kvm_vcpu *vcpu)
 {
 	if (lapic_in_kernel(vcpu))
@@ -337,6 +344,16 @@ void kvm_pmu_reset(struct kvm_vcpu *vcpu)
 	kvm_x86_ops->pmu_ops->reset(vcpu);
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_create()
+ *     vmx_create_vcpu()
+ *      kvm_vcpu_init()
+ *       kvm_arch_vcpu_init()
+ *        kvm_pmu_init()
+ */
 void kvm_pmu_init(struct kvm_vcpu *vcpu)
 {
 	struct kvm_pmu *pmu = vcpu_to_pmu(vcpu);

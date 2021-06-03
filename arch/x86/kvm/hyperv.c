@@ -713,6 +713,16 @@ static void stimer_init(struct kvm_vcpu_hv_stimer *stimer, int timer_index)
 	stimer_prepare_msg(stimer);
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_create()
+ *     vmx_create_vcpu()
+ *      kvm_vcpu_init()
+ *       kvm_arch_vcpu_init()
+ *        kvm_hv_vcpu_init()
+ */
 void kvm_hv_vcpu_init(struct kvm_vcpu *vcpu)
 {
 	struct kvm_vcpu_hv *hv_vcpu = vcpu_to_hv_vcpu(vcpu);
@@ -1547,6 +1557,13 @@ int kvm_hv_hypercall(struct kvm_vcpu *vcpu)
 	return kvm_hv_hypercall_complete(vcpu, ret);
 }
 
+/*
+ * kvm_dev_ioctl()
+ *  kvm_dev_ioctl_create_vm()
+ *   kvm_create_vm()
+ *    kvm_arch_init_vm()
+ *     kvm_hv_init_vm()
+ */
 void kvm_hv_init_vm(struct kvm *kvm)
 {
 	mutex_init(&kvm->arch.hyperv.hv_lock);

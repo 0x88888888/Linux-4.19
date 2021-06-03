@@ -169,6 +169,13 @@ void kvm_page_track_cleanup(struct kvm *kvm)
 	cleanup_srcu_struct(&head->track_srcu);
 }
 
+/*
+ * kvm_dev_ioctl()
+ *  kvm_dev_ioctl_create_vm()
+ *   kvm_create_vm()
+ *    kvm_arch_init_vm()
+ *     kvm_page_track_init()
+ */
 void kvm_page_track_init(struct kvm *kvm)
 {
 	struct kvm_page_track_notifier_head *head;

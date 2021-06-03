@@ -156,11 +156,18 @@ bool kvm_is_reserved_pfn(kvm_pfn_t pfn)
 
 /*
  * Switches to specified vcpu, until a matching vcpu_put()
+ *
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_setup()
+ *     vcpu_load()
  */
 void vcpu_load(struct kvm_vcpu *vcpu)
 {
 	int cpu = get_cpu();
 	preempt_notifier_register(&vcpu->preempt_notifier);
+	
 	kvm_arch_vcpu_load(vcpu, cpu);
 	put_cpu();
 }
@@ -631,6 +638,11 @@ static int kvm_create_vm_debugfs(struct kvm *kvm, int fd)
 	return 0;
 }
 
+/*
+ * kvm_dev_ioctl()
+ *  kvm_dev_ioctl_create_vm()
+ *   kvm_create_vm()
+ */
 static struct kvm *kvm_create_vm(unsigned long type)
 {
 	int r, i;
@@ -2448,6 +2460,11 @@ static struct file_operations kvm_vcpu_fops = {
 
 /*
  * Allocates an inode for the vcpu.
+ *
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    create_vcpu_fd()
  */
 static int create_vcpu_fd(struct kvm_vcpu *vcpu)
 {
@@ -2457,6 +2474,12 @@ static int create_vcpu_fd(struct kvm_vcpu *vcpu)
 	return anon_inode_getfd(name, &kvm_vcpu_fops, vcpu, O_RDWR | O_CLOEXEC);
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_create_vcpu_debugfs()
+ */
 static int kvm_create_vcpu_debugfs(struct kvm_vcpu *vcpu)
 {
 	char dir_name[ITOA_MAX_LEN * 2];
@@ -2524,6 +2547,7 @@ static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
 		goto vcpu_destroy;
 
 	mutex_lock(&kvm->lock);
+	
 	if (kvm_get_vcpu_by_id(kvm, id)) {
 		r = -EEXIST;
 		goto unlock_vcpu_destroy;
@@ -2533,6 +2557,8 @@ static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
 
 	/* Now it's all set up, let userspace reach it */
 	kvm_get_kvm(kvm);
+
+	//将vcpu和匿名inode关联起来，返回fd
 	r = create_vcpu_fd(vcpu);
 	if (r < 0) {
 		kvm_put_kvm(kvm);
@@ -3045,6 +3071,7 @@ static long kvm_vm_ioctl(struct file *filp,
 		r = kvm_vm_ioctl_get_dirty_log(kvm, &log);
 		break;
 	}
+	//有定义
 #ifdef CONFIG_KVM_MMIO
 	case KVM_REGISTER_COALESCED_MMIO: {
 		struct kvm_coalesced_mmio_zone zone;
@@ -3118,6 +3145,8 @@ static long kvm_vm_ioctl(struct file *filp,
 		break;
 	}
 #endif
+
+//有定义
 #ifdef CONFIG_HAVE_KVM_IRQ_ROUTING
 	case KVM_SET_GSI_ROUTING: {
 		struct kvm_irq_routing routing;
@@ -3230,6 +3259,10 @@ static struct file_operations kvm_vm_fops = {
 	KVM_COMPAT(kvm_vm_compat_ioctl),
 };
 
+/*
+ * kvm_dev_ioctl()
+ *  kvm_dev_ioctl_create_vm()
+ */
 static int kvm_dev_ioctl_create_vm(unsigned long type)
 {
 	int r;
@@ -3244,6 +3277,7 @@ static int kvm_dev_ioctl_create_vm(unsigned long type)
 	if (r < 0)
 		goto put_kvm;
 #endif
+
 	r = get_unused_fd_flags(O_CLOEXEC);
 	if (r < 0)
 		goto put_kvm;
@@ -3309,7 +3343,7 @@ static long kvm_dev_ioctl(struct file *filp,
 	case KVM_TRACE_DISABLE:
 		r = -EOPNOTSUPP;
 		break;
-	default:
+	default: //这里有KVM_GETMSR_INDEX_LIST,KVM_GET_EMULATED_CPUID,KVM_X86_GET_MCE_CAP_SUPPORTED,KVM_GET_MSRS....
 		return kvm_arch_dev_ioctl(filp, ioctl, arg);
 	}
 out:
@@ -3322,12 +3356,17 @@ static struct file_operations kvm_chardev_ops = {
 	KVM_COMPAT(kvm_dev_ioctl),
 };
 
+// 设备 /dev/kvm
 static struct miscdevice kvm_dev = {
 	KVM_MINOR,
 	"kvm",
 	&kvm_chardev_ops,
 };
 
+/*
+ * kvm_starting_cpu()
+ *  hardware_enable_nolock()
+ */
 static void hardware_enable_nolock(void *junk)
 {
 	int cpu = raw_smp_processor_id();
@@ -3338,6 +3377,7 @@ static void hardware_enable_nolock(void *junk)
 
 	cpumask_set_cpu(cpu, cpus_hardware_enabled);
 
+	//设置vmxon
 	r = kvm_arch_hardware_enable();
 
 	if (r) {
@@ -3346,12 +3386,20 @@ static void hardware_enable_nolock(void *junk)
 		pr_info("kvm: enabling virtualization on CPU%d failed\n", cpu);
 	}
 }
-
+/*
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops) vmx_x86_ops定义在vmx.c文件中
+ *   cpuhp_setup_state_nocalls(CPUHP_AP_KVM_STARTING, "kvm/cpu:starting",
+ *							  startup=kvm_starting_cpu, teardownkvm_dying_cpu)
+ *    ......
+ *     kvm_starting_cpu()
+ */ 
 static int kvm_starting_cpu(unsigned int cpu)
 {
 	raw_spin_lock(&kvm_count_lock);
-	if (kvm_usage_count)
+	if (kvm_usage_count) //CR4.VMXE=ON, VMXON
 		hardware_enable_nolock(NULL);
+	
 	raw_spin_unlock(&kvm_count_lock);
 	return 0;
 }

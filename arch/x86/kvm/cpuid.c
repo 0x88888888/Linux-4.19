@@ -779,6 +779,11 @@ static bool sanity_check_entries(struct kvm_cpuid_entry2 __user *entries,
 	return false;
 }
 
+/*
+ * kvm_dev_ioctl()
+ *  kvm_arch_dev_ioctl()
+ *   kvm_dev_ioctl_get_cpuid()
+ */
 int kvm_dev_ioctl_get_cpuid(struct kvm_cpuid2 *cpuid,
 			    struct kvm_cpuid_entry2 __user *entries,
 			    unsigned int type)

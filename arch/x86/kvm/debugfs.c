@@ -41,6 +41,13 @@ static int vcpu_get_tsc_scaling_frac_bits(void *data, u64 *val)
 
 DEFINE_SIMPLE_ATTRIBUTE(vcpu_tsc_scaling_frac_fops, vcpu_get_tsc_scaling_frac_bits, NULL, "%llu\n");
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_create_vcpu_debugfs()
+ *     kvm_arch_create_vcpu_debugfs()
+ */
 int kvm_arch_create_vcpu_debugfs(struct kvm_vcpu *vcpu)
 {
 	struct dentry *ret;

@@ -442,6 +442,13 @@ int kvm_mtrr_get_msr(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata)
 	return 0;
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_setup()
+ *     kvm_vcpu_mtrr_init()
+ */
 void kvm_vcpu_mtrr_init(struct kvm_vcpu *vcpu)
 {
 	INIT_LIST_HEAD(&vcpu->arch.mtrr_state.head);

@@ -1383,6 +1383,7 @@ DEFINE_STATIC_KEY_FALSE(enable_evmcs);
 
 #define KVM_EVMCS_VERSION 1
 
+//有定义
 #if IS_ENABLED(CONFIG_HYPERV)
 static bool __read_mostly enlightened_vmcs = true;
 module_param(enlightened_vmcs, bool, 0444);
@@ -2174,6 +2175,7 @@ static void vmcs_load(struct vmcs *vmcs)
 		       vmcs, phys_addr);
 }
 
+//有定义
 #ifdef CONFIG_KEXEC_CORE
 /*
  * This bitmap is used to indicate whether the vmclear
@@ -3028,6 +3030,16 @@ static void vmx_write_guest_kernel_gs_base(struct vcpu_vmx *vmx, u64 data)
 }
 #endif
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_setup()
+ *     vcpu_load()
+ *      kvm_arch_vcpu_load()
+ *       vmx_vcpu_load()
+ *        vmx_vcpu_pi_load()
+ */
 static void vmx_vcpu_pi_load(struct kvm_vcpu *vcpu, int cpu)
 {
 	struct pi_desc *pi_desc = vcpu_to_pi_desc(vcpu);
@@ -3098,6 +3110,14 @@ static void decache_tsc_multiplier(struct vcpu_vmx *vmx)
  *     vmx_create_vcpu()
  *      vmx_vcpu_load()
  *
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_setup()
+ *     vcpu_load()
+ *      kvm_arch_vcpu_load()
+ *       vmx_vcpu_load()
+ *
  * 加载vcpu到cpu
  */
 static void vmx_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
@@ -3134,6 +3154,7 @@ static void vmx_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 		indirect_branch_prediction_barrier();
 	}
 
+    //vCPU首次load
 	if (!already_loaded) {
 		void *gdt = get_current_gdt_ro();
 		unsigned long sysenter_esp;
@@ -3169,6 +3190,7 @@ static void vmx_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 
 	vmx_vcpu_pi_load(vcpu, cpu);
 	vmx->host_pkru = read_pkru();
+	//读取MSR_IA32_DEBUGCTL
 	vmx->host_debugctlmsr = get_debugctlmsr();
 }
 
@@ -4456,6 +4478,13 @@ static __init int vmx_disabled_by_bios(void)
 	return 0;
 }
 
+/*
+ * kvm_starting_cpu()
+ *  hardware_enable_nolock()
+ *   kvm_arch_hardware_enable()
+ *    hardware_enable()
+ *     kvm_cpu_vmxon()
+ */
 static void kvm_cpu_vmxon(u64 addr)
 {
 	cr4_set_bits(X86_CR4_VMXE);
@@ -4466,6 +4495,12 @@ static void kvm_cpu_vmxon(u64 addr)
 			: "memory", "cc");
 }
 
+/*
+ * kvm_starting_cpu()
+ *  hardware_enable_nolock()
+ *   kvm_arch_hardware_enable()
+ *    hardware_enable()
+ */
 static int hardware_enable(void)
 {
 	int cpu = raw_smp_processor_id();
@@ -4509,8 +4544,9 @@ static int hardware_enable(void)
 		/* enable and lock */
 		wrmsrl(MSR_IA32_FEATURE_CONTROL, old | test_bits);
 	}
+	//设置CR4.VMXE,    VMXON
 	kvm_cpu_vmxon(phys_addr);
-	if (enable_ept)
+	if (enable_ept)//执行INVEPT
 		ept_sync_global();
 
 	return 0;
@@ -4571,6 +4607,13 @@ static __init bool allow_1_setting(u32 msr, u32 ctl)
 	return vmx_msr_high & ctl;
 }
 
+/*
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops) vmx_x86_ops定义在vmx.c文件中
+ *   kvm_arch_hardware_setup()
+ *    hardware_setup()
+ *     setup_vmcs_config()
+ */
 static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf)
 {
 	u32 vmx_msr_low, vmx_msr_high;
@@ -4776,6 +4819,14 @@ static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf)
 	return 0;
 }
 
+/*
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops) vmx_x86_ops定义在vmx.c文件中
+ *   kvm_arch_hardware_setup()
+ *    hardware_setup()
+ *     alloc_kvm_area()
+ *      alloc_vmcs_cpu()
+ */
 static struct vmcs *alloc_vmcs_cpu(bool shadow, int cpu)
 {
 	int node = cpu_to_node(cpu);
@@ -4796,6 +4847,7 @@ static struct vmcs *alloc_vmcs_cpu(bool shadow, int cpu)
 
 	if (shadow)
 		vmcs->hdr.shadow_vmcs = 1;
+	
 	return vmcs;
 }
 
@@ -4961,10 +5013,18 @@ static void init_vmcs_shadow_fields(void)
 	max_shadow_read_write_fields = j;
 }
 
+/*
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops) vmx_x86_ops定义在vmx.c文件中
+ *   kvm_arch_hardware_setup()
+ *    hardware_setup()
+ *     alloc_kvm_area()
+ */
 static __init int alloc_kvm_area(void)
 {
 	int cpu;
 
+    //给每个cpu分配一个vmcs
 	for_each_possible_cpu(cpu) {
 		struct vmcs *vmcs;
 
@@ -6187,6 +6247,16 @@ static void vmx_update_msr_bitmap(struct kvm_vcpu *vcpu)
 	vmx->msr_bitmap_mode = mode;
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_create()
+ *     vmx_create_vcpu()
+ *      kvm_vcpu_init()
+ *       kvm_arch_vcpu_init()
+ *        vmx_get_enable_apicv()
+ */
 static bool vmx_get_enable_apicv(struct kvm_vcpu *vcpu)
 {
 	return enable_apicv;
@@ -6630,6 +6700,14 @@ static void vmx_compute_secondary_exec_control(struct vcpu_vmx *vmx)
 	vmx->secondary_exec_control = exec_control;
 }
 
+/*
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops) vmx_x86_ops定义在vmx.c文件中
+ *   kvm_arch_hardware_setup()
+ *    hardware_setup()
+ *     vmx_enable_tdp()
+ *      ept_set_mmio_spte_mask()
+ */
 static void ept_set_mmio_spte_mask(void)
 {
 	/*
@@ -7248,8 +7326,10 @@ static int handle_triple_fault(struct kvm_vcpu *vcpu)
 }
 
 /*
- * vmx_handle_exit()
- *  handle_io()
+ * vcpu_run()
+ *  vcpu_enter_guest()
+ *   vmx_handle_exit()
+ *    handle_io()
  *
  * 处理out,in这种敏感指令
  */
@@ -7956,6 +8036,13 @@ static void wakeup_handler(void)
 	spin_unlock(&per_cpu(blocked_vcpu_on_cpu_lock, cpu));
 }
 
+/*
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops) vmx_x86_ops定义在vmx.c文件中
+ *   kvm_arch_hardware_setup()
+ *    hardware_setup()
+ *     vmx_enable_tdp()
+ */
 static void vmx_enable_tdp(void)
 {
 	kvm_mmu_set_mask_ptes(VMX_EPT_READABLE_MASK,
@@ -7985,7 +8072,7 @@ static __init int hardware_setup(void)
 	for (i = 0; i < ARRAY_SIZE(vmx_msr_index); ++i)
 		kvm_define_shared_msr(i, vmx_msr_index[i]);
 
-	for (i = 0; i < VMX_BITMAP_NR; i++) {
+	for (i = 0; i < VMX_BITMAP_NR/*2*/; i++) {
 		vmx_bitmap[i] = (unsigned long *)__get_free_page(GFP_KERNEL);
 		if (!vmx_bitmap[i])
 			goto out;
@@ -10261,8 +10348,8 @@ static int vmx_handle_exit(struct kvm_vcpu *vcpu)
 
 	if (exit_reason < kvm_vmx_max_exit_handlers
 	    && kvm_vmx_exit_handlers[exit_reason])
-		return kvm_vmx_exit_handlers[exit_reason](vcpu);
-	else {
+		return kvm_vmx_exit_handlers[exit_reason](vcpu); //跳入异常处理函数
+	else { //不在kvm掌控范围了。。。。。。
 		vcpu_unimpl(vcpu, "vmx: unexpected exit reason 0x%x\n",
 				exit_reason);
 		kvm_queue_exception(vcpu, UD_VECTOR);
@@ -11274,6 +11361,13 @@ free_vcpu:
 #define L1TF_MSG_SMT "L1TF CPU bug present and SMT on, data leak possible. See CVE-2018-3646 and https://www.kernel.org/doc/html/latest/admin-guide/l1tf.html for details.\n"
 #define L1TF_MSG_L1D "L1TF CPU bug present and virtualization mitigation disabled, data leak possible. See CVE-2018-3646 and https://www.kernel.org/doc/html/latest/admin-guide/l1tf.html for details.\n"
 
+/*
+ * kvm_dev_ioctl()
+ *  kvm_dev_ioctl_create_vm()
+ *   kvm_create_vm()
+ *    kvm_arch_init_vm()
+ *     vmx_vm_init()
+ */
 static int vmx_vm_init(struct kvm *kvm)
 {
 	spin_lock_init(&to_kvm_vmx(kvm)->ept_pointer_lock);
@@ -11533,6 +11627,7 @@ static int nested_ept_init_mmu_context(struct kvm_vcpu *vcpu)
 			VMX_EPT_EXECUTE_ONLY_BIT,
 			nested_ept_ad_enabled(vcpu),
 			nested_ept_get_cr3(vcpu));
+	
 	vcpu->arch.mmu.set_cr3           = vmx_set_cr3;
 	vcpu->arch.mmu.get_cr3           = nested_ept_get_cr3;
 	vcpu->arch.mmu.inject_page_fault = nested_ept_inject_page_fault;
@@ -14551,10 +14646,12 @@ static int __init vmx_init(void)
 		}
 	}
 
+//有定义
 #ifdef CONFIG_KEXEC_CORE
 	rcu_assign_pointer(crash_vmclear_loaded_vmcss,
 			   crash_vmclear_local_loaded_vmcss);
 #endif
+
 	vmx_check_vmcs12_offsets();
 
 	return 0;

@@ -2222,6 +2222,11 @@ int apic_has_pending_timer(struct kvm_vcpu *vcpu)
 	return 0;
 }
 
+/*
+ * kvm_pmi_trigger_fn()
+ *  kvm_pmu_deliver_pmi()
+ *   kvm_apic_local_deliver()
+ */
 int kvm_apic_local_deliver(struct kvm_lapic *apic, int lvt_type)
 {
 	u32 reg = kvm_lapic_get_reg(apic, lvt_type);
@@ -2265,6 +2270,18 @@ static enum hrtimer_restart apic_timer_fn(struct hrtimer *data)
 		return HRTIMER_NORESTART;
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_create()
+ *     vmx_create_vcpu()
+ *      kvm_vcpu_init()
+ *       kvm_arch_vcpu_init()
+ *        kvm_create_lapic()
+ *
+ * 分配kvm_lapic对象
+ */
 int kvm_create_lapic(struct kvm_vcpu *vcpu)
 {
 	struct kvm_lapic *apic;

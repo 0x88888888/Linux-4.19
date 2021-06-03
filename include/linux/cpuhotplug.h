@@ -233,6 +233,11 @@ static inline int cpuhp_setup_state_cpuslocked(enum cpuhp_state state,
  * start_kernel()  [init/main.c]
  *  radix_tree_init()
  *   cpuhp_setup_state_nocalls()
+ *
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops) vmx_x86_ops定义在vmx.c文件中
+ *   cpuhp_setup_state_nocalls(CPUHP_AP_KVM_STARTING, "kvm/cpu:starting",
+ *                             startup=kvm_starting_cpu, teardownkvm_dying_cpu)
  */
 static inline int cpuhp_setup_state_nocalls(enum cpuhp_state state,
 					    const char *name,

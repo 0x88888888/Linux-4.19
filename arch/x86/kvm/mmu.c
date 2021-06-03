@@ -4738,12 +4738,22 @@ kvm_calc_tdp_mmu_root_page_role(struct kvm_vcpu *vcpu)
 	return role;
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_setup()
+ *     kvm_mmu_setup()
+ *      kvm_init_mmu(reset_roots==false)
+ *       init_kvm_tdp_mmu()
+ */
 static void init_kvm_tdp_mmu(struct kvm_vcpu *vcpu)
 {
 	struct kvm_mmu *context = &vcpu->arch.mmu;
 
 	context->base_role.word = mmu_base_role_mask.word &
 				  kvm_calc_tdp_mmu_root_page_role(vcpu).word;
+	
 	context->page_fault = tdp_page_fault;
 	context->sync_page = nonpaging_sync_page;
 	context->invlpg = nonpaging_invlpg;
@@ -4925,6 +4935,14 @@ static void init_kvm_nested_mmu(struct kvm_vcpu *vcpu)
 	update_last_nonleaf_level(vcpu, g_context);
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_setup()
+ *     kvm_mmu_setup()
+ *      kvm_init_mmu(reset_roots==false)
+ */
 void kvm_init_mmu(struct kvm_vcpu *vcpu, bool reset_roots)
 {
 	if (reset_roots) {
@@ -4938,7 +4956,7 @@ void kvm_init_mmu(struct kvm_vcpu *vcpu, bool reset_roots)
 
 	if (mmu_is_nested(vcpu))
 		init_kvm_nested_mmu(vcpu);
-	else if (tdp_enabled)
+	else if (tdp_enabled)//通常是这里
 		init_kvm_tdp_mmu(vcpu);
 	else
 		init_kvm_softmmu(vcpu);
@@ -5372,6 +5390,14 @@ void kvm_mmu_invpcid_gva(struct kvm_vcpu *vcpu, gva_t gva, unsigned long pcid)
 }
 EXPORT_SYMBOL_GPL(kvm_mmu_invpcid_gva);
 
+/*
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops) vmx_x86_ops定义在vmx.c文件中
+ *   kvm_arch_hardware_setup()
+ *    hardware_setup()
+ *     vmx_enable_tdp()
+ *      kvm_enable_tdp(s)
+ */
 void kvm_enable_tdp(void)
 {
 	tdp_enabled = true;
@@ -5390,12 +5416,23 @@ static void free_mmu_pages(struct kvm_vcpu *vcpu)
 	free_page((unsigned long)vcpu->arch.mmu.lm_root);
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_create()
+ *     vmx_create_vcpu()
+ *      kvm_vcpu_init()
+ *       kvm_arch_vcpu_init()
+ *        kvm_mmu_create()
+ *         alloc_mmu_pages()
+ */
 static int alloc_mmu_pages(struct kvm_vcpu *vcpu)
 {
 	struct page *page;
 	int i;
 
-	if (tdp_enabled)
+	if (tdp_enabled)//ept必须启动
 		return 0;
 
 	/*
@@ -5414,6 +5451,16 @@ static int alloc_mmu_pages(struct kvm_vcpu *vcpu)
 	return 0;
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_create()
+ *     vmx_create_vcpu()
+ *      kvm_vcpu_init()
+ *       kvm_arch_vcpu_init()
+ *        kvm_mmu_create()
+ */
 int kvm_mmu_create(struct kvm_vcpu *vcpu)
 {
 	uint i;
@@ -5429,6 +5476,13 @@ int kvm_mmu_create(struct kvm_vcpu *vcpu)
 	return alloc_mmu_pages(vcpu);
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_setup()
+ *     kvm_mmu_setup()
+ */
 void kvm_mmu_setup(struct kvm_vcpu *vcpu)
 {
 	MMU_WARN_ON(VALID_PAGE(vcpu->arch.mmu.root_hpa));
@@ -5448,6 +5502,13 @@ static void kvm_mmu_invalidate_zap_pages_in_memslot(struct kvm *kvm,
 	kvm_mmu_invalidate_zap_all_pages(kvm);
 }
 
+/*
+ * kvm_dev_ioctl()
+ *	kvm_dev_ioctl_create_vm()
+ *	 kvm_create_vm()
+ *	  kvm_arch_init_vm()
+ *     kvm_mmu_init_vm()
+ */
 void kvm_mmu_init_vm(struct kvm *kvm)
 {
 	struct kvm_page_track_notifier_node *node = &kvm->arch.mmu_sp_tracker;

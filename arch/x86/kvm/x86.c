@@ -400,6 +400,13 @@ static int exception_type(int vector)
 	return EXCPT_FAULT;
 }
 
+/*
+ * vcpu_run()
+ *  vcpu_enter_guest()
+ *   vmx_handle_exit()
+ *    kvm_queue_exception()
+ *     kvm_multiple_exception(nr=UD_VECTOR,false, 0, false)
+ */
 static void kvm_multiple_exception(struct kvm_vcpu *vcpu,
 		unsigned nr, bool has_error, u32 error_code,
 		bool reinject)
@@ -462,6 +469,12 @@ static void kvm_multiple_exception(struct kvm_vcpu *vcpu,
 		goto queue;
 }
 
+/*
+ * vcpu_run()
+ *  vcpu_enter_guest()
+ *   vmx_handle_exit()
+ *    kvm_queue_exception(nr=UD_VECTOR)
+ */
 void kvm_queue_exception(struct kvm_vcpu *vcpu, unsigned nr)
 {
 	kvm_multiple_exception(vcpu, nr, false, 0, false);
@@ -494,6 +507,7 @@ void kvm_inject_page_fault(struct kvm_vcpu *vcpu, struct x86_exception *fault)
 		vcpu->arch.apf.nested_apf_token = fault->address;
 	else
 		vcpu->arch.cr2 = fault->address;
+	
 	kvm_queue_exception_e(vcpu, PF_VECTOR, fault->error_code);
 }
 EXPORT_SYMBOL_GPL(kvm_inject_page_fault);
@@ -502,7 +516,7 @@ static bool kvm_propagate_fault(struct kvm_vcpu *vcpu, struct x86_exception *fau
 {
 	if (mmu_is_nested(vcpu) && !fault->nested_page_fault)
 		vcpu->arch.nested_mmu.inject_page_fault(vcpu, fault);
-	else
+	else//kvm_inject_page_fault
 		vcpu->arch.mmu.inject_page_fault(vcpu, fault);
 
 	return fault->nested_page_fault;
@@ -1455,6 +1469,16 @@ static int set_tsc_khz(struct kvm_vcpu *vcpu, u32 user_tsc_khz, bool scale)
 	return 0;
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_create()
+ *     vmx_create_vcpu()
+ *      kvm_vcpu_init()
+ *       kvm_arch_vcpu_init()
+ *        kvm_set_tsc_khz()
+ */
 static int kvm_set_tsc_khz(struct kvm_vcpu *vcpu, u32 user_tsc_khz)
 {
 	u32 thresh_lo, thresh_hi;
@@ -2992,6 +3016,10 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 
 }
 
+/*
+ * kvm_dev_ioctl()
+ *  kvm_arch_dev_ioctl()
+ */
 long kvm_arch_dev_ioctl(struct file *filp,
 			unsigned int ioctl, unsigned long arg)
 {
@@ -3095,6 +3123,14 @@ static bool need_emulate_wbinvd(struct kvm_vcpu *vcpu)
 	return kvm_arch_has_noncoherent_dma(vcpu->kvm);
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_setup()
+ *     vcpu_load()
+ *      kvm_arch_vcpu_load()
+ */
 void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 {
 	/* Address WBINVD may be executed by guest */
@@ -3106,6 +3142,7 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 					wbinvd_ipi, NULL, 1);
 	}
 
+    //vmx_vcpu_load
 	kvm_x86_ops->vcpu_load(vcpu, cpu);
 
 	/* Apply any externally detected TSC adjustments (due to suspend) */
@@ -5855,7 +5892,7 @@ static void toggle_interruptibility(struct kvm_vcpu *vcpu, u32 mask)
 static bool inject_emulated_exception(struct kvm_vcpu *vcpu)
 {
 	struct x86_emulate_ctxt *ctxt = &vcpu->arch.emulate_ctxt;
-	if (ctxt->exception.vector == PF_VECTOR)
+	if (ctxt->exception.vector == PF_VECTOR)//page fault了
 		return kvm_propagate_fault(vcpu, &ctxt->exception);
 
 	if (ctxt->exception.error_code_valid)
@@ -6801,6 +6838,7 @@ int kvm_arch_init(void *opaque)
 	}
 
 	r = -ENOMEM;
+	
 	shared_msrs = alloc_percpu(struct kvm_shared_msrs);
 	if (!shared_msrs) {
 		printk(KERN_ERR "kvm: failed to allocate percpu kvm_shared_msrs\n");
@@ -8646,16 +8684,29 @@ struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm,
 	return vcpu;
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_setup()
+ */
 int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
 {
 	kvm_vcpu_mtrr_init(vcpu);
 	vcpu_load(vcpu);
 	kvm_vcpu_reset(vcpu, false);
+	
 	kvm_mmu_setup(vcpu);
 	vcpu_put(vcpu);
 	return 0;
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_postcreate()
+ */
 void kvm_arch_vcpu_postcreate(struct kvm_vcpu *vcpu)
 {
 	struct msr_data msr;
@@ -8665,6 +8716,7 @@ void kvm_arch_vcpu_postcreate(struct kvm_vcpu *vcpu)
 
 	if (mutex_lock_killable(&vcpu->mutex))
 		return;
+	
 	vcpu_load(vcpu);
 	msr.data = 0x0;
 	msr.index = MSR_IA32_TSC;
@@ -8776,6 +8828,11 @@ void kvm_vcpu_deliver_sipi_vector(struct kvm_vcpu *vcpu, u8 vector)
 	kvm_rip_write(vcpu, 0);
 }
 
+/*
+ * kvm_starting_cpu()
+ *  hardware_enable_nolock()
+ *   kvm_arch_hardware_enable()
+ */
 int kvm_arch_hardware_enable(void)
 {
 	struct kvm *kvm;
@@ -8787,6 +8844,7 @@ int kvm_arch_hardware_enable(void)
 	bool stable, backwards_tsc = false;
 
 	kvm_shared_msr_cpu_online();
+	//hardware_enable
 	ret = kvm_x86_ops->hardware_enable();
 	if (ret != 0)
 		return ret;
@@ -8949,8 +9007,10 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
 	struct page *page;
 	int r;
 
+    //vmx_get_enable_apicv
 	vcpu->arch.apicv_active = kvm_x86_ops->get_enable_apicv(vcpu);
 	vcpu->arch.emulate_ctxt.ops = &emulate_ops;
+	
 	if (!irqchip_in_kernel(vcpu->kvm) || kvm_vcpu_is_reset_bsp(vcpu))
 		vcpu->arch.mp_state = KVM_MP_STATE_RUNNABLE;
 	else
@@ -8965,11 +9025,13 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
 
 	kvm_set_tsc_khz(vcpu, max_tsc_khz);
 
+    //分配kvm_vcpu->arch.mmu
 	r = kvm_mmu_create(vcpu);
 	if (r < 0)
 		goto fail_free_pio_data;
 
 	if (irqchip_in_kernel(vcpu->kvm)) {
+		//分配kvm_vcpu->arch.apic 
 		r = kvm_create_lapic(vcpu);
 		if (r < 0)
 			goto fail_mmu_destroy;
@@ -9050,6 +9112,12 @@ void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu)
 	kvm_x86_ops->sched_in(vcpu, cpu);
 }
 
+/*
+ * kvm_dev_ioctl()
+ *  kvm_dev_ioctl_create_vm()
+ *   kvm_create_vm()
+ *    kvm_arch_init_vm()
+ */
 int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 {
 	if (type)
@@ -9083,7 +9151,7 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 	kvm_page_track_init(kvm);
 	kvm_mmu_init_vm(kvm);
 
-	if (kvm_x86_ops->vm_init)
+	if (kvm_x86_ops->vm_init) //vmx_vm_init
 		return kvm_x86_ops->vm_init(kvm);
 
 	return 0;
