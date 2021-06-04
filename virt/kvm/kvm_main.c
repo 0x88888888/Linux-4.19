@@ -14,6 +14,10 @@
  * This work is licensed under the terms of the GNU GPL, version 2.  See
  * the COPYING file in the top-level directory.
  *
+ * kvm_dev_ioctl  控制VMM的 /dev/kvm 设备
+ * kvm_vcpu_compat_ioctl  控制创建出来的vcpu
+ * kvm_vm_compat_ioctl 控制创建出来的vm 
+ *
  */
 
 #include <kvm/iodev.h>
@@ -642,6 +646,8 @@ static int kvm_create_vm_debugfs(struct kvm *kvm, int fd)
  * kvm_dev_ioctl()
  *  kvm_dev_ioctl_create_vm()
  *   kvm_create_vm()
+ *
+ * 创建vm
  */
 static struct kvm *kvm_create_vm(unsigned long type)
 {
@@ -825,6 +831,13 @@ static int kvm_create_dirty_bitmap(struct kvm_memory_slot *memslot)
  * so binary search could be used to lookup GFN.
  * Sorting algorithm takes advantage of having initially
  * sorted array and known changed memslot position.
+ *
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_set_memory_region()
+ *    kvm_set_memory_region()
+ *     __kvm_set_memory_region()
+ *      update_memslots()
  */
 static void update_memslots(struct kvm_memslots *slots,
 			    struct kvm_memory_slot *new)
@@ -889,6 +902,14 @@ static int check_memory_region_flags(const struct kvm_userspace_memory_region *m
 	return 0;
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_set_memory_region()
+ *    kvm_set_memory_region()
+ *     __kvm_set_memory_region()
+ *      install_new_memslots()
+ */
 static struct kvm_memslots *install_new_memslots(struct kvm *kvm,
 		int as_id, struct kvm_memslots *slots)
 {
@@ -953,14 +974,17 @@ int __kvm_set_memory_region(struct kvm *kvm,
 		goto out;
 
 	r = -EINVAL;
+	
 	as_id = mem->slot >> 16;
 	id = (u16)mem->slot;
 
 	/* General sanity checks */
-	if (mem->memory_size & (PAGE_SIZE - 1))
+	if (mem->memory_size & (PAGE_SIZE - 1)) //低12字节必须为0，也就是必须4k对齐
 		goto out;
-	if (mem->guest_phys_addr & (PAGE_SIZE - 1))
+	
+	if (mem->guest_phys_addr & (PAGE_SIZE - 1)) //和上面一个意思
 		goto out;
+	
 	/* We can read the guest memory with __xxx_user() later on. */
 	if ((id < KVM_USER_MEM_SLOTS) &&
 	    ((mem->userspace_addr & (PAGE_SIZE - 1)) ||
@@ -968,11 +992,15 @@ int __kvm_set_memory_region(struct kvm *kvm,
 			(void __user *)(unsigned long)mem->userspace_addr,
 			mem->memory_size)))
 		goto out;
+	
 	if (as_id >= KVM_ADDRESS_SPACE_NUM || id >= KVM_MEM_SLOTS_NUM)
 		goto out;
+
+	// mem->memory_size不能大过头，溢出了
 	if (mem->guest_phys_addr + mem->memory_size < mem->guest_phys_addr)
 		goto out;
 
+    //从kvm->memslots[]中得到相应的slot
 	slot = id_to_memslot(__kvm_memslots(kvm, as_id), id);
 	base_gfn = mem->guest_phys_addr >> PAGE_SHIFT;
 	npages = mem->memory_size >> PAGE_SHIFT;
@@ -987,10 +1015,10 @@ int __kvm_set_memory_region(struct kvm *kvm,
 	new.npages = npages;
 	new.flags = mem->flags;
 
-	if (npages) {
-		if (!old.npages)
+	if (npages) { //是新建或者修改了
+ 		if (!old.npages) //新建
 			change = KVM_MR_CREATE;
-		else { /* Modify an existing slot. */
+		else { /*修改, Modify an existing slot. */
 			if ((mem->userspace_addr != old.userspace_addr) ||
 			    (npages != old.npages) ||
 			    ((new.flags ^ old.flags) & KVM_MEM_READONLY))
@@ -1005,7 +1033,7 @@ int __kvm_set_memory_region(struct kvm *kvm,
 				goto out;
 			}
 		}
-	} else {
+	} else { //是删除
 		if (!old.npages)
 			goto out;
 
@@ -1015,7 +1043,9 @@ int __kvm_set_memory_region(struct kvm *kvm,
 	}
 
 	if ((change == KVM_MR_CREATE) || (change == KVM_MR_MOVE)) {
-		/* Check for overlaps */
+		/* Check for overlaps 
+		 * 下面的循环检查是否有overlap
+	     */
 		r = -EEXIST;
 		kvm_for_each_memslot(slot, __kvm_memslots(kvm, as_id)) {
 			if (slot->id == id)
@@ -1031,7 +1061,7 @@ int __kvm_set_memory_region(struct kvm *kvm,
 		new.dirty_bitmap = NULL;
 
 	r = -ENOMEM;
-	if (change == KVM_MR_CREATE) {
+	if (change == KVM_MR_CREATE) { //新建，需要相应的slots
 		new.userspace_addr = mem->userspace_addr;
 
 		if (kvm_arch_create_memslot(kvm, &new, npages))
@@ -1047,6 +1077,7 @@ int __kvm_set_memory_region(struct kvm *kvm,
 	slots = kvzalloc(sizeof(struct kvm_memslots), GFP_KERNEL);
 	if (!slots)
 		goto out_free;
+	
 	memcpy(slots, __kvm_memslots(kvm, as_id), sizeof(struct kvm_memslots));
 
 	if ((change == KVM_MR_DELETE) || (change == KVM_MR_MOVE)) {
@@ -1072,6 +1103,7 @@ int __kvm_set_memory_region(struct kvm *kvm,
 		slots = old_memslots;
 	}
 
+    //x86中为空函数
 	r = kvm_arch_prepare_memory_region(kvm, &new, mem, change);
 	if (r)
 		goto out_slots;
@@ -1082,11 +1114,15 @@ int __kvm_set_memory_region(struct kvm *kvm,
 		memset(&new.arch, 0, sizeof(new.arch));
 	}
 
+    //将new插入到slots，并且排序
 	update_memslots(slots, &new);
+
+	//将slots放入到kvm->slots[as_id]
 	old_memslots = install_new_memslots(kvm, as_id, slots);
 
 	kvm_arch_commit_memory_region(kvm, mem, &old, &new, change);
 
+    //释放掉old的东西
 	kvm_free_memslot(kvm, &old, &new);
 	kvfree(old_memslots);
 	return 0;
@@ -1122,6 +1158,7 @@ EXPORT_SYMBOL_GPL(kvm_set_memory_region);
  * kvm_vm_compat_ioctl()
  *  kvm_vm_ioctl()
  *   kvm_vm_ioctl_set_memory_region()
+ * 创建内存
  */
 static int kvm_vm_ioctl_set_memory_region(struct kvm *kvm,
 					  struct kvm_userspace_memory_region *mem)
@@ -1146,7 +1183,9 @@ int kvm_get_dirty_log(struct kvm *kvm,
 	if (as_id >= KVM_ADDRESS_SPACE_NUM || id >= KVM_USER_MEM_SLOTS)
 		return -EINVAL;
 
+    //得到kvm->memslots[as_id]
 	slots = __kvm_memslots(kvm, as_id);
+	//从slots得到相应的slot
 	memslot = id_to_memslot(slots, id);
 	if (!memslot->dirty_bitmap)
 		return -ENOENT;
@@ -2522,7 +2561,8 @@ static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
 		return -EINVAL;
 
 	mutex_lock(&kvm->lock);
-	if (kvm->created_vcpus == KVM_MAX_VCPUS) {
+	
+	if (kvm->created_vcpus == KVM_MAX_VCPUS) {//每个vm可以拥有的vcpu不能超额
 		mutex_unlock(&kvm->lock);
 		return -EINVAL;
 	}
@@ -2565,6 +2605,7 @@ static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
 		goto unlock_vcpu_destroy;
 	}
 
+    //将vCPU放到VM中来
 	kvm->vcpus[atomic_read(&kvm->online_vcpus)] = vcpu;
 
 	/*
@@ -2814,6 +2855,7 @@ out:
 	return r;
 }
 
+//有定义
 #ifdef CONFIG_KVM_COMPAT
 static long kvm_vcpu_compat_ioctl(struct file *filp,
 				  unsigned int ioctl, unsigned long arg)
@@ -2915,13 +2957,23 @@ struct kvm_device *kvm_device_from_filp(struct file *filp)
 	return filp->private_data;
 }
 
+/*
+ * 似乎只有kvm_device_ops_table[KVM_DEV_TYPE_VFIO] == kvm_vfio_ops
+ */
 static struct kvm_device_ops *kvm_device_ops_table[KVM_DEV_TYPE_MAX] = {
+//没有定义啊
 #ifdef CONFIG_KVM_MPIC
 	[KVM_DEV_TYPE_FSL_MPIC_20]	= &kvm_mpic_ops,
 	[KVM_DEV_TYPE_FSL_MPIC_42]	= &kvm_mpic_ops,
 #endif
 };
 
+/*
+ * vmx_init()
+ *  kvm_init(opaque==&vmx_x86_ops)
+ *   kvm_vfio_ops_init()
+ *    kvm_register_device_ops(ops=kvm_vfio_ops, KVM_DEV_TYPE_VFIO)
+ */
 int kvm_register_device_ops(struct kvm_device_ops *ops, u32 type)
 {
 	if (type >= ARRAY_SIZE(kvm_device_ops_table))
@@ -2944,6 +2996,8 @@ void kvm_unregister_device_ops(u32 type)
  * kvm_vm_compat_ioctl()
  *  kvm_vm_ioctl()
  *   kvm_ioctl_create_device()
+ *
+ * 创建设备
  */
 static int kvm_ioctl_create_device(struct kvm *kvm,
 				   struct kvm_create_device *cd)
@@ -2956,6 +3010,7 @@ static int kvm_ioctl_create_device(struct kvm *kvm,
 	if (cd->type >= ARRAY_SIZE(kvm_device_ops_table))
 		return -ENODEV;
 
+    // 
 	ops = kvm_device_ops_table[cd->type];
 	if (ops == NULL)
 		return -ENODEV;
@@ -2971,6 +3026,7 @@ static int kvm_ioctl_create_device(struct kvm *kvm,
 	dev->kvm = kvm;
 
 	mutex_lock(&kvm->lock);
+	// kvm_vfio_create
 	ret = ops->create(dev, cd->type);
 	if (ret < 0) {
 		mutex_unlock(&kvm->lock);
@@ -3101,7 +3157,7 @@ static long kvm_vm_ioctl(struct file *filp,
 		r = kvm_irqfd(kvm, &data);
 		break;
 	}
-	case KVM_IOEVENTFD: {
+	case KVM_IOEVENTFD: {//事件fd操作
 		struct kvm_ioeventfd data;
 
 		r = -EFAULT;
@@ -3110,6 +3166,7 @@ static long kvm_vm_ioctl(struct file *filp,
 		r = kvm_ioeventfd(kvm, &data);
 		break;
 	}
+	//有定义
 #ifdef CONFIG_HAVE_KVM_MSI
 	case KVM_SIGNAL_MSI: {
 		struct kvm_msi msi;
@@ -3183,7 +3240,7 @@ out_free_irq_routing:
 		break;
 	}
 #endif /* CONFIG_HAVE_KVM_IRQ_ROUTING */
-	case KVM_CREATE_DEVICE: {
+	case KVM_CREATE_DEVICE: {//创建设备
 		struct kvm_create_device cd;
 
 		r = -EFAULT;
@@ -3262,16 +3319,21 @@ static struct file_operations kvm_vm_fops = {
 /*
  * kvm_dev_ioctl()
  *  kvm_dev_ioctl_create_vm()
+ *
+ * 创建vm
  */
 static int kvm_dev_ioctl_create_vm(unsigned long type)
 {
 	int r;
+	//kvm表示一个虚拟机对象
 	struct kvm *kvm;
 	struct file *file;
 
+    //创建VM
 	kvm = kvm_create_vm(type);
 	if (IS_ERR(kvm))
 		return PTR_ERR(kvm);
+//有定义	
 #ifdef CONFIG_KVM_MMIO
 	r = kvm_coalesced_mmio_init(kvm);
 	if (r < 0)
@@ -3321,7 +3383,7 @@ static long kvm_dev_ioctl(struct file *filp,
 			goto out;
 		r = KVM_API_VERSION;
 		break;
-	case KVM_CREATE_VM:
+	case KVM_CREATE_VM://创建一个kvm对象
 		r = kvm_dev_ioctl_create_vm(arg);
 		break;
 	case KVM_CHECK_EXTENSION:
@@ -4131,6 +4193,7 @@ int kvm_init(void *opaque, unsigned vcpu_size, unsigned vcpu_align,
 		goto out_free_0;
 	}
 
+    //打开vmx功能
 	r = kvm_arch_hardware_setup();
 	if (r < 0)
 		goto out_free_0a;

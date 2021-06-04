@@ -55,6 +55,8 @@
  * 1. the guest-virtual to guest-physical
  * 2. while doing 1. it walks guest-physical to host-physical
  * If the hardware supports that we don't need to do shadow paging.
+ *
+ * 启动ept
  */
 bool tdp_enabled = false;
 
@@ -2703,6 +2705,14 @@ static bool prepare_zap_oldest_mmu_page(struct kvm *kvm,
 /*
  * Changing the number of mmu pages allocated to the vm
  * Note: if goal_nr_mmu_pages is too small, you will get dead lock
+ *
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_set_memory_region()
+ *    kvm_set_memory_region()
+ * 	   __kvm_set_memory_region()
+ *      kvm_arch_commit_memory_region()
+ *       kvm_mmu_change_mmu_pages()
  */
 void kvm_mmu_change_mmu_pages(struct kvm *kvm, unsigned int goal_nr_mmu_pages)
 {
@@ -3845,6 +3855,14 @@ exit:
 	return reserved;
 }
 
+/*
+ * vcpu_run()
+ *  vcpu_enter_guest()
+ *   vmx_handle_exit()
+ *    handle_ept_violation()
+ *     kvm_mmu_page_fault()
+ *      handle_mmio_page_fault()
+ */
 static int handle_mmio_page_fault(struct kvm_vcpu *vcpu, u64 addr, bool direct)
 {
 	u64 spte;
@@ -3997,6 +4015,11 @@ static bool try_async_pf(struct kvm_vcpu *vcpu, bool prefault, gfn_t gfn,
 	return false;
 }
 
+/*
+ * vmx_handle_exit()
+ *  handle_exception()
+ *   kvm_handle_page_fault()
+ */
 int kvm_handle_page_fault(struct kvm_vcpu *vcpu, u64 error_code,
 				u64 fault_address, char *insn, int insn_len)
 {
@@ -4009,6 +4032,7 @@ int kvm_handle_page_fault(struct kvm_vcpu *vcpu, u64 error_code,
 
 		if (kvm_event_needs_reinjection(vcpu))
 			kvm_mmu_unprotect_page_virt(vcpu, fault_address);
+		//走起
 		r = kvm_mmu_page_fault(vcpu, fault_address, error_code, insn,
 				insn_len);
 		break;
@@ -5243,6 +5267,24 @@ static int make_mmu_pages_available(struct kvm_vcpu *vcpu)
 	return 0;
 }
 
+/*
+ * vcpu_run()
+ *  vcpu_enter_guest()
+ *   vmx_handle_exit()
+ *    handle_ept_violation()
+ *     kvm_mmu_page_fault()
+ *
+ * vcpu_run()
+ *  vcpu_enter_guest()
+ *   vmx_handle_exit()
+ *    handle_ept_misconfig()
+ *     kvm_mmu_page_fault()
+ *
+ * vmx_handle_exit()
+ *  handle_exception()
+ *   kvm_handle_page_fault()
+ *    kvm_mmu_page_fault()
+ */
 int kvm_mmu_page_fault(struct kvm_vcpu *vcpu, gva_t cr2, u64 error_code,
 		       void *insn, int insn_len)
 {
@@ -5300,6 +5342,8 @@ int kvm_mmu_page_fault(struct kvm_vcpu *vcpu, gva_t cr2, u64 error_code,
 	 */
 	if (!mmio_info_in_cache(vcpu, cr2, direct) && !is_guest_mode(vcpu))
 		emulation_type = EMULTYPE_ALLOW_RETRY;
+
+//软件模拟	
 emulate:
 	/*
 	 * On AMD platforms, under certain conditions insn_len may be zero on #NPF.

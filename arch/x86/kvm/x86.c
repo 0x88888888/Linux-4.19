@@ -4463,7 +4463,7 @@ set_identity_unlock:
 	case KVM_GET_NR_MMU_PAGES:
 		r = kvm_vm_ioctl_get_nr_mmu_pages(kvm);
 		break;
-	case KVM_CREATE_IRQCHIP: {
+	case KVM_CREATE_IRQCHIP: {//创建pic,ioapic
 		mutex_lock(&kvm->lock);
 
 		r = -EEXIST;
@@ -7932,9 +7932,12 @@ static int vcpu_run(struct kvm_vcpu *vcpu)
 			break;
 
 		kvm_clear_request(KVM_REQ_PENDING_TIMER, vcpu);
+
+		/*检查是否有阻塞的时钟timer*/
 		if (kvm_cpu_has_pending_timer(vcpu))
 			kvm_inject_pending_timer_irqs(vcpu);
 
+        /*检查是否有用户空间的中断注入*/ 
 		if (dm_request_for_irq_injection(vcpu) &&
 			kvm_vcpu_ready_for_interrupt_injection(vcpu)) {
 			r = 0;
@@ -7945,12 +7948,14 @@ static int vcpu_run(struct kvm_vcpu *vcpu)
 
 		kvm_check_async_pf_completion(vcpu);
 
+        /*是否有阻塞的signal*/
 		if (signal_pending(current)) {
 			r = -EINTR;
 			vcpu->run->exit_reason = KVM_EXIT_INTR;
 			++vcpu->stat.signal_exits;
 			break;
 		}
+		/*执行一个调度*/
 		if (need_resched()) {
 			srcu_read_unlock(&kvm->srcu, vcpu->srcu_idx);
 			cond_resched();
@@ -9304,6 +9309,14 @@ void kvm_arch_free_memslot(struct kvm *kvm, struct kvm_memory_slot *free,
 	kvm_page_track_free_memslot(free, dont);
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_set_memory_region()
+ *    kvm_set_memory_region()
+ *     __kvm_set_memory_region()
+ *      kvm_arch_create_memslot()
+ */
 int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
 			    unsigned long npages)
 {
@@ -9436,6 +9449,14 @@ static void kvm_mmu_slot_apply_flags(struct kvm *kvm,
 	}
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_set_memory_region()
+ *    kvm_set_memory_region()
+ * 	   __kvm_set_memory_region()
+ *      kvm_arch_commit_memory_region()
+ */
 void kvm_arch_commit_memory_region(struct kvm *kvm,
 				const struct kvm_userspace_memory_region *mem,
 				const struct kvm_memory_slot *old,
@@ -9444,7 +9465,7 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
 {
 	int nr_mmu_pages = 0;
 
-	if (!kvm->arch.n_requested_mmu_pages)
+	if (!kvm->arch.n_requested_mmu_pages)//所需要的物理页面数量,所以页表映射到这些物理页面的 页表也需要变
 		nr_mmu_pages = kvm_mmu_calculate_mmu_pages(kvm);
 
 	if (nr_mmu_pages)
@@ -9846,6 +9867,7 @@ bool kvm_vector_hashing_enabled(void)
 }
 EXPORT_SYMBOL_GPL(kvm_vector_hashing_enabled);
 
+//搞出来很多 TRACE POINT
 EXPORT_TRACEPOINT_SYMBOL_GPL(kvm_exit);
 EXPORT_TRACEPOINT_SYMBOL_GPL(kvm_fast_mmio);
 EXPORT_TRACEPOINT_SYMBOL_GPL(kvm_inj_virq);

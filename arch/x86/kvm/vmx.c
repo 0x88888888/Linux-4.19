@@ -72,6 +72,10 @@ static const struct x86_cpu_id vmx_cpu_id[] = {
 };
 MODULE_DEVICE_TABLE(x86cpu, vmx_cpu_id);
 
+/********************************************************/
+
+
+//下面的这些module 变量用来控制KVM的功能了
 static bool __read_mostly enable_vpid = 1;
 module_param_named(vpid, enable_vpid, bool, 0444);
 
@@ -106,12 +110,19 @@ module_param_named(enable_shadow_vmcs, enable_shadow_vmcs, bool, S_IRUGO);
  * If nested=1, nested virtualization is supported, i.e., guests may use
  * VMX and be a hypervisor for its own guests. If nested=0, guests may not
  * use VMX instructions.
+ *
+ * 是否支持虚拟化嵌套
  */
 static bool __read_mostly nested = 0;
 module_param(nested, bool, S_IRUGO);
 
 static u64 __read_mostly host_xss;
 
+/*
+ * 脏页跟踪功能
+ * https://blog.csdn.net/huang987246510/article/details/108348207
+ * https://www.intel.com/content/dam/www/public/us/en/documents/white-papers/page-modification-logging-vmm-white-paper.pdf
+ */
 static bool __read_mostly enable_pml = 1;
 module_param_named(pml, enable_pml, bool, S_IRUGO);
 
@@ -130,6 +141,9 @@ static bool __read_mostly enable_preemption_timer = 1;
 #ifdef CONFIG_X86_64
 module_param_named(preemption_timer, enable_preemption_timer, bool, S_IRUGO);
 #endif
+
+/********************************************************/
+
 
 #define KVM_GUEST_CR0_MASK (X86_CR0_NW | X86_CR0_CD)
 #define KVM_VM_CR0_ALWAYS_ON_UNRESTRICTED_GUEST X86_CR0_NE
@@ -4584,8 +4598,10 @@ static __init int adjust_vmx_controls(u32 ctl_min, u32 ctl_opt,
 				      u32 msr, u32 *result)
 {
 	u32 vmx_msr_low, vmx_msr_high;
+	//合起来
 	u32 ctl = ctl_min | ctl_opt;
 
+    //读取msr的值，低32位放在vmx_msr_low,高32位放在vmx_msr_high
 	rdmsr(msr, vmx_msr_low, vmx_msr_high);
 
 	ctl &= vmx_msr_high; /* bit == 0 in high word ==> must be zero */
@@ -4613,6 +4629,8 @@ static __init bool allow_1_setting(u32 msr, u32 ctl)
  *   kvm_arch_hardware_setup()
  *    hardware_setup()
  *     setup_vmcs_config()
+ *
+ * 设置vmcs的配置,各种配置选项不要前后矛盾
  */
 static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf)
 {
@@ -4625,6 +4643,7 @@ static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf)
 	u32 _vmentry_control = 0;
 
 	memset(vmcs_conf, 0, sizeof(*vmcs_conf));
+	
 	min = CPU_BASED_HLT_EXITING |
 #ifdef CONFIG_X86_64
 	      CPU_BASED_CR8_LOAD_EXITING |
@@ -4643,14 +4662,18 @@ static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf)
 	opt = CPU_BASED_TPR_SHADOW |
 	      CPU_BASED_USE_MSR_BITMAPS |
 	      CPU_BASED_ACTIVATE_SECONDARY_CONTROLS;
+	//读取MSR_IA32_VMX_PROCBASED_CTLS 到_cpu_based_exec_control
 	if (adjust_vmx_controls(min, opt, MSR_IA32_VMX_PROCBASED_CTLS,
 				&_cpu_based_exec_control) < 0)
 		return -EIO;
+	
 #ifdef CONFIG_X86_64
 	if ((_cpu_based_exec_control & CPU_BASED_TPR_SHADOW))
 		_cpu_based_exec_control &= ~CPU_BASED_CR8_LOAD_EXITING &
 					   ~CPU_BASED_CR8_STORE_EXITING;
 #endif
+
+    
 	if (_cpu_based_exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS) {
 		min2 = 0;
 		opt2 = SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
@@ -4673,6 +4696,8 @@ static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf)
 			SECONDARY_EXEC_TSC_SCALING |
 			SECONDARY_EXEC_ENABLE_VMFUNC |
 			SECONDARY_EXEC_ENCLS_EXITING;
+	
+	    //读取SECONDARY配置信息到_cpu_based_2nd_exec_control中来
 		if (adjust_vmx_controls(min2, opt2,
 					MSR_IA32_VMX_PROCBASED_CTLS2,
 					&_cpu_based_2nd_exec_control) < 0)
@@ -4690,6 +4715,7 @@ static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf)
 				SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE |
 				SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY);
 
+    //确定是否启动ept,vpid
 	rdmsr_safe(MSR_IA32_VMX_EPT_VPID_CAP,
 		&vmx_capability.ept, &vmx_capability.vpid);
 
@@ -4699,7 +4725,7 @@ static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf)
 		_cpu_based_exec_control &= ~(CPU_BASED_CR3_LOAD_EXITING |
 					     CPU_BASED_CR3_STORE_EXITING |
 					     CPU_BASED_INVLPG_EXITING);
-	} else if (vmx_capability.ept) {
+	} else if (vmx_capability.ept) {//不支持ept，然而又读出来ept，警告一下
 		vmx_capability.ept = 0;
 		pr_warn_once("EPT CAP should not exist if not support "
 				"1-setting enable EPT VM-execution control\n");
@@ -6728,6 +6754,8 @@ static void ept_set_mmio_spte_mask(void)
  *    kvm_arch_vcpu_create()
  *     vmx_create_vcpu()
  *      vmx_vcpu_setup()
+ *
+ * 设置vcpu为实模式，设置各种寄存器?
  */
 static void vmx_vcpu_setup(struct vcpu_vmx *vmx)
 {
@@ -6743,6 +6771,7 @@ static void vmx_vcpu_setup(struct vcpu_vmx *vmx)
 		vmcs_write64(VMREAD_BITMAP, __pa(vmx_vmread_bitmap));
 		vmcs_write64(VMWRITE_BITMAP, __pa(vmx_vmread_bitmap));
 	}
+	
 	if (cpu_has_vmx_msr_bitmap())
 		vmcs_write64(MSR_BITMAP, __pa(vmx->vmcs01.msr_bitmap));
 
@@ -6830,6 +6859,7 @@ static void vmx_vcpu_setup(struct vcpu_vmx *vmx)
 	if (vmx_xsaves_supported())
 		vmcs_write64(XSS_EXIT_BITMAP, VMX_XSS_EXIT_BITMAP);
 
+    //开启page modify log功能
 	if (enable_pml) {
 		ASSERT(vmx->pml_pg);
 		vmcs_write64(PML_ADDRESS, page_to_phys(vmx->pml_pg));
@@ -7259,10 +7289,12 @@ static int handle_exception(struct kvm_vcpu *vcpu)
 		return 0;
 	}
 
+    //page fault异常
 	if (is_page_fault(intr_info)) {
 		cr2 = vmcs_readl(EXIT_QUALIFICATION);
 		/* EPT won't cause page fault directly */
 		WARN_ON_ONCE(!vcpu->arch.apf.host_apf_reason && enable_ept);
+	    //走起
 		return kvm_handle_page_fault(vcpu, error_code, cr2, NULL, 0);
 	}
 
@@ -7837,6 +7869,12 @@ static int handle_task_switch(struct kvm_vcpu *vcpu)
 	return 1;
 }
 
+/*
+ * vcpu_run()
+ *  vcpu_enter_guest()
+ *   vmx_handle_exit()
+ *    handle_ept_violation()
+ */
 static int handle_ept_violation(struct kvm_vcpu *vcpu)
 {
 	unsigned long exit_qualification;
@@ -7878,9 +7916,16 @@ static int handle_ept_violation(struct kvm_vcpu *vcpu)
 	       PFERR_GUEST_FINAL_MASK : PFERR_GUEST_PAGE_MASK;
 
 	vcpu->arch.exit_qualification = exit_qualification;
+	//走起
 	return kvm_mmu_page_fault(vcpu, gpa, error_code, NULL, 0);
 }
 
+/*
+ * vcpu_run()
+ *  vcpu_enter_guest()
+ *   vmx_handle_exit()
+ *    handle_ept_misconfig()
+ */
 static int handle_ept_misconfig(struct kvm_vcpu *vcpu)
 {
 	gpa_t gpa;
@@ -11253,6 +11298,8 @@ static void vmx_free_vcpu(struct kvm_vcpu *vcpu)
  *   kvm_vm_ioctl_create_vcpu()
  *    kvm_arch_vcpu_create()
  *     vmx_create_vcpu()
+ *
+ * 创建vCPU
  */
 static struct kvm_vcpu *vmx_create_vcpu(struct kvm *kvm, unsigned int id)
 {
@@ -11264,6 +11311,7 @@ static struct kvm_vcpu *vmx_create_vcpu(struct kvm *kvm, unsigned int id)
 	if (!vmx)
 		return ERR_PTR(-ENOMEM);
 
+	//分配vCPU id
 	vmx->vpid = allocate_vpid();
 
 	err = kvm_vcpu_init(&vmx->vcpu, kvm, id);
@@ -11284,6 +11332,7 @@ static struct kvm_vcpu *vmx_create_vcpu(struct kvm *kvm, unsigned int id)
 			goto uninit_vcpu;
 	}
 
+    //保存guset ost的msr空间
 	vmx->guest_msrs = kmalloc(PAGE_SIZE, GFP_KERNEL);
 	BUILD_BUG_ON(ARRAY_SIZE(vmx_msr_index) * sizeof(vmx->guest_msrs[0])
 		     > PAGE_SIZE);
@@ -11291,6 +11340,7 @@ static struct kvm_vcpu *vmx_create_vcpu(struct kvm *kvm, unsigned int id)
 	if (!vmx->guest_msrs)
 		goto free_pml;
 
+    //分配对应的vmcs
 	err = alloc_loaded_vmcs(&vmx->vmcs01);
 	if (err < 0)
 		goto free_msrs;
@@ -11309,7 +11359,8 @@ static struct kvm_vcpu *vmx_create_vcpu(struct kvm *kvm, unsigned int id)
 	
 	vmx_vcpu_load(&vmx->vcpu, cpu);
 	vmx->vcpu.cpu = cpu;
-	
+
+	/*设置vcpu为实模式，设置各种寄存器*/
 	vmx_vcpu_setup(vmx);
 	vmx_vcpu_put(&vmx->vcpu);
 	put_cpu();
@@ -11414,6 +11465,7 @@ static void __init vmx_check_processor_compat(void *rtn)
 	*(int *)rtn = 0;
 	if (setup_vmcs_config(&vmcs_conf) < 0)
 		*(int *)rtn = -EIO;
+	
 	nested_vmx_setup_ctls_msrs(&vmcs_conf.nested, enable_apicv);
 	
 	if (memcmp(&vmcs_config, &vmcs_conf, sizeof(struct vmcs_config)) != 0) {
@@ -12594,6 +12646,7 @@ static int prepare_vmcs02(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
 	}
 
 	if (nested_cpu_has_ept(vmcs12)) {
+		
 		if (nested_ept_init_mmu_context(vcpu)) {
 			*entry_failure_code = ENTRY_FAIL_DEFAULT;
 			return 1;

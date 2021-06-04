@@ -20,6 +20,7 @@
 #include <linux/vfio.h>
 #include "vfio.h"
 
+//没有定义
 #ifdef CONFIG_SPAPR_TCE_IOMMU
 #include <asm/kvm_ppc.h>
 #endif
@@ -109,6 +110,7 @@ static bool kvm_vfio_group_is_coherent(struct vfio_group *vfio_group)
 	return ret > 0;
 }
 
+//没有定义
 #ifdef CONFIG_SPAPR_TCE_IOMMU
 static int kvm_vfio_external_user_iommu_id(struct vfio_group *vfio_group)
 {
@@ -258,6 +260,7 @@ static int kvm_vfio_set_group(struct kvm_device *dev, long attr, u64 arg)
 
 			list_del(&kvg->node);
 			kvm_arch_end_assignment(dev->kvm);
+//没有定义			
 #ifdef CONFIG_SPAPR_TCE_IOMMU
 			kvm_spapr_tce_release_vfio_group(dev->kvm,
 							 kvg->vfio_group);
@@ -277,6 +280,7 @@ static int kvm_vfio_set_group(struct kvm_device *dev, long attr, u64 arg)
 
 		return ret;
 
+//没有定义
 #ifdef CONFIG_SPAPR_TCE_IOMMU
 	case KVM_DEV_VFIO_GROUP_SET_SPAPR_TCE: {
 		struct kvm_vfio_spapr_tce param;
@@ -395,6 +399,13 @@ static struct kvm_device_ops kvm_vfio_ops = {
 	.has_attr = kvm_vfio_has_attr,
 };
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_ioctl_create_device()
+ *    kvm_vfio_create()
+ * 创建设备
+ */
 static int kvm_vfio_create(struct kvm_device *dev, u32 type)
 {
 	struct kvm_device *tmp;
@@ -402,7 +413,7 @@ static int kvm_vfio_create(struct kvm_device *dev, u32 type)
 
 	/* Only one VFIO "device" per VM */
 	list_for_each_entry(tmp, &dev->kvm->devices, vm_node)
-		if (tmp->ops == &kvm_vfio_ops)
+		if (tmp->ops == &kvm_vfio_ops) //已经创建过了，返回吧
 			return -EBUSY;
 
 	kv = kzalloc(sizeof(*kv), GFP_KERNEL);

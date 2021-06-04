@@ -347,7 +347,7 @@ struct kvm_mmu {
 	unsigned long (*get_cr3)(struct kvm_vcpu *vcpu);
 	u64 (*get_pdptr)(struct kvm_vcpu *vcpu, int index);
 	/*
-	 * tdp_page_fault,nonpaging_page_fault,
+	 * tdp_page_fault(kvm host 应该是用这个函数),nonpaging_page_fault,
 	 * paging64_page_fault, paging32_page_fault
 	 * ept_page_fault
 	 */
@@ -1164,6 +1164,7 @@ extern struct kvm_x86_ops *kvm_x86_ops;
 #define __KVM_HAVE_ARCH_VM_ALLOC
 static inline struct kvm *kvm_arch_alloc_vm(void)
 {
+    //
 	return kvm_x86_ops->vm_alloc();
 }
 

@@ -512,6 +512,7 @@ void kvm_unregister_irq_ack_notifier(struct kvm *kvm,
 void
 kvm_eventfd_init(struct kvm *kvm)
 {
+//有定义
 #ifdef CONFIG_HAVE_KVM_IRQFD
 	spin_lock_init(&kvm->irqfds.lock);
 	INIT_LIST_HEAD(&kvm->irqfds.items);
@@ -521,6 +522,7 @@ kvm_eventfd_init(struct kvm *kvm)
 	INIT_LIST_HEAD(&kvm->ioeventfds);
 }
 
+//有定义
 #ifdef CONFIG_HAVE_KVM_IRQFD
 /*
  * shutdown any irqfd's that match fd+gsi
@@ -788,6 +790,13 @@ static enum kvm_bus ioeventfd_bus_from_flags(__u32 flags)
 	return KVM_MMIO_BUS;
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_ioeventfd()
+ *    kvm_assign_ioeventfd()
+ *     kvm_assign_ioeventfd_idx()
+ */
 static int kvm_assign_ioeventfd_idx(struct kvm *kvm,
 				enum kvm_bus bus_idx,
 				struct kvm_ioeventfd *args)
@@ -827,6 +836,7 @@ static int kvm_assign_ioeventfd_idx(struct kvm *kvm,
 		goto unlock_fail;
 	}
 
+    //操作函数
 	kvm_iodevice_init(&p->dev, &ioeventfd_ops);
 
 	ret = kvm_io_bus_register_dev(kvm, bus_idx, p->addr, p->length,
@@ -835,6 +845,7 @@ static int kvm_assign_ioeventfd_idx(struct kvm *kvm,
 		goto unlock_fail;
 
 	kvm_get_bus(kvm, bus_idx)->ioeventfd_count++;
+	//添加事件监控fd到虚拟机上去
 	list_add_tail(&p->list, &kvm->ioeventfds);
 
 	mutex_unlock(&kvm->slots_lock);
@@ -906,6 +917,12 @@ static int kvm_deassign_ioeventfd(struct kvm *kvm, struct kvm_ioeventfd *args)
 	return ret;
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_ioeventfd()
+ *    kvm_assign_ioeventfd()
+ */
 static int
 kvm_assign_ioeventfd(struct kvm *kvm, struct kvm_ioeventfd *args)
 {
@@ -958,11 +975,16 @@ fail:
 	return ret;
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_ioeventfd()
+ */
 int
 kvm_ioeventfd(struct kvm *kvm, struct kvm_ioeventfd *args)
 {
 	if (args->flags & KVM_IOEVENTFD_FLAG_DEASSIGN)
-		return kvm_deassign_ioeventfd(kvm, args);
+		return kvm_deassign_ioeventfd(kvm, args);//删除
 
-	return kvm_assign_ioeventfd(kvm, args);
+	return kvm_assign_ioeventfd(kvm, args);//添加
 }

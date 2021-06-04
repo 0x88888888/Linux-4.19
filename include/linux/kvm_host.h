@@ -394,11 +394,13 @@ struct kvm_memslots {
 	int used_slots;
 };
 
+//在kvm_dev_ioctl_create_vm中创建，表示一个虚拟机对象
 struct kvm {
 	spinlock_t mmu_lock;
 	struct mutex slots_lock;
 	struct mm_struct *mm; /* userspace tied to this vm */
 	struct kvm_memslots __rcu *memslots[KVM_ADDRESS_SPACE_NUM];
+    //虚拟机中的所有vCPU对象
 	struct kvm_vcpu *vcpus[KVM_MAX_VCPUS];
 
 	/*
@@ -410,6 +412,7 @@ struct kvm {
 	atomic_t online_vcpus;
 	int created_vcpus;
 	int last_boosted_vcpu;
+	//所有的虚拟机对象kvm都链接到vm_list链表中
 	struct list_head vm_list;
 	struct mutex lock;
 	struct kvm_io_bus __rcu *buses[KVM_NR_BUSES];
@@ -420,11 +423,19 @@ struct kvm {
 		struct list_head  resampler_list;
 		struct mutex      resampler_lock;
 	} irqfds;
+	/*
+	 * 在kvm_assign_ioeventfd_idx() 和 kvm_deassign_ioeventfd_idx
+	 * 中操作
+	 */
 	struct list_head ioeventfds;
 #endif
+    //虚拟机的一些状态
 	struct kvm_vm_stat stat;
+
+	//硬件平台相关的部分
 	struct kvm_arch arch;
 	refcount_t users_count;
+	//有定义
 #ifdef CONFIG_KVM_MMIO
 	struct kvm_coalesced_mmio_ring *coalesced_mmio_ring;
 	spinlock_t ring_lock;

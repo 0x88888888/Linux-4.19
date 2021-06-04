@@ -160,6 +160,13 @@ int kvm_cpu_get_interrupt(struct kvm_vcpu *v)
 }
 EXPORT_SYMBOL_GPL(kvm_cpu_get_interrupt);
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ *    vcpu_run()
+ *     kvm_inject_pending_timer_irqs()
+ */
 void kvm_inject_pending_timer_irqs(struct kvm_vcpu *vcpu)
 {
 	if (lapic_in_kernel(vcpu))

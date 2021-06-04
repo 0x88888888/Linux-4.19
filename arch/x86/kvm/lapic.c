@@ -2347,6 +2347,14 @@ int kvm_apic_accept_pic_intr(struct kvm_vcpu *vcpu)
 	return r;
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ *    vcpu_run()
+ *     kvm_inject_pending_timer_irqs()
+ *      kvm_inject_apic_timer_irqs()
+ */
 void kvm_inject_apic_timer_irqs(struct kvm_vcpu *vcpu)
 {
 	struct kvm_lapic *apic = vcpu->arch.apic;
