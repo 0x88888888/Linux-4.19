@@ -161,12 +161,20 @@ void kvm_clear_async_pf_completion_queue(struct kvm_vcpu *vcpu)
 	vcpu->async_pf.queued = 0;
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ *    vcpu_run()
+ *     kvm_check_async_pf_completion()
+ */
 void kvm_check_async_pf_completion(struct kvm_vcpu *vcpu)
 {
 	struct kvm_async_pf *work;
 
 	while (!list_empty_careful(&vcpu->async_pf.done) &&
 	      kvm_arch_can_inject_async_page_present(vcpu)) {
+	      
 		spin_lock(&vcpu->async_pf.lock);
 		work = list_first_entry(&vcpu->async_pf.done, typeof(*work),
 					      link);

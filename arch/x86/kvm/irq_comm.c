@@ -396,7 +396,7 @@ static const struct kvm_irq_routing_entry default_routing[] = {
 
 /*
  * kvm_vm_compat_ioctl()
- *  kvm_vm_ioctl()
+ *  kvm_vm_ioctl()  KVM_CREATE_IRQCHIP
  *   kvm_arch_vm_ioctl()
  *    kvm_setup_default_irq_routing()
  */

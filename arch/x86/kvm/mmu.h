@@ -78,6 +78,14 @@ static inline unsigned int kvm_mmu_available_pages(struct kvm *kvm)
 	return 0;
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ *    vcpu_run()
+ *     vcpu_enter_guest()
+ *      kvm_mmu_reload()
+ */
 static inline int kvm_mmu_reload(struct kvm_vcpu *vcpu)
 {
 	if (likely(vcpu->arch.mmu.root_hpa != INVALID_PAGE))

@@ -103,6 +103,12 @@ static const struct kvm_io_device_ops coalesced_mmio_ops = {
 	.destructor = coalesced_mmio_destructor,
 };
 
+/*
+ * kvm_dev_ioctl()
+ *  kvm_dev_ioctl_create_vm()
+ *   kvm_coalesced_mmio_init()
+ * 创建vm
+ */
 int kvm_coalesced_mmio_init(struct kvm *kvm)
 {
 	struct page *page;

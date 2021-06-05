@@ -2317,6 +2317,8 @@ EXPORT_SYMBOL_GPL(kvm_vcpu_wake_up);
 #ifndef CONFIG_S390
 /*
  * Kick a sleeping VCPU, or a guest VCPU in guest mode, into host kernel mode.
+ *
+ * 给vCPU发送一个ipi,到HOST中来
  */
 void kvm_vcpu_kick(struct kvm_vcpu *vcpu)
 {
@@ -3060,6 +3062,7 @@ static long kvm_vm_ioctl_check_extension_generic(struct kvm *kvm, long arg)
 	case KVM_CAP_DESTROY_MEMORY_REGION_WORKS:
 	case KVM_CAP_JOIN_MEMORY_REGIONS_WORKS:
 	case KVM_CAP_INTERNAL_ERROR_DATA:
+		//有定义
 #ifdef CONFIG_HAVE_KVM_MSI
 	case KVM_CAP_SIGNAL_MSI:
 #endif
@@ -3180,7 +3183,7 @@ static long kvm_vm_ioctl(struct file *filp,
 #endif
 #ifdef __KVM_HAVE_IRQ_LINE
 	case KVM_IRQ_LINE_STATUS:
-	case KVM_IRQ_LINE: {
+	case KVM_IRQ_LINE: { //想VM(vCPU)注入中断
 		struct kvm_irq_level irq_event;
 
 		r = -EFAULT;
@@ -3205,7 +3208,7 @@ static long kvm_vm_ioctl(struct file *filp,
 
 //有定义
 #ifdef CONFIG_HAVE_KVM_IRQ_ROUTING
-	case KVM_SET_GSI_ROUTING: {
+	case KVM_SET_GSI_ROUTING: { //设置KVM中的IRQ ROUTING
 		struct kvm_irq_routing routing;
 		struct kvm_irq_routing __user *urouting;
 		struct kvm_irq_routing_entry *entries = NULL;
@@ -3217,11 +3220,13 @@ static long kvm_vm_ioctl(struct file *filp,
 		
 		if (!kvm_arch_can_set_irq_routing(kvm))
 			goto out;
+		
 		if (routing.nr > KVM_MAX_IRQ_ROUTES)
 			goto out;
 		if (routing.flags)
 			goto out;
-		if (routing.nr) {
+		
+		if (routing.nr) { //复制到内核中来
 			r = -ENOMEM;
 			entries = vmalloc(array_size(sizeof(*entries),
 						     routing.nr));
@@ -3233,6 +3238,7 @@ static long kvm_vm_ioctl(struct file *filp,
 					   routing.nr * sizeof(*entries)))
 				goto out_free_irq_routing;
 		}
+		//开始设置
 		r = kvm_set_irq_routing(kvm, entries, routing.nr,
 					routing.flags);
 out_free_irq_routing:
@@ -3278,6 +3284,9 @@ struct compat_kvm_dirty_log {
 	};
 };
 
+/*
+ * 控制VM的入口函数
+ */
 static long kvm_vm_compat_ioctl(struct file *filp,
 			   unsigned int ioctl, unsigned long arg)
 {
@@ -3372,6 +3381,9 @@ put_kvm:
 	return r;
 }
 
+/*
+ * 字符设备文件/dev/kvm的操作
+ */
 static long kvm_dev_ioctl(struct file *filp,
 			  unsigned int ioctl, unsigned long arg)
 {
@@ -3412,6 +3424,7 @@ out:
 	return r;
 }
 
+// 字符设备文件/dev/kvm的操作
 static struct file_operations kvm_chardev_ops = {
 	.unlocked_ioctl = kvm_dev_ioctl,
 	.llseek		= noop_llseek,
@@ -3501,6 +3514,9 @@ static void hardware_disable_all(void)
 	raw_spin_unlock(&kvm_count_lock);
 }
 
+/*
+ * 所有的cpu都 vmxon
+ */
 static int hardware_enable_all(void)
 {
 	int r = 0;
@@ -4033,6 +4049,9 @@ static const struct file_operations *stat_fops[] = {
 	[KVM_STAT_VM]   = &vm_stat_fops,
 };
 
+/*
+ * 通知用户态程序
+ */
 static void kvm_uevent_notify_change(unsigned int type, struct kvm *kvm)
 {
 	struct kobj_uevent_env *env;

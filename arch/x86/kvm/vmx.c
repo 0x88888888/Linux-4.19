@@ -3404,6 +3404,15 @@ static void vmx_clear_hlt(struct kvm_vcpu *vcpu)
 		vmcs_write32(GUEST_ACTIVITY_STATE, GUEST_ACTIVITY_ACTIVE);
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ *    vcpu_run()
+ *     vcpu_enter_guest()
+ *      inject_pending_event()
+ *       vmx_queue_exception()
+ */
 static void vmx_queue_exception(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
@@ -5266,6 +5275,9 @@ static void exit_lmode(struct kvm_vcpu *vcpu)
 
 #endif
 
+/*
+ * 根据KVM不同的配置，进行不同的方式对tlb进行flush
+ */
 static inline void __vmx_flush_tlb(struct kvm_vcpu *vcpu, int vpid,
 				bool invalidate_gpa)
 {
@@ -5278,6 +5290,16 @@ static inline void __vmx_flush_tlb(struct kvm_vcpu *vcpu, int vpid,
 	}
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *	kvm_vcpu_ioctl()
+ *	 kvm_arch_vcpu_ioctl_run()
+ *	  vcpu_run()
+ *	   vcpu_enter_guest()
+ *		kvm_mmu_reload()
+ *		 kvm_mmu_load()
+ *        vmx_flush_tlb()
+ */
 static void vmx_flush_tlb(struct kvm_vcpu *vcpu, bool invalidate_gpa)
 {
 	__vmx_flush_tlb(vcpu, to_vmx(vcpu)->vpid, invalidate_gpa);
@@ -5328,6 +5350,7 @@ static void ept_load_pdptrs(struct kvm_vcpu *vcpu)
 		      (unsigned long *)&vcpu->arch.regs_dirty))
 		return;
 
+    //guest os启动分页，pae，并且不是long mode，写入PDPTR值
 	if (is_paging(vcpu) && is_pae(vcpu) && !is_long_mode(vcpu)) {
 		vmcs_write64(GUEST_PDPTR0, mmu->pdptrs[0]);
 		vmcs_write64(GUEST_PDPTR1, mmu->pdptrs[1]);
@@ -5476,6 +5499,7 @@ static u64 construct_eptp(struct kvm_vcpu *vcpu, unsigned long root_hpa)
 	return eptp;
 }
 
+//给guest设置cr3,nest 的情况下用 
 static void vmx_set_cr3(struct kvm_vcpu *vcpu, unsigned long cr3)
 {
 	struct kvm *kvm = vcpu->kvm;
@@ -5503,6 +5527,7 @@ static void vmx_set_cr3(struct kvm_vcpu *vcpu, unsigned long cr3)
 		ept_load_pdptrs(vcpu);
 	}
 
+    //写进去
 	vmcs_writel(GUEST_CR3, guest_cr3);
 }
 
@@ -6309,7 +6334,11 @@ static void nested_mark_vmcs12_pages_dirty(struct kvm_vcpu *vcpu)
 	}
 }
 
-
+/*
+ * kvm_vcpu_running()
+ *  vmx_check_nested_events()
+ *   vmx_complete_nested_posted_interrupt()
+ */
 static void vmx_complete_nested_posted_interrupt(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
@@ -7009,10 +7038,22 @@ static void enable_nmi_window(struct kvm_vcpu *vcpu)
 		      CPU_BASED_VIRTUAL_NMI_PENDING);
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ *    vcpu_run()
+ *     vcpu_enter_guest()
+ *      inject_pending_event()
+ *       vmx_inject_irq()
+ *
+ * 在VMCS的VM_ENTRY_INTR_INFO_FIELD字段写入中断信息
+ */
 static void vmx_inject_irq(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
 	uint32_t intr;
+	//中断号
 	int irq = vcpu->arch.interrupt.nr;
 
 	trace_kvm_inj_virq(irq);
@@ -7026,6 +7067,7 @@ static void vmx_inject_irq(struct kvm_vcpu *vcpu)
 			kvm_make_request(KVM_REQ_TRIPLE_FAULT, vcpu);
 		return;
 	}
+	
 	intr = irq | INTR_INFO_VALID_MASK;
 	if (vcpu->arch.interrupt.soft) {
 		intr |= INTR_TYPE_SOFT_INTR;
@@ -7033,11 +7075,21 @@ static void vmx_inject_irq(struct kvm_vcpu *vcpu)
 			     vmx->vcpu.arch.event_exit_inst_len);
 	} else
 		intr |= INTR_TYPE_EXT_INTR;
+	
 	vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, intr);
 
 	vmx_clear_hlt(vcpu);
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ *    vcpu_run()
+ *     vcpu_enter_guest()
+ *      inject_pending_event()
+ *       vmx_inject_nmi()
+ */
 static void vmx_inject_nmi(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
@@ -7232,8 +7284,10 @@ static int handle_machine_check(struct kvm_vcpu *vcpu)
 }
 
 /*
- * vmx_handle_exit()
- *  handle_exception()
+ * vcpu_run()
+ *  vcpu_enter_guest()
+ *   vmx_handle_exit()
+ *    handle_exception()
  */
 static int handle_exception(struct kvm_vcpu *vcpu)
 {
@@ -7259,6 +7313,7 @@ static int handle_exception(struct kvm_vcpu *vcpu)
 	error_code = 0;
 	if (intr_info & INTR_INFO_DELIVER_CODE_MASK)
 		error_code = vmcs_read32(VM_EXIT_INTR_ERROR_CODE);
+
 
 	if (!vmx->rmode.vm86_active && is_gp_fault(intr_info)) {
 		WARN_ON_ONCE(!enable_vmware_backdoor);
@@ -7291,6 +7346,8 @@ static int handle_exception(struct kvm_vcpu *vcpu)
 
     //page fault异常
 	if (is_page_fault(intr_info)) {
+		
+		/*读cr2寄存器的值*/
 		cr2 = vmcs_readl(EXIT_QUALIFICATION);
 		/* EPT won't cause page fault directly */
 		WARN_ON_ONCE(!vcpu->arch.apf.host_apf_reason && enable_ept);
@@ -10804,6 +10861,16 @@ static void vmx_recover_nmi_blocking(struct vcpu_vmx *vmx)
 					      vmx->loaded_vmcs->entry_time));
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ *    vcpu_run()
+ *     vcpu_enter_guest()
+ *      vmx_vcpu_run()
+ *       vmx_complete_interrupts()
+ *        __vmx_complete_interrupts()
+ */
 static void __vmx_complete_interrupts(struct kvm_vcpu *vcpu,
 				      u32 idt_vectoring_info,
 				      int instr_len_field,
@@ -10815,6 +10882,7 @@ static void __vmx_complete_interrupts(struct kvm_vcpu *vcpu,
 
 	idtv_info_valid = idt_vectoring_info & VECTORING_INFO_VALID_MASK;
 
+    //清空原来的状态
 	vcpu->arch.nmi_injected = false;
 	kvm_clear_exception_queue(vcpu);
 	kvm_clear_interrupt_queue(vcpu);
@@ -10827,6 +10895,13 @@ static void __vmx_complete_interrupts(struct kvm_vcpu *vcpu,
 	vector = idt_vectoring_info & VECTORING_INFO_VECTOR_MASK;
 	type = idt_vectoring_info & VECTORING_INFO_TYPE_MASK;
 
+    /*
+     * 根据type,来设置vcpu->arch.interrupt.injected, 
+     *                vcpu->arch.interrupt.nr,
+     *                vcpu->arch.interrupt.pending
+     *                vcpu->arch.interrupt.soft 这类信息，
+     * 然后在vcpu_enter_guest 中，进入guest os之前，用这些信息去设置vmcs
+     */
 	switch (type) {
 	case INTR_TYPE_NMI_INTR:
 		vcpu->arch.nmi_injected = true;
@@ -10858,6 +10933,15 @@ static void __vmx_complete_interrupts(struct kvm_vcpu *vcpu,
 	}
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ *    vcpu_run()
+ *     vcpu_enter_guest()
+ *      vmx_vcpu_run()
+ *       vmx_complete_interrupts()
+ */
 static void vmx_complete_interrupts(struct vcpu_vmx *vmx)
 {
 	__vmx_complete_interrupts(&vmx->vcpu, vmx->idt_vectoring_info,
@@ -11226,6 +11310,7 @@ static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 
 	vmx_complete_atomic_exit(vmx);
 	vmx_recover_nmi_blocking(vmx);
+	//
 	vmx_complete_interrupts(vmx);
 }
 STACK_FRAME_NON_STANDARD(vmx_vcpu_run);
@@ -13239,6 +13324,10 @@ static void vmcs12_save_pending_event(struct kvm_vcpu *vcpu,
 	}
 }
 
+/*
+ * kvm_vcpu_running()
+ *  vmx_check_nested_events()
+ */
 static int vmx_check_nested_events(struct kvm_vcpu *vcpu, bool external_intr)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
@@ -13250,6 +13339,7 @@ static int vmx_check_nested_events(struct kvm_vcpu *vcpu, bool external_intr)
 		nested_vmx_check_exception(vcpu, &exit_qual)) {
 		if (block_nested_events)
 			return -EBUSY;
+		
 		nested_vmx_inject_exception_vmexit(vcpu, exit_qual);
 		return 0;
 	}
@@ -13279,6 +13369,7 @@ static int vmx_check_nested_events(struct kvm_vcpu *vcpu, bool external_intr)
 
 	if ((kvm_cpu_has_interrupt(vcpu) || external_intr) &&
 	    nested_exit_on_intr(vcpu)) {
+	    
 		if (block_nested_events)
 			return -EBUSY;
 		nested_vmx_vmexit(vcpu, EXIT_REASON_EXTERNAL_INTERRUPT, 0, 0);
@@ -14514,6 +14605,7 @@ static struct kvm_x86_ops vmx_x86_ops __ro_after_init = {
 	.set_interrupt_shadow = vmx_set_interrupt_shadow,
 	.get_interrupt_shadow = vmx_get_interrupt_shadow,
 	.patch_hypercall = vmx_patch_hypercall,
+	 //在VMCS中写入中断信息
 	.set_irq = vmx_inject_irq,
 	.set_nmi = vmx_inject_nmi,
 	.queue_exception = vmx_queue_exception,

@@ -79,6 +79,13 @@ int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi)
  *  < 0   Interrupt was ignored (masked or not delivered for other reasons)
  *  = 0   Interrupt was coalesced (previous irq is still pending)
  *  > 0   Number of CPUs interrupt was delivered to
+ *
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_irq_line()
+ *    kvm_set_irq()
+ * 注入中断
+ * 
  */
 int kvm_set_irq(struct kvm *kvm, int irq_source_id, u32 irq, int level,
 		bool line_status)
@@ -93,6 +100,7 @@ int kvm_set_irq(struct kvm *kvm, int irq_source_id, u32 irq, int level,
 	 * writes to the unused one.
 	 */
 	idx = srcu_read_lock(&kvm->irq_srcu);
+	
 	i = kvm_irq_map_gsi(kvm, irq_set, irq);
 	srcu_read_unlock(&kvm->irq_srcu, idx);
 
@@ -137,6 +145,12 @@ void kvm_free_irq_routing(struct kvm *kvm)
 	free_irq_routing_table(rt);
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_set_irq_routing()
+ *    setup_routing_entry()
+ */
 static int setup_routing_entry(struct kvm *kvm,
 			       struct kvm_irq_routing_table *rt,
 			       struct kvm_kernel_irq_routing_entry *e,
@@ -177,6 +191,17 @@ bool __weak kvm_arch_can_set_irq_routing(struct kvm *kvm)
 	return true;
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_set_irq_routing()
+ *
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()  KVM_CREATE_IRQCHIP
+ *   kvm_arch_vm_ioctl()
+ *    kvm_setup_default_irq_routing()
+ *     kvm_set_irq_routing(kvm, default_routing, , 0)
+ */
 int kvm_set_irq_routing(struct kvm *kvm,
 			const struct kvm_irq_routing_entry *ue,
 			unsigned nr,
@@ -195,6 +220,7 @@ int kvm_set_irq_routing(struct kvm *kvm,
 
 	nr_rt_entries += 1;
 
+    //分配一个hlist of routing entry 出来
 	new = kzalloc(sizeof(*new) + (nr_rt_entries * sizeof(struct hlist_head)),
 		      GFP_KERNEL);
 

@@ -4016,9 +4016,11 @@ static bool try_async_pf(struct kvm_vcpu *vcpu, bool prefault, gfn_t gfn,
 }
 
 /*
- * vmx_handle_exit()
- *  handle_exception()
- *   kvm_handle_page_fault()
+ * vcpu_run()
+ *  vcpu_enter_guest()
+ *   vmx_handle_exit()
+ *    handle_exception()
+ *     kvm_handle_page_fault()
  */
 int kvm_handle_page_fault(struct kvm_vcpu *vcpu, u64 error_code,
 				u64 fault_address, char *insn, int insn_len)
@@ -4770,6 +4772,8 @@ kvm_calc_tdp_mmu_root_page_role(struct kvm_vcpu *vcpu)
  *     kvm_mmu_setup()
  *      kvm_init_mmu(reset_roots==false)
  *       init_kvm_tdp_mmu()
+ *
+ * ept方式，都用这个来初始化了,实现内存虚拟化
  */
 static void init_kvm_tdp_mmu(struct kvm_vcpu *vcpu)
 {
@@ -4844,6 +4848,17 @@ kvm_calc_shadow_mmu_root_page_role(struct kvm_vcpu *vcpu)
 	return role;
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_setup()
+ *     kvm_mmu_setup()
+ *      kvm_init_mmu(reset_roots==false)
+ *       kvm_init_shadow_mmu()
+ *
+ * shadow page table 实现方式,不看
+ */
 void kvm_init_shadow_mmu(struct kvm_vcpu *vcpu)
 {
 	struct kvm_mmu *context = &vcpu->arch.mmu;
@@ -4978,11 +4993,11 @@ void kvm_init_mmu(struct kvm_vcpu *vcpu, bool reset_roots)
 			vcpu->arch.mmu.prev_roots[i] = KVM_MMU_ROOT_INFO_INVALID;
 	}
 
-	if (mmu_is_nested(vcpu))
+	if (mmu_is_nested(vcpu))//跳过,不看
 		init_kvm_nested_mmu(vcpu);
-	else if (tdp_enabled)//通常是这里
+	else if (tdp_enabled)//通常都是启动ept,所以走这里
 		init_kvm_tdp_mmu(vcpu);
-	else
+	else // shadow page table实现，跳过
 		init_kvm_softmmu(vcpu);
 }
 EXPORT_SYMBOL_GPL(kvm_init_mmu);
@@ -5003,6 +5018,15 @@ void kvm_mmu_reset_context(struct kvm_vcpu *vcpu)
 }
 EXPORT_SYMBOL_GPL(kvm_mmu_reset_context);
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ *    vcpu_run()
+ *     vcpu_enter_guest()
+ *      kvm_mmu_reload()
+ *       kvm_mmu_load()
+ */
 int kvm_mmu_load(struct kvm_vcpu *vcpu)
 {
 	int r;
@@ -5015,6 +5039,7 @@ int kvm_mmu_load(struct kvm_vcpu *vcpu)
 	if (r)
 		goto out;
 	kvm_mmu_load_cr3(vcpu);
+	// vmx_flush_tlb
 	kvm_x86_ops->tlb_flush(vcpu, true);
 out:
 	return r;
@@ -5280,10 +5305,12 @@ static int make_mmu_pages_available(struct kvm_vcpu *vcpu)
  *    handle_ept_misconfig()
  *     kvm_mmu_page_fault()
  *
- * vmx_handle_exit()
- *  handle_exception()
- *   kvm_handle_page_fault()
- *    kvm_mmu_page_fault()
+ * vcpu_run()
+ *  vcpu_enter_guest()
+ *   vmx_handle_exit()
+ *    handle_exception()
+ *     kvm_handle_page_fault()
+ *      kvm_mmu_page_fault()
  */
 int kvm_mmu_page_fault(struct kvm_vcpu *vcpu, gva_t cr2, u64 error_code,
 		       void *insn, int insn_len)

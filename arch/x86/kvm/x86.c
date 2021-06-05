@@ -4304,6 +4304,9 @@ static int kvm_vm_ioctl_reinject(struct kvm *kvm,
  *   2. Write protect the corresponding page.
  *   3. Copy the snapshot to the userspace.
  *   4. Flush TLB's if needed.
+ *
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl_get_dirty_log()
  */
 int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
 {
@@ -4332,6 +4335,12 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
 	return r;
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_irq_line()
+ * 注入中断
+ */
 int kvm_vm_ioctl_irq_line(struct kvm *kvm, struct kvm_irq_level *irq_event,
 			bool line_status)
 {
@@ -7108,13 +7117,21 @@ static void update_cr8_intercept(struct kvm_vcpu *vcpu)
 	kvm_x86_ops->update_cr8_intercept(vcpu, tpr, max_irr);
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ *    vcpu_run()
+ *     vcpu_enter_guest()
+ *      inject_pending_event()
+ */
 static int inject_pending_event(struct kvm_vcpu *vcpu, bool req_int_win)
 {
 	int r;
 
 	/* try to reinject previous events if any */
 
-	if (vcpu->arch.exception.injected)
+	if (vcpu->arch.exception.injected) //vmx_queue_exception
 		kvm_x86_ops->queue_exception(vcpu);
 	/*
 	 * Do not inject an NMI or interrupt if there is a pending
@@ -7132,10 +7149,10 @@ static int inject_pending_event(struct kvm_vcpu *vcpu, bool req_int_win)
 	 */
 	else if (!vcpu->arch.exception.pending) {
 		if (vcpu->arch.nmi_injected)
-			kvm_x86_ops->set_nmi(vcpu);
+			kvm_x86_ops->set_nmi(vcpu); //vmx_inject_nmi
 		else if (vcpu->arch.interrupt.injected)
-			kvm_x86_ops->set_irq(vcpu);
-	}
+			kvm_x86_ops->set_irq(vcpu); //vmx_inject_irq
+	} 
 
 	/*
 	 * Call check_nested_events() even if we reinjected a previous event
@@ -7169,6 +7186,7 @@ static int inject_pending_event(struct kvm_vcpu *vcpu, bool req_int_win)
 			kvm_update_dr7(vcpu);
 		}
 
+        //vmx_queue_exception
 		kvm_x86_ops->queue_exception(vcpu);
 	}
 
@@ -7558,6 +7576,8 @@ EXPORT_SYMBOL_GPL(__kvm_request_immediate_exit);
  *   kvm_arch_vcpu_ioctl_run()
  *    vcpu_run()
  *     vcpu_enter_guest()
+ *
+ * 当这个函数返回的时候，说明guest os已经发生VM EXIT了
  */
 static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 {
@@ -7568,6 +7588,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 
 	bool req_immediate_exit = false;
 
+    //看是否有来自request哦，如果有，就处理掉
 	if (kvm_request_pending(vcpu)) {
 		if (kvm_check_request(KVM_REQ_GET_VMCS12_PAGES, vcpu))
 			kvm_x86_ops->get_vmcs12_pages(vcpu);
@@ -7591,10 +7612,13 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 		}
 		if (kvm_check_request(KVM_REQ_MMU_SYNC, vcpu))
 			kvm_mmu_sync_roots(vcpu);
+		
 		if (kvm_check_request(KVM_REQ_LOAD_CR3, vcpu))
 			kvm_mmu_load_cr3(vcpu);
+
 		if (kvm_check_request(KVM_REQ_TLB_FLUSH, vcpu))
 			kvm_vcpu_flush_tlb(vcpu, true);
+		
 		if (kvm_check_request(KVM_REQ_REPORT_TPR_ACCESS, vcpu)) {
 			vcpu->run->exit_reason = KVM_EXIT_TPR_ACCESS;
 			r = 0;
@@ -7671,6 +7695,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 			kvm_hv_process_stimers(vcpu);
 	}
 
+
 	if (kvm_check_request(KVM_REQ_EVENT, vcpu) || req_int_win) {
 		++vcpu->stat.req_event;
 		kvm_apic_accept_events(vcpu);
@@ -7679,6 +7704,10 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 			goto out;
 		}
 
+        /*
+         * 根据__vmx_complete_interrupts()中设置的信息
+         * 来设置相应的vmcs的中断信息
+         */
 		if (inject_pending_event(vcpu, req_int_win) != 0)
 			req_immediate_exit = true;
 		else {
@@ -7720,7 +7749,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 
 	preempt_disable();
 
-    //vmx_prepare_switch_to_guest
+    //vmx_prepare_switch_to_guest,保存host信息
 	kvm_x86_ops->prepare_guest_switch(vcpu);
 
 	/*
@@ -7901,7 +7930,7 @@ static inline int vcpu_block(struct kvm *kvm, struct kvm_vcpu *vcpu)
 static inline bool kvm_vcpu_running(struct kvm_vcpu *vcpu)
 {
 	if (is_guest_mode(vcpu) && kvm_x86_ops->check_nested_events)
-		kvm_x86_ops->check_nested_events(vcpu, false);
+		kvm_x86_ops->check_nested_events(vcpu, false); //vmx_check_nested_events
 
 	return (vcpu->arch.mp_state == KVM_MP_STATE_RUNNABLE &&
 		!vcpu->arch.apf.halted);
@@ -7923,7 +7952,7 @@ static int vcpu_run(struct kvm_vcpu *vcpu)
 
 	for (;;) {
 		if (kvm_vcpu_running(vcpu)) {
-			r = vcpu_enter_guest(vcpu); //走起
+			r = vcpu_enter_guest(vcpu); //guest os走起
 		} else {
 			r = vcpu_block(kvm, vcpu);
 		}
@@ -7940,6 +7969,7 @@ static int vcpu_run(struct kvm_vcpu *vcpu)
         /*检查是否有用户空间的中断注入*/ 
 		if (dm_request_for_irq_injection(vcpu) &&
 			kvm_vcpu_ready_for_interrupt_injection(vcpu)) {
+			
 			r = 0;
 			vcpu->run->exit_reason = KVM_EXIT_IRQ_WINDOW_OPEN;
 			++vcpu->stat.request_irq_exits;

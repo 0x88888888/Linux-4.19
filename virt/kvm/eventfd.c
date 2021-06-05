@@ -284,6 +284,12 @@ int  __attribute__((weak)) kvm_arch_update_irqfd_routing(
 }
 #endif
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_irqfd()
+ *    kvm_irqfd_assign()
+ */
 static int
 kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
 {
@@ -567,6 +573,11 @@ kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd *args)
 	return 0;
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_irqfd()
+ */
 int
 kvm_irqfd(struct kvm *kvm, struct kvm_irqfd *args)
 {
