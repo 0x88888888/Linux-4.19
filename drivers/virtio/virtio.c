@@ -311,6 +311,12 @@ EXPORT_SYMBOL_GPL(unregister_virtio_driver);
  * as another code path may have obtained a reference to @dev.
  *
  * Returns: 0 on suceess, -error on failure
+ *
+ * virtio_mmio_probe()
+ *  register_virtio_device()
+ *
+ * virtio_pci_probe()
+ *  register_virtio_device()
  */
 int register_virtio_device(struct virtio_device *dev)
 {

@@ -295,10 +295,24 @@ static inline int kvm_vcpu_exiting_guest_mode(struct kvm_vcpu *vcpu)
 #define KVM_MEM_MAX_NR_PAGES ((1UL << 31) - 1)
 
 struct kvm_memory_slot {
+    /* 
+     * 虚机内存区间的物理页框号，内存插槽slot添加一块内存之后，
+     * 就关联起虚机的一段内存了，base_gfn记录这个区间的起始页框号
+     */
 	gfn_t base_gfn;
+	// 将内存区间的大小转化成页数，由npages记录
 	unsigned long npages;
+	/*
+	 * slot还提供对slot上内存的每个页进行脏页记录功能，
+	 * 脏页纪录功能开启时，kvm就会通过dirty_bitmap记录脏页，
+	 * 这在迁移内存时需要
+	 *
+	 * 一个bit对应一个page是否dirty
+	 */
 	unsigned long *dirty_bitmap;
+	// 反向映射相关的结构
 	struct kvm_arch_memory_slot arch;
+	//内存区间对应的主机虚拟地址
 	unsigned long userspace_addr;
 	u32 flags;
 	short id;

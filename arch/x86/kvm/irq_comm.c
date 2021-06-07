@@ -56,9 +56,13 @@ static int kvm_set_ioapic_irq(struct kvm_kernel_irq_routing_entry *e,
 }
 
 /*
- * kvm_lapic_reg_write()
- *  apic_send_ipi()
- *   kvm_irq_delivery_to_apic()
+ * write_mmio()
+ *	vcpu_mmio_write()
+ *   kvm_iodevice_write()
+ *    apic_mmio_write()
+ *     kvm_lapic_reg_write() 
+ *      apic_send_ipi()
+ *       kvm_irq_delivery_to_apic()
  *
  * 发送IPI中断
  */

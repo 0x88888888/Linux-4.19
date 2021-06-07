@@ -249,11 +249,22 @@ struct kvm_mmu_memory_cache {
 union kvm_mmu_page_role {
 	unsigned word;
 	struct {
+		/*
+		 * spt在页结构中的层级，比如level=1就是最底层，
+		 * 每个条目指向一个物理页，level=4最上层，
+		 * 它的地址被VMCS的EPT pointer记录
+		 */
 		unsigned level:4;
 		unsigned cr4_pae:1;
 		unsigned quadrant:2;
+		/*
+		 * 表明页表项是否直接指向了物理页
+		 */
 		unsigned direct:1;
 		unsigned access:3;
+		/*
+		 * spt是否无效，如果被设置成无效，就不应该被使用了，因此稍后它可能被销毁
+		 */
 		unsigned invalid:1;
 		unsigned nxe:1;
 		unsigned cr0_wp:1;
@@ -285,9 +296,11 @@ struct kvm_mmu_page {
 	 * The following two entries are used to key the shadow page in the
 	 * hash table.
 	 */
+	 //这个页结构包含的虚机物理内存区域的起始页框号
 	gfn_t gfn;
+	//页结构在EPT页层级中的角色
 	union kvm_mmu_page_role role;
-
+    //页结构的核心成员，指向一张物理页的基址，存放着512个页表项（sptes）
 	u64 *spt;
 	/* hold the gfn of each spte inside spt */
 	gfn_t *gfns;
@@ -347,9 +360,12 @@ struct kvm_mmu {
 	unsigned long (*get_cr3)(struct kvm_vcpu *vcpu);
 	u64 (*get_pdptr)(struct kvm_vcpu *vcpu, int index);
 	/*
-	 * tdp_page_fault(kvm host 应该是用这个函数),nonpaging_page_fault,
+	 * tdp_page_fault(kvm host 应该是用这个函数),
+	 * nonpaging_page_fault,
 	 * paging64_page_fault, paging32_page_fault
 	 * ept_page_fault
+	 *
+	 * 在init_kvm_tdp_mmu中设置为 tdp_page_fault
 	 */
 	int (*page_fault)(struct kvm_vcpu *vcpu, gva_t gva, u32 err,
 			  bool prefault);
@@ -365,11 +381,26 @@ struct kvm_mmu {
 	void (*invlpg)(struct kvm_vcpu *vcpu, gva_t gva, hpa_t root_hpa);
 	void (*update_pte)(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp,
 			   u64 *spte, const void *pte);
+	/*
+	 * mmu实现地址转换依赖的当然是spt，因此它的结构里面必须包含spt的入口，
+	 * 这样通过mmu可以找到ept页结构的入口点。root_hpa就是这个入口，
+	 * 它存放的是一个物理页地址，这个物理页的内容是spt，
+	 * root_hpa也可以看做是指向根spt的指针。
+	 */
 	hpa_t root_hpa;
 	union kvm_mmu_page_role base_role;
+	/*
+	 * 当客户机采用不同的分页模式时，页结构的层级页各有不同，root_level表示的是最顶层的页结构是第几级
+	 */
 	u8 root_level;
 	u8 shadow_root_level;
 	u8 ept_ad;
+	/*
+	 * 区分mmu是基于影子页表实现还是基于内存硬件机制实现,
+	 * direct_map为true时表示基于硬件（EPT/NPT）实现
+	 *
+	 * 在init_kvm_tdp_mmu中设置为true
+	 */ 
 	bool direct_map;
 	struct kvm_mmu_root_info prev_roots[KVM_MMU_NUM_PREV_ROOTS];
 
@@ -745,6 +776,15 @@ struct kvm_lpage_info {
 };
 
 struct kvm_arch_memory_slot {
+	/*
+	 *反向映射，host内存不够的时候 ，要用这个了
+	 * 在rmap_add中操作
+	 *
+	 * KVM_NR_PAGE_SIZES是qemu为虚机分配的不同大小的页的种类，
+	 * 比如2M，1G等，这里的宏定义为3种。kvm需要为不同页大小的页都维护其对应的EPT页表项。
+	 * 每个rmap[i]是一个数组，它的内存是页对应的EPT页表地址，
+	 * 整个数组在内存注册时会分配内存空间，
+     */
 	struct kvm_rmap_head *rmap[KVM_NR_PAGE_SIZES];
 	struct kvm_lpage_info *lpage_info[KVM_NR_PAGE_SIZES - 1];
 	unsigned short *gfn_track[KVM_PAGE_TRACK_MAX];
@@ -861,6 +901,7 @@ struct kvm_arch {
 
 	struct kvm_hv hyperv;
 
+    // 没有定义
 	#ifdef CONFIG_KVM_MMU_AUDIT
 	int audit_point;
 	#endif
@@ -1111,6 +1152,8 @@ struct kvm_x86_ops {
 	 *    - 1 means we cannot block the vCPU since some event
 	 *        happens during this period, such as, 'ON' bit in
 	 *        posted-interrupts descriptor is set.
+	 *
+	 * vmx_pre_block
 	 */
 	int (*pre_block)(struct kvm_vcpu *vcpu);
 	void (*post_block)(struct kvm_vcpu *vcpu);
@@ -1125,6 +1168,7 @@ struct kvm_x86_ops {
 	int (*set_hv_timer)(struct kvm_vcpu *vcpu, u64 guest_deadline_tsc);
 	void (*cancel_hv_timer)(struct kvm_vcpu *vcpu);
 
+    //vmx_setup_mce
 	void (*setup_mce)(struct kvm_vcpu *vcpu);
 
 	int (*get_nested_state)(struct kvm_vcpu *vcpu,
@@ -1521,13 +1565,13 @@ void kvm_set_msi_irq(struct kvm *kvm, struct kvm_kernel_irq_routing_entry *e,
 
 static inline void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu)
 {
-	if (kvm_x86_ops->vcpu_blocking)
+	if (kvm_x86_ops->vcpu_blocking) //vmx_x86_ops->vcpu_blocking==NULL
 		kvm_x86_ops->vcpu_blocking(vcpu);
 }
 
 static inline void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu)
 {
-	if (kvm_x86_ops->vcpu_unblocking)
+	if (kvm_x86_ops->vcpu_unblocking) //vmx_x86_ops->vcpu_unblocking==NULL
 		kvm_x86_ops->vcpu_unblocking(vcpu);
 }
 

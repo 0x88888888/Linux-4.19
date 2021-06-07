@@ -1174,7 +1174,7 @@ static void __init do_initcalls(void)
 	int level;
 
     /*
-     * 会调用 populate_rootfs,
+     * 
      *
      * 1. core_initcall(ksysfs_init)
      * 1. core_initcall(sock_init)
@@ -1197,8 +1197,10 @@ static void __init do_initcalls(void)
      * 
      * 6. __initcall(cpucache_init)
      * 6. __initcall(memblock_init_debugfs)
+     *
      * 6. module_init(init_kprobes)
-     * 6. rootfs_initcall(populate_rootfs)
+     *
+     * 6. rootfs_initcall(populate_rootfs) ,会调用 populate_rootfs,
      *  
      *
      * 7. late_initcall(debugfs_kprobe_init)

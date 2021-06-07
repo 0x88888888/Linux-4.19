@@ -622,11 +622,15 @@ static int __init populate_rootfs(void)
 	if (err)
 		panic("%s", err); /* Failed to decompress INTERNAL initramfs */
 	/* If available load the bootloader supplied initrd */
-	
+
+	//没有定义CONFIG_INITRAMFS_FORCE
 	if (initrd_start && !IS_ENABLED(CONFIG_INITRAMFS_FORCE)) {
+
+//有定义		
 #ifdef CONFIG_BLK_DEV_RAM
 		int fd;
 		printk(KERN_INFO "Trying to unpack rootfs image as initramfs...\n");
+		//解压
 		err = unpack_to_rootfs((char *)initrd_start,
 			initrd_end - initrd_start);
 		if (!err) {

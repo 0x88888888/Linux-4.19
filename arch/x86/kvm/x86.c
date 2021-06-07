@@ -169,6 +169,9 @@ struct kvm_shared_msrs {
 static struct kvm_shared_msrs_global __read_mostly shared_msrs_global;
 static struct kvm_shared_msrs __percpu *shared_msrs;
 
+/*
+ * /sys/kernel/debug/kvm/中的文件
+ */
 struct kvm_stats_debugfs_item debugfs_entries[] = {
 	{ "pf_fixed", VCPU_STAT(pf_fixed) },
 	{ "pf_guest", VCPU_STAT(pf_guest) },
@@ -522,6 +525,13 @@ static bool kvm_propagate_fault(struct kvm_vcpu *vcpu, struct x86_exception *fau
 	return fault->nested_page_fault;
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *	kvm_vcpu_ioctl()
+ *	 kvm_arch_vcpu_ioctl()
+ *    kvm_vcpu_ioctl_nmi()
+ *     kvm_inject_nmi()
+ */
 void kvm_inject_nmi(struct kvm_vcpu *vcpu)
 {
 	atomic_inc(&vcpu->arch.nmi_queued);
@@ -662,6 +672,12 @@ out:
 }
 EXPORT_SYMBOL_GPL(pdptrs_changed);
 
+/*
+ * vmx_handle_exit()
+ *  handle_cr()
+ *   handle_set_cr0()
+ *    kvm_set_cr0()
+ */
 int kvm_set_cr0(struct kvm_vcpu *vcpu, unsigned long cr0)
 {
 	unsigned long old_cr0 = kvm_read_cr0(vcpu);
@@ -709,6 +725,7 @@ int kvm_set_cr0(struct kvm_vcpu *vcpu, unsigned long cr0)
 		kvm_async_pf_hash_reset(vcpu);
 	}
 
+    //切换虚拟mmu了，guest从实模式进入保护模式，会用
 	if ((cr0 ^ old_cr0) & update_bits)
 		kvm_mmu_reset_context(vcpu);
 
@@ -3229,6 +3246,12 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
 	set_debugreg(0, 6);
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl()
+ *    kvm_vcpu_ioctl_get_lapic()
+ */ 
 static int kvm_vcpu_ioctl_get_lapic(struct kvm_vcpu *vcpu,
 				    struct kvm_lapic_state *s)
 {
@@ -3298,6 +3321,12 @@ static int kvm_vcpu_ioctl_interrupt(struct kvm_vcpu *vcpu,
 	return 0;
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *	kvm_vcpu_ioctl()
+ *	 kvm_arch_vcpu_ioctl()
+ *    kvm_vcpu_ioctl_nmi()
+ */ 
 static int kvm_vcpu_ioctl_nmi(struct kvm_vcpu *vcpu)
 {
 	kvm_inject_nmi(vcpu);
@@ -3321,6 +3350,12 @@ static int vcpu_ioctl_tpr_access_reporting(struct kvm_vcpu *vcpu,
 	return 0;
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl()  [KVM_X86_SETUP_MCE]
+ *    kvm_vcpu_ioctl_x86_setup_mce()
+ */
 static int kvm_vcpu_ioctl_x86_setup_mce(struct kvm_vcpu *vcpu,
 					u64 mcg_cap)
 {
@@ -3341,7 +3376,7 @@ static int kvm_vcpu_ioctl_x86_setup_mce(struct kvm_vcpu *vcpu,
 	for (bank = 0; bank < bank_num; bank++)
 		vcpu->arch.mce_banks[bank*4] = ~(u64)0;
 
-	if (kvm_x86_ops->setup_mce)
+	if (kvm_x86_ops->setup_mce) //vmx_setup_mce
 		kvm_x86_ops->setup_mce(vcpu);
 out:
 	return r;
@@ -3908,6 +3943,7 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
 		r = -EFAULT;
 		if (copy_from_user(&mcg_cap, argp, sizeof mcg_cap))
 			goto out;
+		
 		r = kvm_vcpu_ioctl_x86_setup_mce(vcpu, mcg_cap);
 		break;
 	}
@@ -6266,6 +6302,11 @@ static bool is_vmware_backdoor_opcode(struct x86_emulate_ctxt *ctxt)
  *  handle_io()
  *   kvm_emulate_instruction(emulation_type==0) 
  *    x86_emulate_instruction( cr2 ==0 ,emulation_type==0,insn=NULL, insn_len=0)
+ *
+ * vmx_handle_exit()
+ *  handle_apic_access()
+ *   kvm_emulate_instruction(emulation_type==0)
+ *    x86_emulate_instruction(cr2=0, emulation_type==0,insn=NULL, insn_len=0)
  */
 int x86_emulate_instruction(struct kvm_vcpu *vcpu,
 			    unsigned long cr2,
@@ -6350,6 +6391,7 @@ restart:
 	/* Save the faulting GPA (cr2) in the address field */
 	ctxt->exception.address = cr2;
 
+    //模拟指令了
 	r = x86_emulate_insn(ctxt);
 
 	if (r == EMULATION_INTERCEPTED)
@@ -6424,6 +6466,10 @@ restart:
  * vmx_handle_exit()
  *  handle_apic_access()
  *   kvm_emulate_instruction( emulation_type==0)
+ *
+ * vmx_handle_exit()
+ *  handle_apic_access()
+ *   kvm_emulate_instruction(emulation_type==0)
  */
 int kvm_emulate_instruction(struct kvm_vcpu *vcpu, int emulation_type)
 {
@@ -7624,6 +7670,8 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 			r = 0;
 			goto out;
 		}
+
+		//直接关机了
 		if (kvm_check_request(KVM_REQ_TRIPLE_FAULT, vcpu)) {
 			vcpu->run->exit_reason = KVM_EXIT_SHUTDOWN;
 			vcpu->mmio_needed = 0;
@@ -7894,10 +7942,15 @@ out:
 	return r;
 }
 
+/*
+ * vcpu_run()
+ *  vcpu_block()
+ */
 static inline int vcpu_block(struct kvm *kvm, struct kvm_vcpu *vcpu)
 {
 	if (!kvm_arch_vcpu_runnable(vcpu) &&
-	    (!kvm_x86_ops->pre_block || kvm_x86_ops->pre_block(vcpu) == 0)) {
+	    (!kvm_x86_ops->pre_block || kvm_x86_ops->pre_block(vcpu) == 0 /* vmx_pre_block */)) {
+	    
 		srcu_read_unlock(&kvm->srcu, vcpu->srcu_idx);
 		kvm_vcpu_block(vcpu);
 		vcpu->srcu_idx = srcu_read_lock(&kvm->srcu);
@@ -7954,6 +8007,7 @@ static int vcpu_run(struct kvm_vcpu *vcpu)
 		if (kvm_vcpu_running(vcpu)) {
 			r = vcpu_enter_guest(vcpu); //guest os走起
 		} else {
+		    //逐个vcpu继续不能运行
 			r = vcpu_block(kvm, vcpu);
 		}
 
@@ -8105,7 +8159,7 @@ static void kvm_put_guest_fpu(struct kvm_vcpu *vcpu)
 /*
  * kvm_vcpu_compat_ioctl()
  *  kvm_vcpu_ioctl()
- *   kvm_arch_vcpu_ioctl_run()
+ *   kvm_arch_vcpu_ioctl_run()  [KVM_RUN]
  */
 int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *kvm_run)
 {
@@ -9358,14 +9412,21 @@ int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
 		int lpages;
 		int level = i + 1;
 
+        // 根据内存区间大小计算出页的个数
 		lpages = gfn_to_index(slot->base_gfn + npages - 1,
 				      slot->base_gfn, level) + 1;
 
+        /*
+         * 为反向映射rmap[i]分配内存，可以看到分配了lpages个元素，
+         * 因此QEMU注册的每个页，都有对应的EPT页表项地址存放在rmap二维数组中。
+         * 当kvm处理缺页走主机缺页流程后，填写EPT页表之后，也会把页表地址写到ramp中
+         */
 		slot->arch.rmap[i] =
 			kvcalloc(lpages, sizeof(*slot->arch.rmap[i]),
 				 GFP_KERNEL);
 		if (!slot->arch.rmap[i])
 			goto out_free;
+		
 		if (i == 0)
 			continue;
 
@@ -9377,8 +9438,10 @@ int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
 
 		if (slot->base_gfn & (KVM_PAGES_PER_HPAGE(level) - 1))
 			linfo[0].disallow_lpage = 1;
+		
 		if ((slot->base_gfn + npages) & (KVM_PAGES_PER_HPAGE(level) - 1))
 			linfo[lpages - 1].disallow_lpage = 1;
+		
 		ugfn = slot->userspace_addr >> PAGE_SHIFT;
 		/*
 		 * If the gfn and userspace address are not aligned wrt each

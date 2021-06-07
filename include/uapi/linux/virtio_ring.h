@@ -99,11 +99,11 @@ struct vring_used {
  */
 struct vring {
 	unsigned int num;
-
+    /*描述符数组*/
 	struct vring_desc *desc;
-
+    /*guest提供给设备的描述符*/
 	struct vring_avail *avail;
-
+    /*指向host使用过的buffers*/
 	struct vring_used *used;
 };
 

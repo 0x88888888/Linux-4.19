@@ -63,7 +63,10 @@ struct vring_desc_state {
 struct vring_virtqueue {
 	struct virtqueue vq;
 
-	/* Actual memory layout for this queue */
+	/* Actual memory layout for this queue 
+	 *
+	 *用于存储数据的数据结构
+	 */
 	struct vring vring;
 
 	/* Can we use weak barriers? */
@@ -72,7 +75,10 @@ struct vring_virtqueue {
 	/* Other side has made a mess, don't try any more. */
 	bool broken;
 
-	/* Host supports indirect buffers */
+	/* Host supports indirect buffers 
+	 *
+	 * host是否支持indirect方式
+	 */
 	bool indirect;
 
 	/* Host publishes avail event idx */
@@ -80,10 +86,16 @@ struct vring_virtqueue {
 
 	/* Head of free buffer list. */
 	unsigned int free_head;
-	/* Number we've added since last sync. */
+	/* Number we've added since last sync. 
+	 *
+	 * 上次同步之后添加的个数
+	 */
 	unsigned int num_added;
 
-	/* Last used index we've seen. */
+	/* Last used index we've seen. 
+	 *
+	 * 最近一次使用的index
+	 */
 	u16 last_used_idx;
 
 	/* Last written value to avail->flags */

@@ -74,6 +74,12 @@ MODULE_DEVICE_TABLE(x86cpu, vmx_cpu_id);
 
 /********************************************************/
 
+/*
+ * 这个文件中的PI 就是Posted-Interrupt的简称
+ * 启动PI功能，能够直接把外部中断投到VM，不用经历VM EXIT到VMM
+ *
+ * https://lore.kernel.org/patchwork/cover/599060/
+ */
 
 //下面的这些module 变量用来控制KVM的功能了
 static bool __read_mostly enable_vpid = 1;
@@ -185,6 +191,9 @@ module_param_named(preemption_timer, enable_preemption_timer, bool, S_IRUGO);
  */
 static unsigned int ple_gap = KVM_DEFAULT_PLE_GAP;
 
+/*
+ * pause loop enable 控制
+ */
 static unsigned int ple_window = KVM_VMX_DEFAULT_PLE_WINDOW;
 module_param(ple_window, uint, 0444);
 
@@ -1038,6 +1047,10 @@ struct vcpu_vmx {
 
 	/* Support for PML */
 #define PML_ENTITY_NUM		512
+    /*
+     * 就是page modify log了,vmx_create_vcpu中分配
+     *
+     */
 	struct page *pml_pg;
 
 	/* apic deadline value in host tsc */
@@ -7407,6 +7420,9 @@ static int handle_external_interrupt(struct kvm_vcpu *vcpu)
 	return 1;
 }
 
+/*
+ * 关机了
+ */
 static int handle_triple_fault(struct kvm_vcpu *vcpu)
 {
 	vcpu->run->exit_reason = KVM_EXIT_SHUTDOWN;
@@ -7437,6 +7453,7 @@ static int handle_io(struct kvm_vcpu *vcpu)
 	if (string)
 		return kvm_emulate_instruction(vcpu, 0) == EMULATE_DONE;
 
+    //从exit_qualification中读取操作port的信息
 	port = exit_qualification >> 16;
 	size = (exit_qualification & 7) + 1;
 	in = (exit_qualification & 8) != 0;
@@ -7456,7 +7473,12 @@ vmx_patch_hypercall(struct kvm_vcpu *vcpu, unsigned char *hypercall)
 	hypercall[2] = 0xc1;
 }
 
-/* called to set cr0 as appropriate for a mov-to-cr0 exit. */
+/* called to set cr0 as appropriate for a mov-to-cr0 exit. 
+ *
+ * vmx_handle_exit()
+ *  handle_cr()
+ *   handle_set_cr0()
+ */
 static int handle_set_cr0(struct kvm_vcpu *vcpu, unsigned long val)
 {
 	if (is_guest_mode(vcpu)) {
@@ -7818,6 +7840,8 @@ static int handle_xrstors(struct kvm_vcpu *vcpu)
 /*
  * vmx_handle_exit()
  *  handle_apic_access()
+ *
+ * 读写APIC寄存器了，可能需要发送ipi哦
  */
 static int handle_apic_access(struct kvm_vcpu *vcpu)
 {
@@ -7833,7 +7857,7 @@ static int handle_apic_access(struct kvm_vcpu *vcpu)
 		 * heavy instruction emulation.
 		 */
 		if ((access_type == TYPE_LINEAR_APIC_INST_WRITE) &&
-		    (offset == APIC_EOI)) {
+		    (offset == APIC_EOI)) { //写APIC_EOI,加快处理了
 			kvm_lapic_set_eoi(vcpu);
 			return kvm_skip_emulated_instruction(vcpu);
 		}
@@ -8026,6 +8050,14 @@ static int handle_nmi_window(struct kvm_vcpu *vcpu)
 	return 1;
 }
 
+/*
+ * vcpu_run()
+ *  vcpu_enter_guest()
+ *   vmx_handle_exit()
+ *    handle_invalid_guest_state()
+ *
+ * vmcs的guest 部分 invalid了
+ */
 static int handle_invalid_guest_state(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
@@ -8260,6 +8292,9 @@ static __init int hardware_setup(void)
 
 	set_bit(0, vmx_vpid_bitmap); /* 0 is reserved for host */
 
+	/*
+	 * 如果系统支持ept，就启动ept页表了
+	 */
 	if (enable_ept)
 		vmx_enable_tdp();
 	else
@@ -10145,6 +10180,10 @@ static void vmx_destroy_pml_buffer(struct vcpu_vmx *vmx)
 	}
 }
 
+/*
+ * vmx_handle_exit()
+ *  vmx_flush_pml_buffer()
+ */
 static void vmx_flush_pml_buffer(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
@@ -10164,14 +10203,17 @@ static void vmx_flush_pml_buffer(struct kvm_vcpu *vcpu)
 		pml_idx++;
 
 	pml_buf = page_address(vmx->pml_pg);
+	//一个个的循环过去
 	for (; pml_idx < PML_ENTITY_NUM; pml_idx++) {
 		u64 gpa;
 
 		gpa = pml_buf[pml_idx];
 		WARN_ON(gpa & (PAGE_SIZE - 1));
+		//将相应dirty 的gpa写入到 memslot->dirty_bitmap中去
 		kvm_vcpu_mark_page_dirty(vcpu, gpa >> PAGE_SHIFT);
 	}
 
+    //空了,reset 掉
 	/* reset PML index */
 	vmcs_write16(GUEST_PML_INDEX, PML_ENTITY_NUM - 1);
 }
@@ -10191,7 +10233,7 @@ static void kvm_flush_pml_buffers(struct kvm *kvm)
 	 * buffer.
 	 */
 	kvm_for_each_vcpu(i, vcpu, kvm)
-		kvm_vcpu_kick(vcpu);
+		kvm_vcpu_kick(vcpu);//目标vCPU发生vm exit,然后会调用vmx_handle_exit,然后调用vmx_flush_pml_buffer
 }
 
 static void vmx_dump_sel(char *name, uint32_t sel)
@@ -10377,6 +10419,8 @@ static int vmx_handle_exit(struct kvm_vcpu *vcpu)
 	 * querying dirty_bitmap, we only need to kick all vcpus out of guest
 	 * mode as if vcpus is in root mode, the PML buffer must has been
 	 * flushed already.
+	 *
+	 * 通过page modified log 这个page中记录相应dirty 的gpa写入到 memslot->dirty_bitmap中去
 	 */
 	if (enable_pml)
 		vmx_flush_pml_buffer(vcpu);
@@ -11410,6 +11454,9 @@ static struct kvm_vcpu *vmx_create_vcpu(struct kvm *kvm, unsigned int id)
 	 * of creating the vcpu, therefore we can simplify PML logic (by
 	 * avoiding dealing with cases, such as enabling PML partially on vcpus
 	 * for the guest, etc.
+	 *
+	 * 分配一个page 用于 page modify log,在页面别修改的时候，计入日志
+	 * 这个功能在虚拟机迁移的时候很有用
 	 */
 	if (enable_pml) {
 		vmx->pml_pg = alloc_page(GFP_KERNEL | __GFP_ZERO);
@@ -14067,6 +14114,13 @@ static void vmx_enable_log_dirty_pt_masked(struct kvm *kvm,
 	kvm_mmu_clear_dirty_pt_masked(kvm, memslot, offset, mask);
 }
 
+/*
+ * vcpu_run()
+ *  vcpu_block()
+ *   vmx_pre_block()
+ *    pi_pre_block()
+ *     __pi_post_block()
+ */
 static void __pi_post_block(struct kvm_vcpu *vcpu)
 {
 	struct pi_desc *pi_desc = vcpu_to_pi_desc(vcpu);
@@ -14094,6 +14148,7 @@ static void __pi_post_block(struct kvm_vcpu *vcpu)
 		spin_lock(&per_cpu(blocked_vcpu_on_cpu_lock, vcpu->pre_pcpu));
 		list_del(&vcpu->blocked_vcpu_list);
 		spin_unlock(&per_cpu(blocked_vcpu_on_cpu_lock, vcpu->pre_pcpu));
+		//这步很重要
 		vcpu->pre_pcpu = -1;
 	}
 }
@@ -14110,6 +14165,11 @@ static void __pi_post_block(struct kvm_vcpu *vcpu)
  *   interrupt is posted for this vCPU, we cannot block it, in
  *   this case, return 1, otherwise, return 0.
  *
+ * vcpu_run()
+ *  vcpu_block()
+ *   vmx_pre_block()
+ *    pi_pre_block()
+ *
  */
 static int pi_pre_block(struct kvm_vcpu *vcpu)
 {
@@ -14120,7 +14180,7 @@ static int pi_pre_block(struct kvm_vcpu *vcpu)
 	if (!kvm_arch_has_assigned_device(vcpu->kvm) ||
 		!irq_remapping_cap(IRQ_POSTING_CAP)  ||
 		!kvm_vcpu_apicv_active(vcpu))
-		return 0;
+		return 0;//这个vCPU线程可以继续睡眠
 
 	WARN_ON(irqs_disabled());
 	local_irq_disable();
@@ -14168,9 +14228,14 @@ static int pi_pre_block(struct kvm_vcpu *vcpu)
 	return (vcpu->pre_pcpu == -1);
 }
 
+/*
+ * vcpu_run()
+ *  vcpu_block()
+ *   vmx_pre_block()
+ */
 static int vmx_pre_block(struct kvm_vcpu *vcpu)
 {
-	if (pi_pre_block(vcpu))
+	if (pi_pre_block(vcpu)) //有外部中断,返回
 		return 1;
 
 	if (kvm_lapic_hv_timer_in_use(vcpu))
@@ -14288,6 +14353,13 @@ out:
 	return ret;
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl()  [KVM_X86_SETUP_MCE]
+ *    kvm_vcpu_ioctl_x86_setup_mce()
+ *     vmx_setup_mce()
+ */
 static void vmx_setup_mce(struct kvm_vcpu *vcpu)
 {
 	if (vcpu->arch.mcg_cap & MCG_LMCE_P)

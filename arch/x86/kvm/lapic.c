@@ -1206,8 +1206,12 @@ void kvm_apic_set_eoi_accelerated(struct kvm_vcpu *vcpu, int vector)
 EXPORT_SYMBOL_GPL(kvm_apic_set_eoi_accelerated);
 
 /*
- * kvm_lapic_reg_write()
- *  apic_send_ipi()
+ * write_mmio()
+ *	vcpu_mmio_write()
+ *   kvm_iodevice_write()
+ *    apic_mmio_write()
+ *     kvm_lapic_reg_write() 
+ *      apic_send_ipi()
  */
 static void apic_send_ipi(struct kvm_lapic *apic)
 {
@@ -1964,6 +1968,7 @@ static int apic_mmio_write(struct kvm_vcpu *vcpu, struct kvm_io_device *this,
 	unsigned int offset = address - apic->base_address;
 	u32 val;
 
+    //地址要在apic映射的范围内
 	if (!apic_mmio_in_range(apic, address))
 		return -EOPNOTSUPP;
 
@@ -2409,6 +2414,14 @@ int kvm_get_apic_interrupt(struct kvm_vcpu *vcpu)
 	return vector;
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *	kvm_vcpu_ioctl()
+ *	 kvm_arch_vcpu_ioctl()
+ *	  kvm_vcpu_ioctl_get_lapic()
+ *     kvm_apic_get_state()
+ *      kvm_apic_state_fixup()
+ */
 static int kvm_apic_state_fixup(struct kvm_vcpu *vcpu,
 		struct kvm_lapic_state *s, bool set)
 {
@@ -2434,6 +2447,13 @@ static int kvm_apic_state_fixup(struct kvm_vcpu *vcpu,
 	return 0;
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *	kvm_vcpu_ioctl()
+ *	 kvm_arch_vcpu_ioctl()
+ *	  kvm_vcpu_ioctl_get_lapic()
+ *     kvm_apic_get_state()
+ */ 
 int kvm_apic_get_state(struct kvm_vcpu *vcpu, struct kvm_lapic_state *s)
 {
 	memcpy(s->regs, vcpu->arch.apic->regs, sizeof(*s));

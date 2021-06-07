@@ -28,8 +28,12 @@
  * 看vring_virtqueue, vring_virtqueue包含了virtqueue和vring
  */
 struct virtqueue {
-    //链接virtqueue
+    /*
+     * 链接virtqueue
+     * 设备的vq链表头，一个设备可以有多个vq
+     */
 	struct list_head list;
+	/*当buffer被使用后调用这个callback函数进行通知*/
 	void (*callback)(struct virtqueue *vq);
 	const char *name;
 	/*
@@ -38,6 +42,7 @@ struct virtqueue {
 	struct virtio_device *vdev;
 	unsigned int index;
 	unsigned int num_free;
+	/*私有指针*/
 	void *priv;
 };
 
@@ -129,20 +134,28 @@ static inline void *virtqueue_get_used(struct virtqueue *vq)
  * @priv: private pointer for the driver's use.
  */
 struct virtio_device {
+	/*virtio bus中的唯一表示*/
 	int index;
 	bool failed;
 	bool config_enabled;
 	bool config_change_pending;
 	spinlock_t config_lock;
+	/*设备对象*/
 	struct device dev;
+	/*设备类型唯一标识，用于识别设备driver*/
 	struct virtio_device_id id;
+	/*设备配置操作函数指针*/
 	const struct virtio_config_ops *config;
 	const struct vringh_config_ops *vringh_config;
 	/*
+	 * 设备virtio_queue，一个设备可以多个，用于数据传输
+	 *
 	 * 链接到virtqueue->list
 	 */
 	struct list_head vqs;
+	/*设备和driver支持的特性*/
 	u64 features;
+	/*供driver使用的私有指针*/
 	void *priv;
 };
 
@@ -185,18 +198,28 @@ int virtio_device_restore(struct virtio_device *dev);
  *    changes; may be called in interrupt context.
  * @freeze: optional function to call during suspend/hibernation.
  * @restore: optional function to call on resume.
+ *
+ * ,
  */
 struct virtio_driver {
+    /*driver对象*/
 	struct device_driver driver;
+	/*driver id*/
 	const struct virtio_device_id *id_table;
+	/*这个设备支持的特性列表，以数组形式存在这个表中*/
 	const unsigned int *feature_table;
+	/*特性表长度*/
 	unsigned int feature_table_size;
+	
 	const unsigned int *feature_table_legacy;
 	unsigned int feature_table_size_legacy;
 	int (*validate)(struct virtio_device *dev);
+	/*设备发现时调用，0成功，-errono错误*/
 	int (*probe)(struct virtio_device *dev);
 	void (*scan)(struct virtio_device *dev);
+	/*设备删除时调用*/
 	void (*remove)(struct virtio_device *dev);
+	/*在设备配置发生改变时调用*/
 	void (*config_changed)(struct virtio_device *dev);
 #ifdef CONFIG_PM
 	int (*freeze)(struct virtio_device *dev);

@@ -2795,7 +2795,9 @@ static int mc_interception(struct vcpu_svm *svm)
 {
 	return 1;
 }
-
+/*
+ * 关机
+ */
 static int shutdown_interception(struct vcpu_svm *svm)
 {
 	struct kvm_run *kvm_run = svm->vcpu.run;

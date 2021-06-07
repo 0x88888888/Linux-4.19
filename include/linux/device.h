@@ -112,6 +112,8 @@ extern void bus_remove_file(struct bus_type *, struct bus_attribute *);
  * private data.
  *
  * 内核中总线对象被定义成bus_type，可以是实际的物理总线也可以是虚拟总线。
+ *
+ * virtio_bus,
  */
 struct bus_type {
     // 总线的名称

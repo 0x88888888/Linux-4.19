@@ -429,6 +429,10 @@ static void virtblk_config_changed(struct virtio_device *vdev)
 	queue_work(virtblk_wq, &vblk->config_work);
 }
 
+/*
+ * virtblk_probe()
+ *  init_vq()
+ */
 static int init_vq(struct virtio_blk *vblk)
 {
 	int err;
@@ -668,6 +672,10 @@ static int virtblk_probe(struct virtio_device *vdev)
 
 	INIT_WORK(&vblk->config_work, virtblk_config_changed_work);
 
+    /* 分配vq，调用virtio_find_single_vq(vdev, blk_done, "requests");	   
+     * 分配单个vq，名字为”request”，注册	的通知函数是blk_done 
+     */
+	   
 	err = init_vq(vblk);
 	if (err)
 		goto out_free_vblk;

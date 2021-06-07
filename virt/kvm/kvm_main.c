@@ -109,6 +109,7 @@ EXPORT_SYMBOL_GPL(kvm_vcpu_cache);
 
 static __read_mostly struct preempt_ops kvm_preempt_ops;
 
+// /sys/kernel/debug/kvm
 struct dentry *kvm_debugfs_dir;
 EXPORT_SYMBOL_GPL(kvm_debugfs_dir);
 
@@ -610,6 +611,12 @@ static void kvm_destroy_vm_debugfs(struct kvm *kvm)
 	}
 }
 
+/*
+ * kvm_dev_ioctl()
+ *  kvm_dev_ioctl_create_vm()
+ *   kvm_create_vm_debugfs()
+ * 
+ */
 static int kvm_create_vm_debugfs(struct kvm *kvm, int fd)
 {
 	char dir_name[ITOA_MAX_LEN * 2];
@@ -620,6 +627,7 @@ static int kvm_create_vm_debugfs(struct kvm *kvm, int fd)
 		return 0;
 
 	snprintf(dir_name, sizeof(dir_name), "%d-%d", task_pid_nr(current), fd);
+	// dir=sys/kernel/debug/kvm
 	kvm->debugfs_dentry = debugfs_create_dir(dir_name, kvm_debugfs_dir);
 
 	kvm->debugfs_stat_data = kcalloc(kvm_debugfs_num_entries,
@@ -636,6 +644,7 @@ static int kvm_create_vm_debugfs(struct kvm *kvm, int fd)
 		stat_data->kvm = kvm;
 		stat_data->offset = p->offset;
 		kvm->debugfs_stat_data[p - debugfs_entries] = stat_data;
+		//创建文件
 		debugfs_create_file(p->name, 0644, kvm->debugfs_dentry,
 				    stat_data, stat_fops_per_vm[p->kind]);
 	}
@@ -975,6 +984,10 @@ int __kvm_set_memory_region(struct kvm *kvm,
 
 	r = -EINVAL;
 	
+    /*
+     * slot的低16位是插槽号，往上是地址空间的id，
+     * 将插槽号和地址空间id都取出来
+     */
 	as_id = mem->slot >> 16;
 	id = (u16)mem->slot;
 
@@ -1002,6 +1015,7 @@ int __kvm_set_memory_region(struct kvm *kvm,
 
     //从kvm->memslots[]中得到相应的slot
 	slot = id_to_memslot(__kvm_memslots(kvm, as_id), id);
+	
 	base_gfn = mem->guest_phys_addr >> PAGE_SHIFT;
 	npages = mem->memory_size >> PAGE_SHIFT;
 
@@ -2120,6 +2134,12 @@ int kvm_clear_guest(struct kvm *kvm, gpa_t gpa, unsigned long len)
 }
 EXPORT_SYMBOL_GPL(kvm_clear_guest);
 
+/*
+ * vmx_handle_exit()
+ *  vmx_flush_pml_buffer()
+ *   kvm_vcpu_mark_page_dirty()
+ *    mark_page_dirty_in_slot()
+ */
 static void mark_page_dirty_in_slot(struct kvm_memory_slot *memslot,
 				    gfn_t gfn)
 {
@@ -2130,6 +2150,9 @@ static void mark_page_dirty_in_slot(struct kvm_memory_slot *memslot,
 	}
 }
 
+/*
+ * x86不会调用到这个函数
+ */
 void mark_page_dirty(struct kvm *kvm, gfn_t gfn)
 {
 	struct kvm_memory_slot *memslot;
@@ -2139,6 +2162,11 @@ void mark_page_dirty(struct kvm *kvm, gfn_t gfn)
 }
 EXPORT_SYMBOL_GPL(mark_page_dirty);
 
+/*
+ * vmx_handle_exit()
+ *  vmx_flush_pml_buffer()
+ *   kvm_vcpu_mark_page_dirty()
+ */
 void kvm_vcpu_mark_page_dirty(struct kvm_vcpu *vcpu, gfn_t gfn)
 {
 	struct kvm_memory_slot *memslot;
@@ -2249,8 +2277,9 @@ void kvm_vcpu_block(struct kvm_vcpu *vcpu)
 			/*
 			 * This sets KVM_REQ_UNHALT if an interrupt
 			 * arrives.
+			 * halt状态被中断打断了
 			 */
-			if (kvm_vcpu_check_block(vcpu) < 0) {
+			if (kvm_vcpu_check_block(vcpu) < 0) { 
 				++vcpu->stat.halt_successful_poll;
 				if (!vcpu_valid_wakeup(vcpu))
 					++vcpu->stat.halt_poll_invalid;
@@ -2262,6 +2291,7 @@ void kvm_vcpu_block(struct kvm_vcpu *vcpu)
 
 	kvm_arch_vcpu_blocking(vcpu);
 
+    //切换出去
 	for (;;) {
 		prepare_to_swait_exclusive(&vcpu->wq, &wait, TASK_INTERRUPTIBLE);
 
@@ -2282,15 +2312,16 @@ out:
 	if (!vcpu_valid_wakeup(vcpu))
 		shrink_halt_poll_ns(vcpu);
 	else if (halt_poll_ns) {
+		
 		if (block_ns <= vcpu->halt_poll_ns)
 			;
 		/* we had a long block, shrink polling */
 		else if (vcpu->halt_poll_ns && block_ns > halt_poll_ns)
-			shrink_halt_poll_ns(vcpu);
+			shrink_halt_poll_ns(vcpu);//缩小halt时常
 		/* we had a short halt and our poll time is too small */
 		else if (vcpu->halt_poll_ns < halt_poll_ns &&
 			block_ns < halt_poll_ns)
-			grow_halt_poll_ns(vcpu);
+			grow_halt_poll_ns(vcpu); //增加halt时常
 	} else
 		vcpu->halt_poll_ns = 0;
 
@@ -2332,6 +2363,7 @@ void kvm_vcpu_kick(struct kvm_vcpu *vcpu)
 	if (cpu != me && (unsigned)cpu < nr_cpu_ids && cpu_online(cpu))
 		if (kvm_arch_vcpu_should_kick(vcpu))
 			smp_send_reschedule(cpu);
+		
 	put_cpu();
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_kick);
@@ -2572,6 +2604,10 @@ static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
 	kvm->created_vcpus++;
 	mutex_unlock(&kvm->lock);
 
+    /*
+	 * 创建vCPU，建立mmu，设置tsc之类的
+     * 
+     */
 	vcpu = kvm_arch_vcpu_create(kvm, id);
 	if (IS_ERR(vcpu)) {
 		r = PTR_ERR(vcpu);
@@ -2580,10 +2616,12 @@ static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
 
 	preempt_notifier_init(&vcpu->preempt_notifier, &kvm_preempt_ops);
 
+    //根据ept的设置建立虚拟mmu, load vcpu
 	r = kvm_arch_vcpu_setup(vcpu);
 	if (r)
 		goto vcpu_destroy;
 
+    // 这里函数里应该是什么都没有创建
 	r = kvm_create_vcpu_debugfs(vcpu);
 	if (r)
 		goto vcpu_destroy;
@@ -2666,6 +2704,8 @@ static long kvm_vcpu_ioctl(struct file *filp,
 	/*
 	 * Some architectures have vcpu ioctls that are asynchronous to vcpu
 	 * execution; mutex_lock() would break them.
+	 *
+	 * x86跳过
 	 */
 	r = kvm_arch_vcpu_async_ioctl(filp, ioctl, arg);
 	if (r != -ENOIOCTLCMD)
