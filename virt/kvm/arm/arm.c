@@ -737,6 +737,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
 		 * interrupts and before the final VCPU requests check.
 		 * See the comment in kvm_vcpu_exiting_guest_mode() and
 		 * Documentation/virtual/kvm/vcpu-requests.rst
+		 *
+		 * 
 		 */
 		smp_store_mb(vcpu->mode, IN_GUEST_MODE);
 

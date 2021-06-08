@@ -302,6 +302,11 @@ unsigned int native_io_apic_read(unsigned int apic, unsigned int reg)
 	return readl(&io_apic->data);
 }
 
+/*
+ * ioapic_write_entry()
+ *  __ioapic_write_entry()
+ *   io_apic_write()
+ */
 static void io_apic_write(unsigned int apic, unsigned int reg,
 			  unsigned int value)
 {
@@ -343,6 +348,9 @@ static struct IO_APIC_route_entry ioapic_read_entry(int apic, int pin)
  * word first! If the mask bit in the low word is clear, we will enable
  * the interrupt, and we need to make sure the entry is fully populated
  * before that happens.
+ *
+ * ioapic_write_entry()
+ *  __ioapic_write_entry()
  */
 static void __ioapic_write_entry(int apic, int pin, struct IO_APIC_route_entry e)
 {
@@ -353,6 +361,9 @@ static void __ioapic_write_entry(int apic, int pin, struct IO_APIC_route_entry e
 	io_apic_write(apic, 0x10 + 2*pin, eu.w1);
 }
 
+/*
+ * 设置io apic的中断路由表信息
+ */
 static void ioapic_write_entry(int apic, int pin, struct IO_APIC_route_entry e)
 {
 	unsigned long flags;
@@ -366,6 +377,8 @@ static void ioapic_write_entry(int apic, int pin, struct IO_APIC_route_entry e)
  * When we mask an IO APIC routing entry, we need to write the low
  * word first, in order to set the mask bit before we change the
  * high bits!
+ *
+ * 在io apic 层面屏蔽中断
  */
 static void ioapic_mask_entry(int apic, int pin)
 {
@@ -671,6 +684,8 @@ int save_ioapic_entries(void)
 
 /*
  * Mask all IO APIC entries.
+ *
+ * 在io apic 层面屏蔽掉所有的中断路由
  */
 void mask_ioapic_entries(void)
 {

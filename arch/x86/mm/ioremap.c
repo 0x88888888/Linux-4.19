@@ -277,6 +277,12 @@ err_free_memtype:
  * write combining or read caching is not desirable:
  *
  * Must be freed with iounmap.
+ *
+ * msix_capability_init()
+ *  msix_map_region()
+ *   ioremap_nocache()
+ *
+ * 将总线地址空间(外设地址)映射到物理内存地址空间
  */
 void __iomem *ioremap_nocache(resource_size_t phys_addr, unsigned long size)
 {

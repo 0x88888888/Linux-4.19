@@ -223,7 +223,40 @@ struct kvm_vcpu {
 	int cpu;
 	int vcpu_id;
 	int srcu_idx;
+	/* 
+	 * vcpu是否运行在guest模式
+	 *
+	 * OUTSIDE_GUEST_MODE  在vcpu_enter_guest中标记为这个
+	 * IN_GUEST_MODE       在vcpu_enter_guest中标记为这个
+	 * EXITING_GUEST_MODE
+	 * READING_SHADOW_PAGE_TABLES
+	 */
 	int mode;
+	/*
+	 * KVM_REQUEST_MASK
+	 * 通过kvm_make_request来设置
+	 *
+	 * synic_set_sint()    ->kvm_make_request(KVM_REQ_SCAN_IOAPIC)
+	 * kvm_hv_notify_acked_sint    ->kvm_make_request(KVM_REQ_HV_STIMER)
+	 * synic_exit()     ->kvm_make_request(KVM_REQ_HV_EXIT)
+	 * stimer_mark_pending()    ->kvm_make_request(KVM_REQ_HV_STIMER)
+	 * kvm_hv_msr_set_crash_ctl()  ->kvm_make_request(KVM_REQ_HV_CRASH)
+	 * kvm_hv_set_msr_pw() ->kvm_make_request(KVM_REQ_MASTERCLOCK_UPDATE)
+	 * kvm_hv_set_msr_pw()  ->kvm_make_request(KVM_REQ_HV_RESET)
+	 * pic_unlock()    ->kvm_make_request(KVM_REQ_EVENT)
+	 * kvm_vcpu_check_block() ->  kvm_make_request(KVM_REQ_UNHALT)
+	 * apic_update_ppr()   -> KVM_REQ_EVENT
+	 * __apic_accept_irq()  -> KVM_REQ_EVENT
+	 * __apic_accept_irq()  -> KVM_REQ_SMI
+	 * kvm_ioapic_send_eoi() ->KVM_REQ_IOAPIC_EOI_EXIT
+	 * vmx_vcpu_load() ->  KVM_REQ_TLB_FLUSH
+	 * vmx_queue_exception() -> KVM_REQ_TRIPLE_FAULT
+	 * vmx_vcpu_reset()-> KVM_REQ_APIC_PAGE_RELOAD
+	 *
+	 * 总之，这个标记用宏 KVM_REQ_XXXX来标记的,这些宏都kvm_host.h中
+	 *
+	 * 用kvm_clear_request()来清除requests中的相应的标记
+	 */
 	u64 requests;
 	unsigned long guest_debug;
 
@@ -344,8 +377,16 @@ struct kvm_hv_sint {
 };
 
 struct kvm_kernel_irq_routing_entry {
+	//可以理解为管脚号，如IR0,IR1,用于匹配中断
 	u32 gsi;
 	u32 type;
+	/*
+	 * kvm_set_pic_irq,
+	 * kvm_set_ioapic_irq 
+	 * kvm_set_msi
+	 * kvm_hv_set_sint
+	 * 这个函数负责注入中断到VMCS
+	 */
 	int (*set)(struct kvm_kernel_irq_routing_entry *e,
 		   struct kvm *kvm, int irq_source_id, int level,
 		   bool line_status);

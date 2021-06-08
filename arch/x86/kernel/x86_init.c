@@ -132,9 +132,15 @@ struct x86_msi_ops x86_msi __ro_after_init = {
 	.restore_msi_irqs	= default_restore_msi_irqs,
 };
 
-/* MSI arch specific hooks */
+/* MSI arch specific hooks 
+ *
+ * msix_capability_init()
+ *  pci_msi_setup_msi_irqs()
+ *   arch_setup_msi_irqs()
+ */
 int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
 {
+    // native_setup_msi_irqs
 	return x86_msi.setup_msi_irqs(dev, nvec, type);
 }
 

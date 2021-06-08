@@ -4373,8 +4373,8 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
 
 /*
  * kvm_vm_compat_ioctl()
- *  kvm_vm_ioctl()
- *   kvm_vm_ioctl_irq_line()
+ *  kvm_vm_ioctl()  [KVM_IRQ_LINE]
+ *   kvm_vm_ioctl_irq_line(line_status==false)
  * 注入中断
  */
 int kvm_vm_ioctl_irq_line(struct kvm *kvm, struct kvm_irq_level *irq_event,
@@ -7528,6 +7528,11 @@ static void process_smi(struct kvm_vcpu *vcpu)
 	kvm_make_request(KVM_REQ_EVENT, vcpu);
 }
 
+/*
+ * ioapic_mmio_write()
+ *  ioapic_write_indirect()
+ *   kvm_make_scan_ioapic_request()
+ */
 void kvm_make_scan_ioapic_request(struct kvm *kvm)
 {
 	kvm_make_all_cpus_request(kvm, KVM_REQ_SCAN_IOAPIC);
@@ -7806,6 +7811,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 	 * result in virtual interrupt delivery.
 	 */
 	local_irq_disable();
+	//标记运行在GUEST模式了
 	vcpu->mode = IN_GUEST_MODE;
 
 	srcu_read_unlock(&vcpu->kvm->srcu, vcpu->srcu_idx);
@@ -7833,6 +7839,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 
 	if (vcpu->mode == EXITING_GUEST_MODE || kvm_request_pending(vcpu)
 	    || need_resched() || signal_pending(current)) {
+	    //不能进入guest 模式
 		vcpu->mode = OUTSIDE_GUEST_MODE;
 		smp_wmb();
 		local_irq_enable();
@@ -7894,7 +7901,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 		hw_breakpoint_restore();
 
 	vcpu->arch.last_guest_tsc = kvm_read_l1_tsc(vcpu, rdtsc());
-
+    //标记从GUEST模式退出来了
 	vcpu->mode = OUTSIDE_GUEST_MODE;
 	smp_wmb();
 

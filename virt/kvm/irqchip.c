@@ -31,6 +31,14 @@
 #include <trace/events/kvm.h>
 #include "irq.h"
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl() [KVM_IRQ_LINE]
+ *   kvm_vm_ioctl_irq_line(line_status==false) 
+ *    kvm_set_irq()
+ *     kvm_irq_map_gsi()
+ * 
+ */
 int kvm_irq_map_gsi(struct kvm *kvm,
 		    struct kvm_kernel_irq_routing_entry *entries, int gsi)
 {
@@ -81,8 +89,8 @@ int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi)
  *  > 0   Number of CPUs interrupt was delivered to
  *
  * kvm_vm_compat_ioctl()
- *  kvm_vm_ioctl()
- *   kvm_vm_ioctl_irq_line()
+ *  kvm_vm_ioctl() [KVM_IRQ_LINE]
+ *   kvm_vm_ioctl_irq_line(line_status==false) 
  *    kvm_set_irq()
  * 注入中断
  * 
@@ -100,12 +108,14 @@ int kvm_set_irq(struct kvm *kvm, int irq_source_id, u32 irq, int level,
 	 * writes to the unused one.
 	 */
 	idx = srcu_read_lock(&kvm->irq_srcu);
-	
+
+	//得到irq map
 	i = kvm_irq_map_gsi(kvm, irq_set, irq);
 	srcu_read_unlock(&kvm->irq_srcu, idx);
 
 	while (i--) {
 		int r;
+		//kvm_set_pic_irq或者 kvm_set_ioapic_irq
 		r = irq_set[i].set(&irq_set[i], kvm, irq_source_id, level,
 				   line_status);
 		if (r < 0)
@@ -149,7 +159,7 @@ void kvm_free_irq_routing(struct kvm *kvm)
  * kvm_vm_compat_ioctl()
  *  kvm_vm_ioctl()
  *   kvm_set_irq_routing()
- *    setup_routing_entry()
+ *    setup_routing_entry() rt来自default_routing
  */
 static int setup_routing_entry(struct kvm *kvm,
 			       struct kvm_irq_routing_table *rt,
@@ -171,6 +181,7 @@ static int setup_routing_entry(struct kvm *kvm,
 
 	e->gsi = ue->gsi;
 	e->type = ue->type;
+	//设置虚拟中断控制器的中断
 	r = kvm_set_routing_entry(kvm, e, ue);
 	if (r)
 		return r;
@@ -249,6 +260,7 @@ int kvm_set_irq_routing(struct kvm *kvm,
 				goto free_entry;
 			break;
 		}
+		//走起
 		r = setup_routing_entry(kvm, new, e, ue);
 		if (r)
 			goto free_entry;

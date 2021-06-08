@@ -17,6 +17,7 @@
  * kvm_dev_ioctl  控制VMM的 /dev/kvm 设备
  * kvm_vcpu_compat_ioctl  控制创建出来的vcpu
  * kvm_vm_compat_ioctl 控制创建出来的vm 
+ * kvm_device_ioctl 
  *
  */
 
@@ -251,6 +252,12 @@ bool kvm_make_vcpus_request_mask(struct kvm *kvm, unsigned int req,
 	return called;
 }
 
+/*
+ * ioapic_mmio_write()
+ *  ioapic_write_indirect()
+ *   kvm_make_scan_ioapic_request()
+ *    kvm_make_all_cpus_request(req=KVM_REQ_SCAN_IOAPIC)
+ */
 bool kvm_make_all_cpus_request(struct kvm *kvm, unsigned int req)
 {
 	cpumask_var_t cpus;
@@ -2350,6 +2357,9 @@ EXPORT_SYMBOL_GPL(kvm_vcpu_wake_up);
  * Kick a sleeping VCPU, or a guest VCPU in guest mode, into host kernel mode.
  *
  * 给vCPU发送一个ipi,到HOST中来
+ *
+ * 如果vcpu在休眠，就踢醒它,使其进入就绪队列，准备接受调度.
+ * 如果vcpu运行在guest模式，则让它发生VM EXIT,到host中来
  */
 void kvm_vcpu_kick(struct kvm_vcpu *vcpu)
 {
@@ -3223,7 +3233,7 @@ static long kvm_vm_ioctl(struct file *filp,
 #endif
 #ifdef __KVM_HAVE_IRQ_LINE
 	case KVM_IRQ_LINE_STATUS:
-	case KVM_IRQ_LINE: { //想VM(vCPU)注入中断
+	case KVM_IRQ_LINE: { //向VM(vCPU)注入中断
 		struct kvm_irq_level irq_event;
 
 		r = -EFAULT;

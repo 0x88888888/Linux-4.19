@@ -173,6 +173,19 @@ static bool rtc_irq_check_coalesced(struct kvm_ioapic *ioapic)
 	return false;
 }
 
+/*
+ * 设置iopic中断控制器的中断
+ *
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl() [KVM_IRQ_LINE]
+ *   kvm_vm_ioctl_irq_line(line_status==false) 
+ *    kvm_set_irq()
+ *     kvm_set_ioapic_irq()
+ *      kvm_ioapic_set_irq()
+ *       ioapic_set_irq()
+ *
+ * 通过虚拟ioapic发送中断请求了
+ */
 static int ioapic_set_irq(struct kvm_ioapic *ioapic, unsigned int irq,
 		int irq_level, bool line_status)
 {
@@ -181,6 +194,7 @@ static int ioapic_set_irq(struct kvm_ioapic *ioapic, unsigned int irq,
 	u32 old_irr;
 	int edge, ret;
 
+    //找到对应的entry
 	entry = ioapic->redirtbl[irq];
 	edge = (entry.fields.trig_mode == IOAPIC_EDGE_TRIG);
 
@@ -217,6 +231,7 @@ static int ioapic_set_irq(struct kvm_ioapic *ioapic, unsigned int irq,
 		}
 	}
 
+    //目标vCPU到host或者唤醒
 	ret = ioapic_service(ioapic, irq, line_status);
 
 out:
@@ -272,6 +287,11 @@ void kvm_arch_post_irq_ack_notifier_list_update(struct kvm *kvm)
 	kvm_make_scan_ioapic_request(kvm);
 }
 
+/*
+ * ioapic_mmio_write()
+ *  ioapic_write_indirect()
+ *修改ioapic中断路由表
+ */
 static void ioapic_write_indirect(struct kvm_ioapic *ioapic, u32 val)
 {
 	unsigned index;
@@ -322,16 +342,29 @@ static void ioapic_write_indirect(struct kvm_ioapic *ioapic, u32 val)
 			e->fields.remote_irr = 0;
 
 		mask_after = e->fields.mask;
-		if (mask_before != mask_after)
+		if (mask_before != mask_after) //同志掉
 			kvm_fire_mask_notifiers(ioapic->kvm, KVM_IRQCHIP_IOAPIC, index, mask_after);
 		if (e->fields.trig_mode == IOAPIC_LEVEL_TRIG
 		    && ioapic->irr & (1 << index))
 			ioapic_service(ioapic, index, false);
+		
 		kvm_make_scan_ioapic_request(ioapic->kvm);
 		break;
 	}
 }
 
+/*
+ * 设置iopic中断控制器的中断
+ *
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl() [KVM_IRQ_LINE]
+ *   kvm_vm_ioctl_irq_line(line_status==false) 
+ *    kvm_set_irq()
+ *     kvm_set_ioapic_irq()
+ *      kvm_ioapic_set_irq()
+ *       ioapic_set_irq()
+ *        ioapic_service()
+ */
 static int ioapic_service(struct kvm_ioapic *ioapic, int irq, bool line_status)
 {
 	union kvm_ioapic_redirect_entry *entry = &ioapic->redirtbl[irq];
@@ -372,7 +405,7 @@ static int ioapic_service(struct kvm_ioapic *ioapic, int irq, bool line_status)
 		ret = kvm_irq_delivery_to_apic(ioapic->kvm, NULL, &irqe,
 					       &ioapic->rtc_status.dest_map);
 		ioapic->rtc_status.pending_eoi = (ret < 0 ? 0 : ret);
-	} else
+	} else //通常是这个
 		ret = kvm_irq_delivery_to_apic(ioapic->kvm, NULL, &irqe, NULL);
 
 	if (ret && irqe.trig_mode == IOAPIC_LEVEL_TRIG)
@@ -381,6 +414,16 @@ static int ioapic_service(struct kvm_ioapic *ioapic, int irq, bool line_status)
 	return ret;
 }
 
+/*
+ * 设置iopic中断控制器的中断
+ *
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl() [KVM_IRQ_LINE]
+ *   kvm_vm_ioctl_irq_line(line_status==false) 
+ *    kvm_set_irq()
+ *     kvm_set_ioapic_irq()
+ *      kvm_ioapic_set_irq()
+ */
 int kvm_ioapic_set_irq(struct kvm_ioapic *ioapic, int irq, int irq_source_id,
 		       int level, bool line_status)
 {
@@ -391,6 +434,7 @@ int kvm_ioapic_set_irq(struct kvm_ioapic *ioapic, int irq, int irq_source_id,
 	spin_lock(&ioapic->lock);
 	irq_level = __kvm_irq_line_state(&ioapic->irq_states[irq],
 					 irq_source_id, level);
+	
 	ret = ioapic_set_irq(ioapic, irq, irq_level, line_status);
 
 	spin_unlock(&ioapic->lock);
@@ -550,6 +594,9 @@ static int ioapic_mmio_read(struct kvm_vcpu *vcpu, struct kvm_io_device *this,
 	return 0;
 }
 
+/*
+ *
+ */
 static int ioapic_mmio_write(struct kvm_vcpu *vcpu, struct kvm_io_device *this,
 				 gpa_t addr, int len, const void *val)
 {
@@ -585,7 +632,7 @@ static int ioapic_mmio_write(struct kvm_vcpu *vcpu, struct kvm_io_device *this,
 		ioapic->ioregsel = data & 0xFF; /* 8-bit register */
 		break;
 
-	case IOAPIC_REG_WINDOW:
+	case IOAPIC_REG_WINDOW: //修改ioapic 中断路由表
 		ioapic_write_indirect(ioapic, data);
 		break;
 

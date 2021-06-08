@@ -31,7 +31,14 @@ int pci_msi_ignore_mask;
 
 #define msix_table_size(flags)	((flags & PCI_MSIX_FLAGS_QSIZE) + 1)
 
+//有定义
 #ifdef CONFIG_PCI_MSI_IRQ_DOMAIN
+/*
+ * msix_capability_init()
+ *  pci_msi_setup_msi_irqs()
+ *
+ * 将msi-x capability配置空间的数据写入 设备的配置空间
+ */
 static int pci_msi_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
 {
 	struct irq_domain *domain;
@@ -648,6 +655,10 @@ static int msi_capability_init(struct pci_dev *dev, int nvec,
 	return 0;
 }
 
+/*
+ * msix_capability_init()
+ *  msix_map_region()
+ */
 static void __iomem *msix_map_region(struct pci_dev *dev, unsigned nr_entries)
 {
 	resource_size_t phys_addr;
@@ -668,6 +679,12 @@ static void __iomem *msix_map_region(struct pci_dev *dev, unsigned nr_entries)
 	return ioremap_nocache(phys_addr, nr_entries * PCI_MSIX_ENTRY_SIZE);
 }
 
+/*
+ * msix_capability_init()
+ *  msix_setup_entries()
+ *
+ * 构建msi-x capability配置空间的数据
+ */
 static int msix_setup_entries(struct pci_dev *dev, void __iomem *base,
 			      struct msix_entry *entries, int nvec,
 			      const struct irq_affinity *affd)
@@ -755,16 +772,20 @@ static int msix_capability_init(struct pci_dev *dev, struct msix_entry *entries,
 	/* Ensure MSI-X is disabled while it is set up */
 	pci_msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_ENABLE, 0);
 
+    //读取设备的MSI-X  的 capability配置数据
 	pci_read_config_word(dev, dev->msix_cap + PCI_MSIX_FLAGS, &control);
 	/* Request & Map MSI-X table region */
+	//将设备msi-x capability配置空间映射到物理内存空间
 	base = msix_map_region(dev, msix_table_size(control));
 	if (!base)
 		return -ENOMEM;
 
+    //构建msi-x capability配置空间的数据
 	ret = msix_setup_entries(dev, base, entries, nvec, affd);
 	if (ret)
 		return ret;
 
+    //将msi-x capability配置空间的数据写入 设备的配置空间
 	ret = pci_msi_setup_msi_irqs(dev, nvec, PCI_CAP_ID_MSIX);
 	if (ret)
 		goto out_avail;
@@ -949,6 +970,8 @@ EXPORT_SYMBOL(pci_msix_vec_count);
  *     pci_enable_msix_range()
  *      __pci_enable_msix_range()
  *       __pci_enable_msix()
+ *
+ * 启动msi-x作为中断方式
  */
 static int __pci_enable_msix(struct pci_dev *dev, struct msix_entry *entries,
 			     int nvec, const struct irq_affinity *affd)
@@ -956,6 +979,7 @@ static int __pci_enable_msix(struct pci_dev *dev, struct msix_entry *entries,
 	int nr_entries;
 	int i, j;
 
+    //
 	if (!pci_msi_supported(dev, nvec))
 		return -EINVAL;
 

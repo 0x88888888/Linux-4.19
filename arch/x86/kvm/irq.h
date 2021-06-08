@@ -53,6 +53,7 @@ struct kvm_kpic_state {
 	u8 rotate_on_auto_eoi;
 	u8 special_fully_nested_mode;
 	u8 init4;		/* true if 4 byte init */
+	//选择edge 或者 levle触发模式
 	u8 elcr;		/* PIIX edge/trigger selection */
 	u8 elcr_mask;
 	u8 isr_ack;	/* interrupt ack detection */

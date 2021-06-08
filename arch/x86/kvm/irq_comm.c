@@ -38,6 +38,9 @@
 #include "hyperv.h"
 #include "x86.h"
 
+/*
+ *设置pic中断控制器的中断
+ */
 static int kvm_set_pic_irq(struct kvm_kernel_irq_routing_entry *e,
 			   struct kvm *kvm, int irq_source_id, int level,
 			   bool line_status)
@@ -46,6 +49,15 @@ static int kvm_set_pic_irq(struct kvm_kernel_irq_routing_entry *e,
 	return kvm_pic_set_irq(pic, e->irqchip.pin, irq_source_id, level);
 }
 
+/*
+ * 设置iopic中断控制器的中断
+ *
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl() [KVM_IRQ_LINE]
+ *   kvm_vm_ioctl_irq_line(line_status==false) 
+ *    kvm_set_irq()
+ *     kvm_set_ioapic_irq()
+ */
 static int kvm_set_ioapic_irq(struct kvm_kernel_irq_routing_entry *e,
 			      struct kvm *kvm, int irq_source_id, int level,
 			      bool line_status)
@@ -54,6 +66,7 @@ static int kvm_set_ioapic_irq(struct kvm_kernel_irq_routing_entry *e,
 	return kvm_ioapic_set_irq(ioapic, e->irqchip.pin, irq_source_id, level,
 				line_status);
 }
+				  
 
 /*
  * write_mmio()
@@ -63,6 +76,16 @@ static int kvm_set_ioapic_irq(struct kvm_kernel_irq_routing_entry *e,
  *     kvm_lapic_reg_write() 
  *      apic_send_ipi()
  *       kvm_irq_delivery_to_apic()
+ *
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl() [KVM_IRQ_LINE]
+ *   kvm_vm_ioctl_irq_line(line_status==false) 
+ *    kvm_set_irq()
+ *     kvm_set_ioapic_irq()
+ *      kvm_ioapic_set_irq()
+ *       ioapic_set_irq()
+ *        ioapic_service()
+ *         kvm_irq_delivery_to_apic()
  *
  * 发送IPI中断
  */
@@ -292,6 +315,13 @@ bool kvm_arch_can_set_irq_routing(struct kvm *kvm)
 	return irqchip_in_kernel(kvm);
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_set_irq_routing()
+ *    setup_routing_entry()
+ *     kvm_set_routing_entry()
+ */
 int kvm_set_routing_entry(struct kvm *kvm,
 			  struct kvm_kernel_irq_routing_entry *e,
 			  const struct kvm_irq_routing_entry *ue)
@@ -306,15 +336,15 @@ int kvm_set_routing_entry(struct kvm *kvm,
 			return -EINVAL;
 		e->irqchip.pin = ue->u.irqchip.pin;
 		switch (ue->u.irqchip.irqchip) {
-		case KVM_IRQCHIP_PIC_SLAVE:
+		case KVM_IRQCHIP_PIC_SLAVE: //这个
 			e->irqchip.pin += PIC_NUM_PINS / 2;
 			/* fall through */
-		case KVM_IRQCHIP_PIC_MASTER:
+		case KVM_IRQCHIP_PIC_MASTER://这个
 			if (ue->u.irqchip.pin >= PIC_NUM_PINS / 2)
 				return -EINVAL;
 			e->set = kvm_set_pic_irq;
 			break;
-		case KVM_IRQCHIP_IOAPIC:
+		case KVM_IRQCHIP_IOAPIC: //这个
 			if (ue->u.irqchip.pin >= KVM_IOAPIC_NUM_PINS)
 				return -EINVAL;
 			e->set = kvm_set_ioapic_irq;
@@ -324,7 +354,7 @@ int kvm_set_routing_entry(struct kvm *kvm,
 		}
 		e->irqchip.irqchip = ue->u.irqchip.irqchip;
 		break;
-	case KVM_IRQ_ROUTING_MSI:
+	case KVM_IRQ_ROUTING_MSI: //这个
 		e->set = kvm_set_msi;
 		e->msi.address_lo = ue->u.msi.address_lo;
 		e->msi.address_hi = ue->u.msi.address_hi;
@@ -392,6 +422,8 @@ static const struct kvm_irq_routing_entry default_routing[] = {
 	ROUTING_ENTRY2(10), ROUTING_ENTRY2(11),
 	ROUTING_ENTRY2(12), ROUTING_ENTRY2(13),
 	ROUTING_ENTRY2(14), ROUTING_ENTRY2(15),
+	//前面16个,pic, ioapic都有，
+	//后面的，只有ioapic的了
 	ROUTING_ENTRY1(16), ROUTING_ENTRY1(17),
 	ROUTING_ENTRY1(18), ROUTING_ENTRY1(19),
 	ROUTING_ENTRY1(20), ROUTING_ENTRY1(21),

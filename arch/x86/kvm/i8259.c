@@ -301,7 +301,11 @@ static void kvm_pic_reset(struct kvm_kpic_state *s)
 		if (edge_irr & (1 << irq))
 			pic_clear_isr(s, irq);
 }
-
+/*
+ * picdev_master_write()
+ *  picdev_write()
+ *   pic_ioport_write()
+ */
 static void pic_ioport_write(void *opaque, u32 addr, u32 val)
 {
 	struct kvm_kpic_state *s = opaque;
@@ -448,6 +452,10 @@ static u32 elcr_ioport_read(void *opaque, u32 addr1)
 	return s->elcr;
 }
 
+/*
+ * picdev_master_write()
+ *  picdev_write()
+ */
 static int picdev_write(struct kvm_pic *s,
 			 gpa_t addr, int len, const void *val)
 {
@@ -594,6 +602,7 @@ int kvm_pic_init(struct kvm *kvm)
 		return -ENOMEM;
 	spin_lock_init(&s->lock);
 	s->kvm = kvm;
+	//初始化master slave 
 	s->pics[0].elcr_mask = 0xf8;
 	s->pics[1].elcr_mask = 0xde;
 	s->pics[0].pics_state = s;

@@ -64,6 +64,12 @@ static struct irq_chip pci_msi_controller = {
 	.flags			= IRQCHIP_SKIP_SET_WAKE,
 };
 
+/* 
+ * msix_capability_init()
+ *  pci_msi_setup_msi_irqs()
+ *   arch_setup_msi_irqs()
+ *    native_setup_msi_irqs()
+ */
 int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
 {
 	struct irq_domain *domain;

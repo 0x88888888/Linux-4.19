@@ -395,6 +395,12 @@ static bool msi_check_reservation_mode(struct irq_domain *domain,
  * @nvec:	The number of interrupts to allocate
  *
  * Returns 0 on success or an error code.
+ *
+ * msix_capability_init()
+ *  pci_msi_setup_msi_irqs()
+ *   arch_setup_msi_irqs()
+ *    native_setup_msi_irqs()
+ *     msi_domain_alloc_irqs()
  */
 int msi_domain_alloc_irqs(struct irq_domain *domain, struct device *dev,
 			  int nvec)
