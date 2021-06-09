@@ -442,7 +442,11 @@ static int iommu_load_old_irte(struct intel_iommu *iommu)
 	return 0;
 }
 
-
+/*
+ * intel_prepare_irq_remapping()
+ *  intel_setup_irq_remapping()
+ *   iommu_set_irq_remapping()
+ */
 static void iommu_set_irq_remapping(struct intel_iommu *iommu, int mode)
 {
 	unsigned long flags;
@@ -498,6 +502,10 @@ static void iommu_enable_irq_remapping(struct intel_iommu *iommu)
 	raw_spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 
+/*
+ * intel_prepare_irq_remapping()
+ *  intel_setup_irq_remapping()
+ */
 static int intel_setup_irq_remapping(struct intel_iommu *iommu)
 {
 	struct ir_table *ir_table;
@@ -541,6 +549,7 @@ static int intel_setup_irq_remapping(struct intel_iommu *iommu)
 		pr_err("IR%d: failed to allocate irqdomain\n", iommu->seq_id);
 		goto out_free_bitmap;
 	}
+	
 	iommu->ir_msi_domain =
 		arch_create_remap_msi_irq_domain(iommu->ir_domain,
 						 "INTEL-IR-MSI",
@@ -583,6 +592,7 @@ static int intel_setup_irq_remapping(struct intel_iommu *iommu)
 				iommu->name);
 	}
 
+    //走起
 	iommu_set_irq_remapping(iommu, eim_mode);
 
 	return 0;
@@ -676,6 +686,10 @@ static void __init intel_cleanup_irq_remapping(void)
 		pr_warn("Failed to enable irq remapping. You are vulnerable to irq-injection attacks.\n");
 }
 
+/* 
+ * 
+ * 中断remapping
+ */
 static int __init intel_prepare_irq_remapping(void)
 {
 	struct dmar_drhd_unit *drhd;
@@ -729,7 +743,7 @@ static int __init intel_prepare_irq_remapping(void)
 		pr_info("Queued invalidation will be enabled to support x2apic and Intr-remapping.\n");
 
 	/* Do the initializations early */
-	for_each_iommu(iommu, drhd) {
+	for_each_iommu(iommu, drhd) { //中断remapping
 		if (intel_setup_irq_remapping(iommu)) {
 			pr_err("Failed to setup irq remapping for %s\n",
 			       iommu->name);

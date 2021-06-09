@@ -7033,6 +7033,18 @@ static bool nested_exit_on_nmi(struct kvm_vcpu *vcpu)
 	return nested_cpu_has_nmi_exiting(get_vmcs12(vcpu));
 }
 
+/*
+ * enable_nmi_window()
+ *  enable_irq_window()
+ *
+ * vcpu_run()
+ *  vcpu_enter_guest() 
+ *   enable_irq_window()
+ * 
+ * 如果guest 中断窗口是关闭，需要调用这个函数设置VMSC的CPU_BASED_VIRTUAL_INTR_PENDING
+ * 告知guest 有中断在等待，guest在允许处理中断的时候，虚拟中断芯片可以给guest注入中断,无需来一次VM EXIT
+ * 提升了性能
+ */
 static void enable_irq_window(struct kvm_vcpu *vcpu)
 {
 	vmcs_set_bits(CPU_BASED_VM_EXEC_CONTROL,
@@ -7875,6 +7887,10 @@ static int handle_apic_eoi_induced(struct kvm_vcpu *vcpu)
 	return 1;
 }
 
+/*
+ * vmx_handle_exit()
+ *  handle_apic_write()
+ */
 static int handle_apic_write(struct kvm_vcpu *vcpu)
 {
 	unsigned long exit_qualification = vmcs_readl(EXIT_QUALIFICATION);

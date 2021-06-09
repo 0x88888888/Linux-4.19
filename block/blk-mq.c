@@ -2476,6 +2476,10 @@ void blk_mq_release(struct request_queue *q)
 	free_percpu(q->queue_ctx);
 }
 
+/*
+ * virtblk_probe()
+ *  blk_mq_init_queue()
+ */
 struct request_queue *blk_mq_init_queue(struct blk_mq_tag_set *set)
 {
 	struct request_queue *uninit_q, *q;
@@ -2564,6 +2568,11 @@ static void blk_mq_realloc_hw_ctxs(struct blk_mq_tag_set *set,
 	blk_mq_sysfs_register(q);
 }
 
+/*
+ * virtblk_probe()
+ *	blk_mq_init_queue()
+ *   blk_mq_init_allocated_queue()
+ */
 struct request_queue *blk_mq_init_allocated_queue(struct blk_mq_tag_set *set,
 						  struct request_queue *q)
 {

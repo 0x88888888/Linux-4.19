@@ -60,6 +60,9 @@ struct vring_desc_state {
 	struct vring_desc *indir_desc;	/* Indirect descriptor, if any. */
 };
 
+/*
+ *  在__vring_new_virtqueue中分配
+ */
 struct vring_virtqueue {
 	struct virtqueue vq;
 
@@ -94,7 +97,7 @@ struct vring_virtqueue {
 
 	/* Last used index we've seen. 
 	 *
-	 * 最近一次使用的index
+	 * vring_virtqueue->last_used_idx表示host(设备)上一次消费到哪里了
 	 */
 	u16 last_used_idx;
 
@@ -965,6 +968,10 @@ irqreturn_t vring_interrupt(int irq, void *_vq)
 }
 EXPORT_SYMBOL_GPL(vring_interrupt);
 
+/*
+ * vring_create_virtqueue()
+ *  __vring_new_virtqueue()
+ */
 struct virtqueue *__vring_new_virtqueue(unsigned int index,
 					struct vring vring,
 					struct virtio_device *vdev,
@@ -977,6 +984,7 @@ struct virtqueue *__vring_new_virtqueue(unsigned int index,
 	unsigned int i;
 	struct vring_virtqueue *vq;
 
+    //分配vring_virtqueue对象
 	vq = kmalloc(sizeof(*vq) + vring.num * sizeof(struct vring_desc_state),
 		     GFP_KERNEL);
 	if (!vq)
@@ -998,6 +1006,8 @@ struct virtqueue *__vring_new_virtqueue(unsigned int index,
 	vq->avail_flags_shadow = 0;
 	vq->avail_idx_shadow = 0;
 	vq->num_added = 0;
+
+	//每个virtio_device可以有多个virtqueue对象
 	list_add_tail(&vq->vq.list, &vdev->vqs);
 #ifdef DEBUG
 	vq->in_use = false;
@@ -1067,6 +1077,11 @@ static void vring_free_queue(struct virtio_device *vdev, size_t size,
 	}
 }
 
+ /*
+  * vm_find_vqs()
+  *  vm_setup_vq()
+  *   vring_create_virtqueue()
+  */
 struct virtqueue *vring_create_virtqueue(
 	unsigned int index,
 	unsigned int num,
@@ -1112,6 +1127,7 @@ struct virtqueue *vring_create_virtqueue(
 		return NULL;
 
 	queue_size_in_bytes = vring_size(num, vring_align);
+	
 	vring_init(&vring, num, queue, vring_align);
 
 	vq = __vring_new_virtqueue(index, vring, vdev, weak_barriers, context,

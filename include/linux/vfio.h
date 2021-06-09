@@ -68,6 +68,7 @@ struct vfio_iommu_driver_ops {
 				size_t count, loff_t *ppos);
 	ssize_t		(*write)(void *iommu_data, const char __user *buf,
 				 size_t count, loff_t *size);
+	//vfio_iommu_type1_ioctl
 	long		(*ioctl)(void *iommu_data, unsigned int cmd,
 				 unsigned long arg);
 	int		(*mmap)(void *iommu_data, struct vm_area_struct *vma);

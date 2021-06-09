@@ -101,7 +101,10 @@ struct vhost_virtqueue {
 	/* The routine to call when the Guest pings us, or timeout. */
 	vhost_work_fn_t handle_kick;
 
-	/* Last available index we saw. */
+	/* Last available index we saw. 
+	 *
+	 * vring_avail->ring[]中可以消费的位置
+	 */
 	u16 last_avail_idx;
 
 	/* Caches available index value from user. */

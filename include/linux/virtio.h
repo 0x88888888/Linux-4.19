@@ -26,6 +26,8 @@
  * sg element.
  *
  * 看vring_virtqueue, vring_virtqueue包含了virtqueue和vring
+ *
+ * 作为vring_virtqueue成员,在__vring_new_virtqueue中分配
  */
 struct virtqueue {
     /*

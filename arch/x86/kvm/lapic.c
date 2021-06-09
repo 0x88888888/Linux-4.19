@@ -1806,7 +1806,10 @@ static void apic_manage_nmi_watchdog(struct kvm_lapic *apic, u32 lvt0_val)
  *        apic_mmio_write()
  *         kvm_lapic_reg_write()
  *
- * 
+ * vmx_handle_exit()
+ *  handle_apic_write()
+ *   kvm_apic_write_nodecode() 
+ *    kvm_lapic_reg_write()
  */
 int kvm_lapic_reg_write(struct kvm_lapic *apic, u32 reg, u32 val)
 {
@@ -1867,7 +1870,7 @@ int kvm_lapic_reg_write(struct kvm_lapic *apic, u32 reg, u32 val)
 		}
 		break;
 	}
-	case APIC_ICR: //发送IPI中断
+	case APIC_ICR: //写ICR寄存器，要发送IPI中断
 		/* No delay here, so we always clear the pending bit */
 		kvm_lapic_set_reg(apic, APIC_ICR, val & ~(1 << 12));
 		apic_send_ipi(apic);
@@ -2009,7 +2012,13 @@ void kvm_lapic_set_eoi(struct kvm_vcpu *vcpu)
 }
 EXPORT_SYMBOL_GPL(kvm_lapic_set_eoi);
 
-/* emulate APIC access in a trap manner */
+/*
+ * vmx_handle_exit()
+ *  handle_apic_write()
+ *   kvm_apic_write_nodecode()
+ *
+ * emulate APIC access in a trap manner 
+ */
 void kvm_apic_write_nodecode(struct kvm_vcpu *vcpu, u32 offset)
 {
 	u32 val = 0;

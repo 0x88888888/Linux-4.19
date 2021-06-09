@@ -1710,7 +1710,8 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
 		return copy_to_user((void __user *)arg, &info, minsz) ?
 			-EFAULT : 0;
 
-	} else if (cmd == VFIO_IOMMU_MAP_DMA) {
+	} else if (cmd == VFIO_IOMMU_MAP_DMA) { //外设地址要经过IOMMU 重映射
+		
 		struct vfio_iommu_type1_dma_map map;
 		uint32_t mask = VFIO_DMA_MAP_FLAG_READ |
 				VFIO_DMA_MAP_FLAG_WRITE;

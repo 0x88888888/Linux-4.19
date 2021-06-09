@@ -2867,6 +2867,10 @@ static int __msr_io(struct kvm_vcpu *vcpu, struct kvm_msrs *msrs,
 }
 
 /*
+ * kvm_dev_ioctl()
+ *  kvm_arch_dev_ioctl()
+ *   msr_io()
+ *
  * Read or write a bunch of msrs. Parameters are user addresses.
  *
  * @return number of msrs set successfully.
@@ -7784,8 +7788,10 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 				
 			if (vcpu->arch.nmi_pending)
 				kvm_x86_ops->enable_nmi_window(vcpu);
+
 			if (kvm_cpu_has_injectable_intr(vcpu) || req_int_win)
-				kvm_x86_ops->enable_irq_window(vcpu);
+				kvm_x86_ops->enable_irq_window(vcpu); //enable_irq_window()设置VMCS的 CPU_BASED_VIRTUAL_INTR_PENDING
+			
 			WARN_ON(vcpu->arch.exception.pending);
 		}
 

@@ -62,21 +62,67 @@
  * at the end of the used ring. Guest should ignore the used->flags field. */
 #define VIRTIO_RING_F_EVENT_IDX		29
 
-/* Virtio ring descriptors: 16 bytes.  These can chain together via "next". */
+/* Virtio ring descriptors: 16 bytes.  These can chain together via "next". 
+ *
+ * 如果数据是从guest(驱动)写给host(设备),就称这个vring_desc为out类型的
+ * 如果数据是从host(设备)写给guest(驱动),就称这个vring_desc为in类型的
+ *
+ * 无论是读还是写，都是guest(驱动)负责管理存储区
+ * virtqueue的管理也是由guest(驱动)负责
+ * 即使是in类型的内存块，也是由guest(驱动)负责分配，host(设备)仅仅是向其中写入驱动需要的数据
+ *
+ *
+ * 一个request包含多个 I/O request.
+ * 一个 I/O request可能包含了多个不连续的内存块，每个内存块需要一个vring_desc来描述
+ */
 struct vring_desc {
 	/* Address (guest-physical). */
 	__virtio64 addr;
 	/* Length. */
+	/*
+	 * 对于in,out两个方向,len 有不同的意义
+	 * 1.对于out方向,len表示驱动在这个内存块中准备了可供设备读取的数据量
+	 * 2.对于in方向,len表示驱动为设备提供的空白的存储区域的尺寸以及设备至多可以向里面写入的数据量
+	 */
 	__virtio32 len;
-	/* The flags as indicated above. */
+	/* The flags as indicated above.  
+	 *
+	 * VRING_DESC_F_NEXT,
+	 * VRING_DESC_F_WRITE,
+	 * VRING_DESC_F_INDIRECT,
+	 * 
+	 * VRING_USED_F_NO_NOTIFY,
+	 * VRING_AVAIL_F_NO_INTERRUPT,
+	 * VIRTIO_RING_F_INDIRECT_DESC
+	 */
 	__virtio16 flags;
-	/* We chain unused descriptors via this, too */
+	/* We chain unused descriptors via this, too 
+	 * 指向下一个 vring_desc
+	 */
 	__virtio16 next;
 };
 
+/*
+ * 看vring_virtqueue, vring_virtqueue包含了virtqueue和vring
+ *
+ * avail是从host(外设)的角度来取名
+ */
 struct vring_avail {
 	__virtio16 flags;
+	/*
+	 * 在驱动侧(guest)下一个可以在ring[]中放vring_desc的位置
+	 */
 	__virtio16 idx;
+	/*
+	 * ring中的每一个元素记录的vring_desc链的第一个ring_desc的id，
+	 * 这个id是描述符在描述符表中的索引
+	 *
+	 *vhost_virtqueue->last_avail_idx记录设备侧(host侧)可以消费vring_avail.ring[]的位置
+	 *
+	 * ring[]中数值是指在vring->desc[]当中的索引?
+	 *
+	 * 
+	 */
 	__virtio16 ring[];
 };
 
@@ -85,6 +131,7 @@ struct vring_used_elem {
 	/* Index of start of used descriptor chain. */
 	__virtio32 id;
 	/* Total length of the descriptor chain which was used (written to) */
+	//记录设备侧(host)向驱动侧(guest)回写的数据长度
 	__virtio32 len;
 };
 
@@ -96,8 +143,11 @@ struct vring_used {
 
 /*
  * 看vring_virtqueue, vring_virtqueue包含了virtqueue和vring
+ *
+ * 作为vring_virtqueue成员,在__vring_new_virtqueue中分配
  */
 struct vring {
+    //avail->ring[]中有num个vring_desc
 	unsigned int num;
     /*描述符数组*/
 	struct vring_desc *desc;
@@ -148,7 +198,9 @@ static inline void vring_init(struct vring *vr, unsigned int num, void *p,
 {
 	vr->num = num;
 	vr->desc = p;
+	//avail的起始地址，跳过vring_desc这个部分
 	vr->avail = p + num*sizeof(struct vring_desc);
+	//used的起始地址,跳过avail->ring[num]，然后对齐一下
 	vr->used = (void *)(((uintptr_t)&vr->avail->ring[num] + sizeof(__virtio16)
 		+ align-1) & ~(align - 1));
 }

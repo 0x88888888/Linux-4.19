@@ -349,6 +349,10 @@ static void vm_del_vqs(struct virtio_device *vdev)
 	free_irq(platform_get_irq(vm_dev->pdev, 0), vm_dev);
 }
 
+/*
+ * vm_find_vqs()
+ *  vm_setup_vq()
+ */
 static struct virtqueue *vm_setup_vq(struct virtio_device *vdev, unsigned index,
 				  void (*callback)(struct virtqueue *vq),
 				  const char *name, bool ctx)
@@ -476,6 +480,7 @@ static int vm_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 		return err;
 
 	for (i = 0; i < nvqs; ++i) {
+		//建立virtqueue
 		vqs[i] = vm_setup_vq(vdev, i, callbacks[i], names[i],
 				     ctx ? ctx[i] : false);
 		if (IS_ERR(vqs[i])) {
