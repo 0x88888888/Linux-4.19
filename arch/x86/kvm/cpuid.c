@@ -70,6 +70,16 @@ u64 kvm_supported_xcr0(void)
 /* For scattered features from cpufeatures.h; we currently expose none */
 #define KF(x) bit(KVM_CPUID_BIT_##x)
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl()
+ *    kvm_vcpu_ioctl_set_cpuid()
+ *     kvm_update_cpuid()
+ *
+ * 设置cpu特性,amd和intel都有的
+ */
+
 int kvm_update_cpuid(struct kvm_vcpu *vcpu)
 {
 	struct kvm_cpuid_entry2 *best;
@@ -221,6 +231,7 @@ int kvm_vcpu_ioctl_set_cpuid(struct kvm_vcpu *vcpu,
 				   cpuid->nent * sizeof(struct kvm_cpuid_entry)))
 			goto out;
 	}
+	//根据用户态的数据，设置到vcpu->arch.cpuid_entries[]中来
 	for (i = 0; i < cpuid->nent; i++) {
 		vcpu->arch.cpuid_entries[i].function = cpuid_entries[i].function;
 		vcpu->arch.cpuid_entries[i].eax = cpuid_entries[i].eax;
@@ -236,7 +247,9 @@ int kvm_vcpu_ioctl_set_cpuid(struct kvm_vcpu *vcpu,
 	vcpu->arch.cpuid_nent = cpuid->nent;
 	cpuid_fix_nx_cap(vcpu);
 	kvm_apic_set_version(vcpu);
+	//更新架构相关的 vmx_cpuid_update
 	kvm_x86_ops->cpuid_update(vcpu);
+	//更新架构无关的,amd和intel都有的
 	r = kvm_update_cpuid(vcpu);
 
 out:

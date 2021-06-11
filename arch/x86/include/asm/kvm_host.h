@@ -550,6 +550,9 @@ struct kvm_vcpu_arch {
 	u32 hflags;
 	u64 efer;
 	u64 apic_base;
+	/*
+	 * lapic对象,在kvm_create_lapic中分配
+	 */
 	struct kvm_lapic *apic;    /* kernel irqchip context */
 	bool apicv_active;
 	bool load_eoi_exitmap_pending;
@@ -637,6 +640,9 @@ struct kvm_vcpu_arch {
 	int halt_request; /* real mode on Intel only */
 
 	int cpuid_nent;
+	/*
+	 * guest os cpuid指令的的返回值
+	 */
 	struct kvm_cpuid_entry2 cpuid_entries[KVM_MAX_CPUID_ENTRIES];
 
 	int maxphyaddr;
@@ -720,6 +726,9 @@ struct kvm_vcpu_arch {
 	unsigned long last_retry_addr;
 
 	struct {
+		/*
+		 * 表示guest os中是否存在需要访问却被HOST主机swap出去的page，如果有，这个vCPU是不能继续运行的
+		 */
 		bool halted;
 		gfn_t gfns[roundup_pow_of_two(ASYNC_PF_PER_VCPU)];
 		struct gfn_to_hva_cache data;
@@ -1106,6 +1115,11 @@ struct kvm_x86_ops {
 	int (*check_intercept)(struct kvm_vcpu *vcpu,
 			       struct x86_instruction_info *info,
 			       enum x86_intercept_stage stage);
+	/*
+	 * vcpu_enter_guest中调用
+	 *
+	 * vmx_handle_external_intr
+	 */
 	void (*handle_external_intr)(struct kvm_vcpu *vcpu);
 	bool (*mpx_supported)(void);
 	bool (*xsaves_supported)(void);

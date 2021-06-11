@@ -412,11 +412,17 @@ struct vmcs_host_state {
  * Track a VMCS that may be loaded on a certain CPU. If it is (cpu!=-1), also
  * remember whether it was VMLAUNCHed, and maintain a linked list of all VMCSs
  * loaded on this CPU (so we can clear them if the CPU goes down).
+ *
+ * 指向VMCS区域
  */
 struct loaded_vmcs {
+    /*
+     * 在alloc_loaded_vmcs()中分配
+     */
 	struct vmcs *vmcs;
 	struct vmcs *shadow_vmcs;
 	int cpu;
+	//是否已经被Launch过，如果Launch过了，就用resume了哦
 	bool launched;
 	bool nmi_known_unmasked;
 	bool hv_timer_armed;
@@ -424,6 +430,12 @@ struct loaded_vmcs {
 	int soft_vnmi_blocked;
 	ktime_t entry_time;
 	s64 vnmi_blocked_time;
+	/*
+	 * 控制读写MSR寄存器时，是否产生VM Exit
+	 * 对应的bit为1就产生VM Exit
+	 * 在alloc_loaded_vmcs中分配并且设置，
+	 * 默认读写所有的MSR都要产生VM Exit
+	 */
 	unsigned long *msr_bitmap;
 	struct list_head loaded_vmcss_on_cpu_link;
 	struct vmcs_host_state host_state;
@@ -973,7 +985,13 @@ struct vmx_msrs {
 	struct vmx_msr_entry	val[NR_AUTOLOAD_MSRS];
 };
 
+/* 
+ * kvm层面的虚拟机对象用kvm_vcpu
+ * intel 的vmx层面的虚拟机对象用vcpu_vmx表示
+ * amd 的svm层面的虚拟机对象用vcpu_svm表示
+ */
 struct vcpu_vmx {
+    //所属的kvm层面的kvm_vcpu对象
 	struct kvm_vcpu       vcpu;
 	unsigned long         host_rsp;
 	u8                    fail;
@@ -998,16 +1016,21 @@ struct vcpu_vmx {
 	u32 secondary_exec_control;
 
 	/*
-	 * loaded_vmcs points to the VMCS currently used in this vcpu. For a
-	 * non-nested (L1) guest, it always points to vmcs01. For a nested
-	 * guest (L2), it points to a different VMCS.  loaded_cpu_state points
+	 * loaded_vmcs points to the VMCS currently used in this vcpu.  根据是否嵌套虚拟化指向不同的vmcs
+	 *
+	 * For a non-nested (L1) guest, it always points to vmcs01. For a nested
+	 * guest (L2), it points to a different VMCS.  
+	 *
+	 * loaded_cpu_state points
 	 * to the VMCS whose state is loaded into the CPU registers that only
 	 * need to be switched when transitioning to/from the kernel; a NULL
 	 * value indicates that host state is loaded.
+	 *
+	 * 
 	 */
-	struct loaded_vmcs    vmcs01;
-	struct loaded_vmcs   *loaded_vmcs;
-	struct loaded_vmcs   *loaded_cpu_state;
+	struct loaded_vmcs    vmcs01;//没有嵌套虚拟化的时候
+	struct loaded_vmcs   *loaded_vmcs; //指向当前的VMCS区域，根据是否嵌套虚拟化指向不同的vmcs
+	struct loaded_vmcs   *loaded_cpu_state;//
 	bool                  __launched; /* temporary, used in vmx_vcpu_run */
 	struct msr_autoload {
 		struct vmx_msrs guest;
@@ -1028,6 +1051,9 @@ struct vcpu_vmx {
 			u32 ar;
 		} seg[8];
 	} segment_cache;
+	/*
+	 * 切换vCPU的时候，根据这个值可以不必将tlb中所有的数据清洗掉
+	 */
 	int vpid;
 	bool emulation_required;
 
@@ -2163,11 +2189,17 @@ static void vmcs_clear(struct vmcs *vmcs)
 		       vmcs, phys_addr);
 }
 
+/*
+ * alloc_loaded_vmcs()
+ *  loaded_vmcs_init()
+ */
 static inline void loaded_vmcs_init(struct loaded_vmcs *loaded_vmcs)
 {
 	vmcs_clear(loaded_vmcs->vmcs);
 	if (loaded_vmcs->shadow_vmcs && loaded_vmcs->launched)
 		vmcs_clear(loaded_vmcs->shadow_vmcs);
+
+	//还没有运行呢，所以处于这个状态了
 	loaded_vmcs->cpu = -1;
 	loaded_vmcs->launched = 0;
 }
@@ -2922,6 +2954,8 @@ static unsigned long segment_base(u16 selector)
  *    vcpu_run()
  *     vcpu_enter_guest()
  *      vmx_prepare_switch_to_guest()
+ *
+ * 保存host状态到VMCS
  */
 static void vmx_prepare_switch_to_guest(struct kvm_vcpu *vcpu)
 {
@@ -3150,6 +3184,13 @@ static void decache_tsc_multiplier(struct vcpu_vmx *vmx)
  *      kvm_arch_vcpu_load()
  *       vmx_vcpu_load()
  *
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_create()
+ *     vmx_create_vcpu()
+ *      vmx_vcpu_load()
+ *
  * 加载vcpu到cpu
  */
 static void vmx_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
@@ -3159,7 +3200,7 @@ static void vmx_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 	//vcpu是否已经运行在cpu上了
 	bool already_loaded = vmx->loaded_vmcs->cpu == cpu;
 
-	if (!already_loaded) {
+	if (!already_loaded) { //
 		loaded_vmcs_clear(vmx->loaded_vmcs);
 		local_irq_disable();
 		crash_disable_local_vmclear(cpu);
@@ -3179,6 +3220,7 @@ static void vmx_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 		local_irq_enable();
 	}
 
+    //不等了，说明要前后vmcs了(也就是要切换vCPU了)
 	if (per_cpu(current_vmcs, cpu) != vmx->loaded_vmcs->vmcs) {
 		per_cpu(current_vmcs, cpu) = vmx->loaded_vmcs->vmcs;
 		//加载vmcs了
@@ -4940,16 +4982,20 @@ static struct vmcs *alloc_vmcs(bool shadow)
 static int alloc_loaded_vmcs(struct loaded_vmcs *loaded_vmcs)
 {
 	loaded_vmcs->vmcs = alloc_vmcs(false);
+	
 	if (!loaded_vmcs->vmcs)
 		return -ENOMEM;
 
 	loaded_vmcs->shadow_vmcs = NULL;
 	loaded_vmcs_init(loaded_vmcs);
 
+    //分配一个msr_bitmap
 	if (cpu_has_vmx_msr_bitmap()) {
+		
 		loaded_vmcs->msr_bitmap = (unsigned long *)__get_free_page(GFP_KERNEL);
 		if (!loaded_vmcs->msr_bitmap)
 			goto out_vmcs;
+		//全部都为1，全部都要产生VM Exit
 		memset(loaded_vmcs->msr_bitmap, 0xff, PAGE_SIZE);
 
 		if (IS_ENABLED(CONFIG_HYPERV) &&
@@ -6802,7 +6848,7 @@ static void ept_set_mmio_spte_mask(void)
  *     vmx_create_vcpu()
  *      vmx_vcpu_setup()
  *
- * 设置vcpu为实模式，设置各种寄存器?
+ * 设置VMCS区域中各个值啊
  */
 static void vmx_vcpu_setup(struct vcpu_vmx *vmx)
 {
@@ -6814,6 +6860,8 @@ static void vmx_vcpu_setup(struct vcpu_vmx *vmx)
 		 * in the VMCS" is supported, so use the more
 		 * permissive vmx_vmread_bitmap to specify both read
 		 * and write permissions for the shadow VMCS.
+		 *
+		 * 设置各种I/O端口操作是，是否发送VM exit
 		 */
 		vmcs_write64(VMREAD_BITMAP, __pa(vmx_vmread_bitmap));
 		vmcs_write64(VMWRITE_BITMAP, __pa(vmx_vmread_bitmap));
@@ -8628,7 +8676,7 @@ static struct vmcs *alloc_shadow_vmcs(struct kvm_vcpu *vcpu)
 	 */
 	WARN_ON(loaded_vmcs == &vmx->vmcs01 && loaded_vmcs->shadow_vmcs);
 
-	if (!loaded_vmcs->shadow_vmcs) {
+	if (!loaded_vmcs->shadow_vmcs) { //还没分配呢，那就分配一个
 		loaded_vmcs->shadow_vmcs = alloc_vmcs(true);
 		if (loaded_vmcs->shadow_vmcs)
 			vmcs_clear(loaded_vmcs->shadow_vmcs);
@@ -10816,11 +10864,14 @@ static void vmx_complete_atomic_exit(struct vcpu_vmx *vmx)
  *    vcpu_run()
  *     vcpu_enter_guest()
  *      vmx_handle_external_intr()
+ *
+ * 处理外部中断
  */
 static void vmx_handle_external_intr(struct kvm_vcpu *vcpu)
 {
 	u32 exit_intr_info = vmcs_read32(VM_EXIT_INTR_INFO);
 
+    //必须是有效的外部中断
 	if ((exit_intr_info & (INTR_INFO_VALID_MASK | INTR_INFO_INTR_TYPE_MASK))
 			== (INTR_INFO_VALID_MASK | INTR_TYPE_EXT_INTR)) {
 		unsigned int vector;
@@ -10831,6 +10882,7 @@ static void vmx_handle_external_intr(struct kvm_vcpu *vcpu)
 		unsigned long tmp;
 #endif
 
+        //读取中断号
 		vector =  exit_intr_info & INTR_INFO_VECTOR_MASK;
 		desc = (gate_desc *)vmx->host_idt_base + vector;
 		entry = gate_offset(desc);
@@ -11370,6 +11422,7 @@ static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 	vmx->nested.nested_run_pending = 0;
 	vmx->idt_vectoring_info = 0;
 
+    //将exit reason 记录下来
 	vmx->exit_reason = vmx->fail ? 0xdead : vmcs_read32(VM_EXIT_REASON);
 	if (vmx->fail || (vmx->exit_reason & VMX_EXIT_REASONS_FAILED_VMENTRY))
 		return;
@@ -11453,11 +11506,12 @@ static void vmx_free_vcpu(struct kvm_vcpu *vcpu)
  *    kvm_arch_vcpu_create()
  *     vmx_create_vcpu()
  *
- * 创建vCPU
+ * 创建intel vmx层面的vcpu
  */
 static struct kvm_vcpu *vmx_create_vcpu(struct kvm *kvm, unsigned int id)
 {
 	int err;
+	//已经包含kvm_vcpu和vcpu_vmx对象了
 	struct vcpu_vmx *vmx = kmem_cache_zalloc(kvm_vcpu_cache, GFP_KERNEL);
 	unsigned long *msr_bitmap;
 	int cpu;
@@ -11465,9 +11519,10 @@ static struct kvm_vcpu *vmx_create_vcpu(struct kvm *kvm, unsigned int id)
 	if (!vmx)
 		return ERR_PTR(-ENOMEM);
 
-	//分配vCPU id
+	//分配vCPU id,切换vCPU的时候，根据这个值可以不必将tlb中所有的数据清洗掉
 	vmx->vpid = allocate_vpid();
 
+    //将vcpu_vmx 和kvm关联起来,对vCPU的通用部分进行初始化
 	err = kvm_vcpu_init(&vmx->vcpu, kvm, id);
 	if (err)
 		goto free_vcpu;
@@ -11489,7 +11544,7 @@ static struct kvm_vcpu *vmx_create_vcpu(struct kvm *kvm, unsigned int id)
 			goto uninit_vcpu;
 	}
 
-    //保存guset ost的msr空间
+    //保存guset os的msr空间
 	vmx->guest_msrs = kmalloc(PAGE_SIZE, GFP_KERNEL);
 	BUILD_BUG_ON(ARRAY_SIZE(vmx_msr_index) * sizeof(vmx->guest_msrs[0])
 		     > PAGE_SIZE);
@@ -11766,6 +11821,15 @@ static void nested_vmx_entry_exit_ctls_update(struct kvm_vcpu *vcpu)
 	}
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl()
+ *    kvm_vcpu_ioctl_set_cpuid()
+ *     vmx_cpuid_update()
+ *
+ * 设置cpu特性
+ */
 static void vmx_cpuid_update(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);

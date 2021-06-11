@@ -766,6 +766,7 @@ struct kvm_ppc_resize_hpt {
 /*
  * Get size for mmap(vcpu_fd)
  */
+ //返回QEMU和KVM共享内存的大小
 #define KVM_GET_VCPU_MMAP_SIZE    _IO(KVMIO,   0x04) /* in bytes */
 #define KVM_GET_SUPPORTED_CPUID   _IOWR(KVMIO, 0x05, struct kvm_cpuid2)
 #define KVM_TRACE_ENABLE          __KVM_DEPRECATED_MAIN_W_0x06

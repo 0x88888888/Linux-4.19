@@ -19,6 +19,11 @@
  * kvm_vm_compat_ioctl 控制创建出来的vm 
  * kvm_device_ioctl 
  *
+ * 下面几个file_operations需要注意:
+ * kvm_chardev_ops /dev/kvm 的操作
+ * kvm_device_fops 虚拟设备的文件操作
+ * kvm_vcpu_fops   vcpu层面的文件操作
+ * kvm_vm_fops     虚拟机层面的文件操作
  */
 
 #include <kvm/iodev.h>
@@ -105,6 +110,7 @@ static cpumask_var_t cpus_hardware_enabled;
 static int kvm_usage_count;
 static atomic_t hardware_enable_failed;
 
+//在kvm_init中创建
 struct kmem_cache *kvm_vcpu_cache;
 EXPORT_SYMBOL_GPL(kvm_vcpu_cache);
 
@@ -313,6 +319,8 @@ void kvm_reload_remote_mmus(struct kvm *kvm)
  *    kvm_arch_vcpu_create()
  *     vmx_create_vcpu()
  *      kvm_vcpu_init()
+ *
+ * 将vcpu_vmx 和kvm关联起来,对vCPU的通用部分进行初始化
  */
 int kvm_vcpu_init(struct kvm_vcpu *vcpu, struct kvm *kvm, unsigned id)
 {
@@ -335,12 +343,14 @@ int kvm_vcpu_init(struct kvm_vcpu *vcpu, struct kvm *kvm, unsigned id)
 		r = -ENOMEM;
 		goto fail;
 	}
+	//设置好run这个page
 	vcpu->run = page_address(page);
 
 	kvm_vcpu_set_in_spin_loop(vcpu, false);
 	kvm_vcpu_set_dy_eligible(vcpu, false);
 	vcpu->preempted = false;
 
+    //对体系结构相关的部分进行初始化
 	r = kvm_arch_vcpu_init(vcpu);
 	if (r < 0)
 		goto fail_free_run;
@@ -2497,23 +2507,31 @@ void kvm_vcpu_on_spin(struct kvm_vcpu *me, bool yield_to_kernel_mode)
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_on_spin);
 
+/*
+ * qemu和KVM共享内存发生pagefault的时候,会调用这里
+ */
 static vm_fault_t kvm_vcpu_fault(struct vm_fault *vmf)
 {
 	struct kvm_vcpu *vcpu = vmf->vma->vm_file->private_data;
 	struct page *page;
 
+	//virt_to_page直接用pfn_to_page返回page
+
 	if (vmf->pgoff == 0)
 		page = virt_to_page(vcpu->run);
+//有定义
 #ifdef CONFIG_X86
 	else if (vmf->pgoff == KVM_PIO_PAGE_OFFSET)
 		page = virt_to_page(vcpu->arch.pio_data);
 #endif
+//有定义
 #ifdef CONFIG_KVM_MMIO
 	else if (vmf->pgoff == KVM_COALESCED_MMIO_PAGE_OFFSET)
 		page = virt_to_page(vcpu->kvm->coalesced_mmio_ring);
 #endif
 	else
 		return kvm_arch_vcpu_fault(vcpu, vmf);
+	
 	get_page(page);
 	vmf->page = page;
 	return 0;
@@ -2523,6 +2541,9 @@ static const struct vm_operations_struct kvm_vcpu_vm_ops = {
 	.fault = kvm_vcpu_fault,
 };
 
+/*
+ * qemu的kvm_vcpu_fault会调用到这个函数
+ */
 static int kvm_vcpu_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	vma->vm_ops = &kvm_vcpu_vm_ops;
@@ -3457,7 +3478,7 @@ static long kvm_dev_ioctl(struct file *filp,
 	case KVM_CHECK_EXTENSION:
 		r = kvm_vm_ioctl_check_extension_generic(NULL, arg);
 		break;
-	case KVM_GET_VCPU_MMAP_SIZE:
+	case KVM_GET_VCPU_MMAP_SIZE: //返回QEMU和KVM共享内存的大小
 		if (arg)
 			goto out;
 		r = PAGE_SIZE;     /* struct kvm_run */

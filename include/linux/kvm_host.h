@@ -215,6 +215,13 @@ struct kvm_mmio_fragment {
 	unsigned len;
 };
 
+/* 
+ * kvm层面的虚拟机对象用kvm_vcpu
+ * intel 的vmx层面的虚拟机对象用vcpu_vmx表示
+ * amd 的svm层面的虚拟机对象用vcpu_svm表示
+ *
+ * 这个通用层面的vcpu对象会嵌入到具体的vcpu_vmx或者vcpu_svm对象中去
+ */
 struct kvm_vcpu {
 	struct kvm *kvm;
 #ifdef CONFIG_PREEMPT_NOTIFIERS
@@ -253,6 +260,8 @@ struct kvm_vcpu {
 	 * vmx_queue_exception() -> KVM_REQ_TRIPLE_FAULT
 	 * vmx_vcpu_reset()-> KVM_REQ_APIC_PAGE_RELOAD
 	 *
+	 *
+	 * 这个requests的每个bit表示一个请求，这些请求来自多个地方，这些请求都是即将在进入guest os的时候进行处理
 	 * 总之，这个标记用宏 KVM_REQ_XXXX来标记的,这些宏都kvm_host.h中
 	 *
 	 * 用kvm_clear_request()来清除requests中的相应的标记
@@ -264,6 +273,7 @@ struct kvm_vcpu {
 	struct list_head blocked_vcpu_list;
 
 	struct mutex mutex;
+	//这个为一个大小的page,在kvm_vcpu_init中设置
 	struct kvm_run *run;
 
 	int guest_xcr0_loaded;
@@ -306,6 +316,7 @@ struct kvm_vcpu {
 	} spin_loop;
 #endif
 	bool preempted;
+    //体系结构相关的vcpu的状态
 	struct kvm_vcpu_arch arch;
 	struct dentry *debugfs_dentry;
 };

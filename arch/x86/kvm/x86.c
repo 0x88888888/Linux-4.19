@@ -3863,7 +3863,7 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
 		struct kvm_cpuid cpuid;
 
 		r = -EFAULT;
-		//从用户空间复制进来
+		//从qemu用户空间复制进来
 		if (copy_from_user(&cpuid, cpuid_arg, sizeof cpuid))
 			goto out;
 		//
@@ -7701,7 +7701,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 
 	bool req_immediate_exit = false;
 
-    //看是否有来自request哦，如果有，就处理掉
+    //看是否有request哦，如果有，就处理掉
 	if (kvm_request_pending(vcpu)) {
 		if (kvm_check_request(KVM_REQ_GET_VMCS12_PAGES, vcpu))
 			kvm_x86_ops->get_vmcs12_pages(vcpu);
@@ -7866,7 +7866,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 
 	preempt_disable();
 
-    //vmx_prepare_switch_to_guest,保存host信息
+    //vmx_prepare_switch_to_guest,保存host信息到VMCS
 	kvm_x86_ops->prepare_guest_switch(vcpu);
 
 	/*
@@ -7973,7 +7973,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 
 	kvm_before_interrupt(vcpu);
 	
-	//vmx_handle_external_intr
+	//vmx_handle_external_intr,处理外部中断
 	kvm_x86_ops->handle_external_intr(vcpu);
 	kvm_after_interrupt(vcpu);
 
@@ -8056,6 +8056,7 @@ static inline bool kvm_vcpu_running(struct kvm_vcpu *vcpu)
 	if (is_guest_mode(vcpu) && kvm_x86_ops->check_nested_events)
 		kvm_x86_ops->check_nested_events(vcpu, false); //vmx_check_nested_events
 
+    //vcpu->arch.apf.halted表示guest os中是否存在需要访问却被HOST主机swap出去的page，如果有，这个vCPU是不能继续运行的
 	return (vcpu->arch.mp_state == KVM_MP_STATE_RUNNABLE &&
 		!vcpu->arch.apf.halted);
 }
@@ -8075,7 +8076,7 @@ static int vcpu_run(struct kvm_vcpu *vcpu)
 	vcpu->arch.l1tf_flush_l1d = true;
 
 	for (;;) {
-		if (kvm_vcpu_running(vcpu)) {
+		if (kvm_vcpu_running(vcpu)) { 
 			r = vcpu_enter_guest(vcpu); //guest os走起
 		} else {
 		    //逐个vcpu继续不能运行
@@ -8838,7 +8839,11 @@ struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm,
 		"kvm: SMP vm created on host with unstable TSC; "
 		"guest TSC will not be reliable\n");
 
-    // vmx_create_vcpu
+    /*
+     * vmx_create_vcpu, 
+     * 创建vcpu_vmx,并且和kvm关联起来
+     * 如果是amd的，就创建vcpu_svm了
+     */
 	vcpu = kvm_x86_ops->vcpu_create(kvm, id);
 
 	return vcpu;
@@ -8853,6 +8858,8 @@ struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm,
 int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
 {
 	kvm_vcpu_mtrr_init(vcpu);
+
+	//
 	vcpu_load(vcpu);
 	kvm_vcpu_reset(vcpu, false);
 	
@@ -8903,6 +8910,13 @@ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
 	kvm_x86_ops->vcpu_free(vcpu);
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_setup()
+ *     kvm_vcpu_reset()
+ */
 void kvm_vcpu_reset(struct kvm_vcpu *vcpu, bool init_event)
 {
 	kvm_lapic_reset(vcpu, init_event);
@@ -9171,6 +9185,8 @@ EXPORT_SYMBOL_GPL(kvm_no_apic_vcpu);
  *     vmx_create_vcpu()
  *      kvm_vcpu_init()
  *       kvm_arch_vcpu_init()
+ *
+ * 对体系结构相关的部分进行初始化
  */
 int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
 {
@@ -9201,7 +9217,7 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
 		goto fail_free_pio_data;
 
 	if (irqchip_in_kernel(vcpu->kvm)) {
-		//分配kvm_vcpu->arch.apic 
+		//分配kvm_vcpu->arch.apic , 分配lapic对象
 		r = kvm_create_lapic(vcpu);
 		if (r < 0)
 			goto fail_mmu_destroy;
