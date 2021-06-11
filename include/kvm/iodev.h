@@ -25,6 +25,19 @@ struct kvm_vcpu;
  * kvm_io_device_ops are called under kvm slots_lock.
  * read and write handlers return 0 if the transaction has been handled,
  * or non-zero to have it passed to the next device.
+ *
+ * coalesced_mmio_ops,
+ * ioeventfd_ops,
+ * pit_dev_ops,
+ * speaker_dev_ops,
+ * picdev_master_ops,
+ * picdev_slave_ops,
+ * picdev_eclr_ops,
+ * ioapic_mmio_ops,
+ * apic_mmio_ops,
+ * mpic_mmio_ops,
+ * kvm_io_gic_ops
+ *
  **/
 struct kvm_io_device_ops {
 	int (*read)(struct kvm_vcpu *vcpu,
@@ -51,10 +64,19 @@ static inline void kvm_iodevice_init(struct kvm_io_device *dev,
 	dev->ops = ops;
 }
 
+/*
+ * kernel_pio()
+ *  kvm_io_bus_read()
+ *   __kvm_io_bus_read()
+ *    kvm_iodevice_read()
+ */
 static inline int kvm_iodevice_read(struct kvm_vcpu *vcpu,
 				    struct kvm_io_device *dev, gpa_t addr,
 				    int l, void *v)
 {
+   /*
+    * ioeventfd_ops.read == NULL
+    */
 	return dev->ops->read ? dev->ops->read(vcpu, dev, addr, l, v)
 				: -EOPNOTSUPP;
 }
@@ -67,13 +89,18 @@ static inline int kvm_iodevice_read(struct kvm_vcpu *vcpu,
  *	   write_mmio()
  *		vcpu_mmio_write()
  *       kvm_iodevice_write()
+ *
+ * kernel_pio()
+ *  kvm_io_bus_write()
+ *   __kvm_io_bus_write()
+ *    kvm_iodevice_write()
  */
 static inline int kvm_iodevice_write(struct kvm_vcpu *vcpu,
 				     struct kvm_io_device *dev, gpa_t addr,
 				     int l, const void *v)
 {
     /*
-     * apic_mmio_write
+     * ioeventfd_ops.write==ioeventfd_write
      */
 	return dev->ops->write ? dev->ops->write(vcpu, dev, addr, l, v)
 				 : -EOPNOTSUPP;

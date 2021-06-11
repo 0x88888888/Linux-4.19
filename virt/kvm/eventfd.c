@@ -743,7 +743,14 @@ ioeventfd_in_range(struct _ioeventfd *p, gpa_t addr, int len, const void *val)
 	return _val == p->datamatch ? true : false;
 }
 
-/* MMIO/PIO writes trigger an event if the addr/val match */
+/* MMIO/PIO writes trigger an event if the addr/val match 
+ *
+ * kernel_pio()
+ *  kvm_io_bus_write()
+ *   __kvm_io_bus_write()
+ *    kvm_iodevice_write()
+ *     ioeventfd_write()
+ */
 static int
 ioeventfd_write(struct kvm_vcpu *vcpu, struct kvm_io_device *this, gpa_t addr,
 		int len, const void *val)
@@ -753,6 +760,7 @@ ioeventfd_write(struct kvm_vcpu *vcpu, struct kvm_io_device *this, gpa_t addr,
 	if (!ioeventfd_in_range(p, addr, len, val))
 		return -EOPNOTSUPP;
 
+    //唤醒io event线程
 	eventfd_signal(p->eventfd, 1);
 	return 0;
 }

@@ -107,7 +107,9 @@ static const struct kvm_io_device_ops coalesced_mmio_ops = {
  * kvm_dev_ioctl()
  *  kvm_dev_ioctl_create_vm()
  *   kvm_coalesced_mmio_init()
- * 创建vm
+ * 
+ * 初始化合并mmio，合并mmio的写请求放到一个环中,
+ * 等到其他事件产生或者环满了并产生VM Exit,再进行MMIO处理
  */
 int kvm_coalesced_mmio_init(struct kvm *kvm)
 {

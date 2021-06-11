@@ -849,6 +849,10 @@ static BUS_ATTR(uevent, S_IWUSR, NULL, bus_uevent_store);
  * Once we have that, we register the bus with the kobject
  * infrastructure, then register the children subsystems it has:
  * the devices and drivers that belong to the subsystem.
+ *
+ * virtio_init(void)
+ *  bus_register(&virtio_bus)
+ *
  */
 int bus_register(struct bus_type *bus)
 {

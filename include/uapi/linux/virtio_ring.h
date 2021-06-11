@@ -53,7 +53,10 @@
  * optimization.  */
 #define VRING_AVAIL_F_NO_INTERRUPT	1
 
-/* We support indirect buffer descriptors */
+/* We support indirect buffer descriptors 
+ *
+ * 用在virtio_device->features
+ */
 #define VIRTIO_RING_F_INDIRECT_DESC	28
 
 /* The Guest publishes the used index for which it expects an interrupt
@@ -91,9 +94,7 @@ struct vring_desc {
 	 * VRING_DESC_F_WRITE,
 	 * VRING_DESC_F_INDIRECT,
 	 * 
-	 * VRING_USED_F_NO_NOTIFY,
-	 * VRING_AVAIL_F_NO_INTERRUPT,
-	 * VIRTIO_RING_F_INDIRECT_DESC
+	 * 
 	 */
 	__virtio16 flags;
 	/* We chain unused descriptors via this, too 
@@ -108,6 +109,9 @@ struct vring_desc {
  * avail是从host(外设)的角度来取名
  */
 struct vring_avail {
+    /*
+     * VRING_AVAIL_F_NO_INTERRUPT,
+     */
 	__virtio16 flags;
 	/*
 	 * 在驱动侧(guest)下一个可以在ring[]中放vring_desc的位置
@@ -119,8 +123,9 @@ struct vring_avail {
 	 *
 	 *vhost_virtqueue->last_avail_idx记录设备侧(host侧)可以消费vring_avail.ring[]的位置
 	 *
-	 * ring[]中数值是指在vring->desc[]当中的索引?
+	 * ring[]中数值是指在vring->desc[]当中的索引，然后由vring->desc[]中的vring_desc组成一个链表
 	 *
+	 * 驱动每次将I/O request转换成vring_desc后，就会在vring_avail->ring[]中增加一个元素,这里会用到idx
 	 * 
 	 */
 	__virtio16 ring[];
@@ -128,14 +133,20 @@ struct vring_avail {
 
 /* u32 is used here for ids for padding reasons. */
 struct vring_used_elem {
-	/* Index of start of used descriptor chain. */
+	/* Index of start of used descriptor chain. 
+	 *
+	 * 指示vring->vring_used[]中的索引
+     */
 	__virtio32 id;
 	/* Total length of the descriptor chain which was used (written to) */
-	//记录设备侧(host)向驱动侧(guest)回写的数据长度
+	//记录设备侧(host)反馈给驱动侧(guest)的数据长度
 	__virtio32 len;
 };
 
 struct vring_used {
+	/*
+     * VRING_USED_F_NO_NOTIFY,
+	 */     
 	__virtio16 flags;
 	__virtio16 idx;
 	struct vring_used_elem ring[];
@@ -145,6 +156,8 @@ struct vring_used {
  * 看vring_virtqueue, vring_virtqueue包含了virtqueue和vring
  *
  * 作为vring_virtqueue成员,在__vring_new_virtqueue中分配
+ *
+ * vring对象在vring_init中初始化
  */
 struct vring {
     //avail->ring[]中有num个vring_desc
@@ -193,6 +206,12 @@ struct vring {
 #define vring_used_event(vr) ((vr)->avail->ring[(vr)->num])
 #define vring_avail_event(vr) (*(__virtio16 *)&(vr)->used->ring[(vr)->num])
 
+/*
+ * vm_find_vqs()
+ *	vm_setup_vq()
+ *	 vring_create_virtqueue()
+ *    vring_init()
+ */
 static inline void vring_init(struct vring *vr, unsigned int num, void *p,
 			      unsigned long align)
 {

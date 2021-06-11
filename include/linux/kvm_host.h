@@ -449,7 +449,10 @@ struct kvm_memslots {
 	int used_slots;
 };
 
-//在kvm_dev_ioctl_create_vm中创建，表示一个虚拟机对象
+/*
+ * 在kvm_dev_ioctl_create_vm中创建，表示一个虚拟机对象
+ * 在kvm_create_vm中创建
+ */
 struct kvm {
 	spinlock_t mmu_lock;
 	struct mutex slots_lock;
@@ -470,6 +473,10 @@ struct kvm {
 	//所有的虚拟机对象kvm都链接到vm_list链表中
 	struct list_head vm_list;
 	struct mutex lock;
+	/*
+	 * 这个结构与linux中的总线结构没有关系
+	 * 它的作用是将内核中实现的模拟设备链接起来，有多种总线类型如KVM_MMIO_BUS,KMV_PIO_BUS
+	 */
 	struct kvm_io_bus __rcu *buses[KVM_NR_BUSES];
 #ifdef CONFIG_HAVE_KVM_EVENTFD
 	struct {
@@ -622,6 +629,7 @@ static inline void kvm_arch_post_irq_routing_update(struct kvm *kvm)
 }
 #endif
 
+//有定义
 #ifdef CONFIG_HAVE_KVM_IRQFD
 int kvm_irqfd_init(void);
 void kvm_irqfd_exit(void);

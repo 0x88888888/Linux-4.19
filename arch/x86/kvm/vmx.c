@@ -1338,6 +1338,11 @@ enum {
 
 static unsigned long *vmx_bitmap[VMX_BITMAP_NR];
 
+/*
+ * 这两个bitmap用于控制在通过io地址来操作外设时，是否产生VM Exit，
+ * 为1就产生VM Exit
+ */
+
 #define vmx_vmread_bitmap                    (vmx_bitmap[VMX_VMREAD_BITMAP])
 #define vmx_vmwrite_bitmap                   (vmx_bitmap[VMX_VMWRITE_BITMAP])
 
@@ -8228,6 +8233,10 @@ static __init int hardware_setup(void)
 			goto out;
 	}
 
+    /*
+     * 这两个bitmap用于控制在通过io地址来操作外设时，是否产生VM Exit，
+     * 为1就产生VM Exit
+     */
 	memset(vmx_vmread_bitmap, 0xff, PAGE_SIZE);
 	memset(vmx_vmwrite_bitmap, 0xff, PAGE_SIZE);
 
@@ -11611,11 +11620,14 @@ static void __init vmx_check_processor_compat(void *rtn)
 	struct vmcs_config vmcs_conf;
 
 	*(int *)rtn = 0;
+
+	//给当前cpu设置vmcs_config
 	if (setup_vmcs_config(&vmcs_conf) < 0)
 		*(int *)rtn = -EIO;
 	
 	nested_vmx_setup_ctls_msrs(&vmcs_conf.nested, enable_apicv);
-	
+
+	//与全局的vmcs_config必须要一样，否则不兼容啊
 	if (memcmp(&vmcs_config, &vmcs_conf, sizeof(struct vmcs_config)) != 0) {
 		printk(KERN_ERR "kvm: CPU %d feature inconsistency!\n",
 				smp_processor_id());

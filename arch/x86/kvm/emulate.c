@@ -1462,6 +1462,14 @@ static int segmented_cmpxchg(struct x86_emulate_ctxt *ctxt,
 					   size, &ctxt->exception);
 }
 
+/* 
+ * vmx_handle_exit()
+ *  handle_io()
+ *   kvm_emulate_instruction() 
+ *    x86_emulate_instruction()
+ * 	   em_in()
+ *      pio_in_emulated()
+ */
 static int pio_in_emulated(struct x86_emulate_ctxt *ctxt,
 			   unsigned int size, unsigned short port,
 			   void *dest)
@@ -1479,6 +1487,7 @@ static int pio_in_emulated(struct x86_emulate_ctxt *ctxt,
 		if (n == 0)
 			n = 1;
 		rc->pos = rc->end = 0;
+		// emulate_ops->pio_in_emulated==emulator_pio_in_emulated
 		if (!ctxt->ops->pio_in_emulated(ctxt, size, port, rc->data, n))
 			return 0;
 		rc->end = n * size;
@@ -3884,6 +3893,13 @@ static int em_jcxz(struct x86_emulate_ctxt *ctxt)
 	return rc;
 }
 
+/* 
+ * vmx_handle_exit()
+ *  handle_io()
+ *   kvm_emulate_instruction() 
+ *    x86_emulate_instruction()
+ *     em_in()
+ */
 static int em_in(struct x86_emulate_ctxt *ctxt)
 {
 	if (!pio_in_emulated(ctxt, ctxt->dst.bytes, ctxt->src.val,
@@ -3893,8 +3909,16 @@ static int em_in(struct x86_emulate_ctxt *ctxt)
 	return X86EMUL_CONTINUE;
 }
 
+/* 
+ * vmx_handle_exit()
+ *  handle_io()
+ *   kvm_emulate_instruction() 
+ *    x86_emulate_instruction()
+ * 	   em_out()
+ */
 static int em_out(struct x86_emulate_ctxt *ctxt)
 {
+    //emulator_pio_out_emulated
 	ctxt->ops->pio_out_emulated(ctxt, ctxt->src.bytes, ctxt->dst.val,
 				    &ctxt->src.val, 1);
 	/* Disable writeback. */

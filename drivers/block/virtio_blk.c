@@ -680,7 +680,10 @@ static int virtblk_probe(struct virtio_device *vdev)
 	if (err)
 		goto out_free_vblk;
 
-	/* FIXME: How many partitions?  How long is a piece of string? */
+	/* FIXME: How many partitions?  How long is a piece of string? 
+	 *
+	 * 分配gendisk对象
+	 */
 	vblk->disk = alloc_disk(1 << PART_BITS);
 	if (!vblk->disk) {
 		err = -ENOMEM;

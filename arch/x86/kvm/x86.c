@@ -5483,15 +5483,35 @@ emul_write:
 	return emulator_write_emulated(ctxt, addr, new, bytes, exception);
 }
 
+ /* 
+  * vmx_handle_exit()
+  *  handle_io()
+  *   kvm_emulate_instruction() 
+  *    x86_emulate_instruction()
+  * 	em_out()
+  * 	 emulator_pio_out_emulated()
+  * 	  emulator_pio_in_out()
+  *        kernel_pio()
+  * 
+  * vmx_handle_exit()
+  *  handle_io()
+  *   kvm_emulate_instruction() 
+  *    x86_emulate_instruction()
+  * 	em_in()
+  * 	 pio_in_emulated()
+  * 	  emulator_pio_in_emulated()
+  * 	   emulator_pio_in_out()
+  *         kernel_pio()
+  */
 static int kernel_pio(struct kvm_vcpu *vcpu, void *pd)
 {
 	int r = 0, i;
 
 	for (i = 0; i < vcpu->arch.pio.count; i++) {
-		if (vcpu->arch.pio.in)
+		if (vcpu->arch.pio.in) //读 
 			r = kvm_io_bus_read(vcpu, KVM_PIO_BUS, vcpu->arch.pio.port,
 					    vcpu->arch.pio.size, pd);
-		else
+		else//写
 			r = kvm_io_bus_write(vcpu, KVM_PIO_BUS,
 					     vcpu->arch.pio.port, vcpu->arch.pio.size,
 					     pd);
@@ -5502,6 +5522,24 @@ static int kernel_pio(struct kvm_vcpu *vcpu, void *pd)
 	return r;
 }
 
+/* 
+ * vmx_handle_exit()
+ *  handle_io()
+ *   kvm_emulate_instruction() 
+ *    x86_emulate_instruction()
+ * 	   em_out()
+ *      emulator_pio_out_emulated()
+ *       emulator_pio_in_out()
+ * 
+ * vmx_handle_exit()
+ *  handle_io()
+ *   kvm_emulate_instruction() 
+ *    x86_emulate_instruction()
+ *     em_in()
+ *      pio_in_emulated()
+ *       emulator_pio_in_emulated()
+ *        emulator_pio_in_out()
+ */
 static int emulator_pio_in_out(struct kvm_vcpu *vcpu, int size,
 			       unsigned short port, void *val,
 			       unsigned int count, bool in)
@@ -5526,6 +5564,15 @@ static int emulator_pio_in_out(struct kvm_vcpu *vcpu, int size,
 	return 0;
 }
 
+/* 
+ * vmx_handle_exit()
+ *  handle_io()
+ *   kvm_emulate_instruction() 
+ *    x86_emulate_instruction()
+ *     em_in()
+ *      pio_in_emulated()
+ *       emulator_pio_in_emulated()
+ */
 static int emulator_pio_in_emulated(struct x86_emulate_ctxt *ctxt,
 				    int size, unsigned short port, void *val,
 				    unsigned int count)
@@ -5550,6 +5597,14 @@ data_avail:
 	return 0;
 }
 
+/* 
+ * vmx_handle_exit()
+ *  handle_io()
+ *   kvm_emulate_instruction() 
+ *    x86_emulate_instruction()
+ * 	   em_out()
+ *      emulator_pio_out_emulated()
+ */
 static int emulator_pio_out_emulated(struct x86_emulate_ctxt *ctxt,
 				     int size, unsigned short port,
 				     const void *val, unsigned int count)
@@ -6904,6 +6959,9 @@ int kvm_arch_init(void *opaque)
 		goto out;
 	}
 
+    /*
+     * 分配pte_list_desc_cache, mmu_page_header_cache
+     */
 	r = kvm_mmu_module_init();
 	if (r)
 		goto out_free_percpu;
@@ -8934,6 +8992,13 @@ void kvm_vcpu_deliver_sipi_vector(struct kvm_vcpu *vcpu, u8 vector)
  * kvm_starting_cpu()
  *  hardware_enable_nolock()
  *   kvm_arch_hardware_enable()
+ *
+ * kvm_dev_ioctl()
+ *  kvm_dev_ioctl_create_vm()
+ *   kvm_create_vm()
+ *    ...
+ *     hardware_enable_nolock()
+ *      kvm_arch_hardware_enable()
  */
 int kvm_arch_hardware_enable(void)
 {
@@ -8946,7 +9011,7 @@ int kvm_arch_hardware_enable(void)
 	bool stable, backwards_tsc = false;
 
 	kvm_shared_msr_cpu_online();
-	//hardware_enable
+	//hardware_enable ，开启CR4.VMXE
 	ret = kvm_x86_ops->hardware_enable();
 	if (ret != 0)
 		return ret;
@@ -9005,6 +9070,7 @@ int kvm_arch_hardware_enable(void)
 	 */
 	if (backwards_tsc) {
 		u64 delta_cyc = max_tsc - local_tsc;
+		//将虚拟机kvm加入到vm_list
 		list_for_each_entry(kvm, &vm_list, vm_list) {
 			kvm->arch.backwards_tsc_observed = true;
 			kvm_for_each_vcpu(i, vcpu, kvm) {
@@ -9074,6 +9140,8 @@ void kvm_arch_hardware_unsetup(void)
  * vmx_init()
  *  kvm_init(opaque==&vmx_x86_ops)
  *   kvm_arch_check_processor_compat()
+ *
+ * 检查所有的cpu特性是否一致
  */
 void kvm_arch_check_processor_compat(void *rtn)
 {

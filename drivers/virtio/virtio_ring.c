@@ -97,7 +97,7 @@ struct vring_virtqueue {
 
 	/* Last used index we've seen. 
 	 *
-	 * vring_virtqueue->last_used_idx表示host(设备)上一次消费到哪里了
+	 * vring_virtqueue->last_used_idx表示当前guest(驱动)侧已经回收到的位置
 	 */
 	u16 last_used_idx;
 
@@ -1095,6 +1095,7 @@ struct virtqueue *vring_create_virtqueue(
 	const char *name)
 {
 	struct virtqueue *vq;
+	//queue就是vring_desc数组,vring->avail,vring->desc,vring->used都指向这个
 	void *queue = NULL;
 	dma_addr_t dma_addr;
 	size_t queue_size_in_bytes;
@@ -1118,7 +1119,7 @@ struct virtqueue *vring_create_virtqueue(
 	if (!num)
 		return NULL;
 
-	if (!queue) {
+	if (!queue) { //前面分配失败，再一次尝试分配
 		/* Try to get a single page. You are my only hope! */
 		queue = vring_alloc_queue(vdev, vring_size(num, vring_align),
 					  &dma_addr, GFP_KERNEL|__GFP_ZERO);

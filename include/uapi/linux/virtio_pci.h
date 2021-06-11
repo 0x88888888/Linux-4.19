@@ -58,7 +58,12 @@
 /* A 16-bit r/w queue selector */
 #define VIRTIO_PCI_QUEUE_SEL		14
 
-/* A 16-bit r/w queue notifier */
+/* A 16-bit r/w queue notifier 
+ *
+ * guest的virtio驱动设置好vring后，
+ * 写这个io端口,产生VM EXIT
+ * pci legacy的时候用
+ */
 #define VIRTIO_PCI_QUEUE_NOTIFY		16
 
 /* An 8-bit device status register.  */

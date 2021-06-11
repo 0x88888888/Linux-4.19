@@ -668,6 +668,8 @@ static int kvm_create_vm_debugfs(struct kvm *kvm, int fd)
 static struct kvm *kvm_create_vm(unsigned long type)
 {
 	int r, i;
+
+	//创建一个虚拟机对象
 	struct kvm *kvm = kvm_arch_alloc_vm();
 
 	if (!kvm)
@@ -687,6 +689,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
 	if (r)
 		goto out_err_no_disable;
 
+    //执行VMXON
 	r = hardware_enable_all();
 	if (r)
 		goto out_err_no_disable;
@@ -698,6 +701,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
 	BUILD_BUG_ON(KVM_MEM_SLOTS_NUM > SHRT_MAX);
 
 	r = -ENOMEM;
+	// 给虚拟机kvm分配kvm_memslots对象
 	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
 		struct kvm_memslots *slots = kvm_alloc_memslots();
 		if (!slots)
@@ -715,6 +719,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
 		goto out_err_no_srcu;
 	if (init_srcu_struct(&kvm->irq_srcu))
 		goto out_err_no_irq_srcu;
+	//给虚拟机kvm分配kvm_io_bus
 	for (i = 0; i < KVM_NR_BUSES; i++) {
 		rcu_assign_pointer(kvm->buses[i],
 			kzalloc(sizeof(struct kvm_io_bus), GFP_KERNEL));
@@ -3210,7 +3215,7 @@ static long kvm_vm_ioctl(struct file *filp,
 		r = kvm_irqfd(kvm, &data);
 		break;
 	}
-	case KVM_IOEVENTFD: {//事件fd操作
+	case KVM_IOEVENTFD: {//事件ioevent fd操作
 		struct kvm_ioeventfd data;
 
 		r = -EFAULT;
@@ -3394,6 +3399,7 @@ static int kvm_dev_ioctl_create_vm(unsigned long type)
 		return PTR_ERR(kvm);
 //有定义	
 #ifdef CONFIG_KVM_MMIO
+    //创建合并mmio的page
 	r = kvm_coalesced_mmio_init(kvm);
 	if (r < 0)
 		goto put_kvm;
@@ -3491,6 +3497,12 @@ static struct miscdevice kvm_dev = {
 /*
  * kvm_starting_cpu()
  *  hardware_enable_nolock()
+ *
+ * kvm_dev_ioctl()
+ *  kvm_dev_ioctl_create_vm()
+ *   kvm_create_vm()
+ *    ...
+ *     hardware_enable_nolock()
  */
 static void hardware_enable_nolock(void *junk)
 {
@@ -3565,6 +3577,11 @@ static void hardware_disable_all(void)
 }
 
 /*
+ * kvm_dev_ioctl()
+ *  kvm_dev_ioctl_create_vm()
+ *   kvm_create_vm()
+ *    hardware_enable_all()
+ *
  * 所有的cpu都 vmxon
  */
 static int hardware_enable_all(void)
@@ -3675,6 +3692,11 @@ static int kvm_io_bus_get_first_dev(struct kvm_io_bus *bus,
 	return off;
 }
 
+/*
+ * kernel_pio()
+ *  kvm_io_bus_write()
+ *   __kvm_io_bus_write()
+ */
 static int __kvm_io_bus_write(struct kvm_vcpu *vcpu, struct kvm_io_bus *bus,
 			      struct kvm_io_range *range, const void *val)
 {
@@ -3695,7 +3717,11 @@ static int __kvm_io_bus_write(struct kvm_vcpu *vcpu, struct kvm_io_bus *bus,
 	return -EOPNOTSUPP;
 }
 
-/* kvm_io_bus_write - called under kvm->slots_lock */
+/* kvm_io_bus_write - called under kvm->slots_lock .
+ *
+ * kernel_pio()
+ *  kvm_io_bus_write()
+ */
 int kvm_io_bus_write(struct kvm_vcpu *vcpu, enum kvm_bus bus_idx, gpa_t addr,
 		     int len, const void *val)
 {
@@ -3745,6 +3771,11 @@ int kvm_io_bus_write_cookie(struct kvm_vcpu *vcpu, enum kvm_bus bus_idx,
 	return __kvm_io_bus_write(vcpu, bus, &range, val);
 }
 
+/*
+ * kernel_pio()
+ *  kvm_io_bus_read()
+ *   __kvm_io_bus_read()
+ */
 static int __kvm_io_bus_read(struct kvm_vcpu *vcpu, struct kvm_io_bus *bus,
 			     struct kvm_io_range *range, void *val)
 {
@@ -3766,7 +3797,11 @@ static int __kvm_io_bus_read(struct kvm_vcpu *vcpu, struct kvm_io_bus *bus,
 }
 EXPORT_SYMBOL_GPL(kvm_io_bus_write);
 
-/* kvm_io_bus_read - called under kvm->slots_lock */
+/* kvm_io_bus_read - called under kvm->slots_lock 
+ *
+ * kernel_pio()
+ *  kvm_io_bus_read()
+ */
 int kvm_io_bus_read(struct kvm_vcpu *vcpu, enum kvm_bus bus_idx, gpa_t addr,
 		    int len, void *val)
 {
@@ -4269,7 +4304,7 @@ int kvm_init(void *opaque, unsigned vcpu_size, unsigned vcpu_align,
 
 	for_each_online_cpu(cpu) {
 		smp_call_function_single(cpu,
-				kvm_arch_check_processor_compat,
+				kvm_arch_check_processor_compat, //检查所有的cpu特性是否一致
 				&r, 1);
 		if (r < 0)
 			goto out_free_1;
@@ -4279,6 +4314,7 @@ int kvm_init(void *opaque, unsigned vcpu_size, unsigned vcpu_align,
 				      kvm_starting_cpu, kvm_dying_cpu);
 	if (r)
 		goto out_free_2;
+	
 	register_reboot_notifier(&kvm_reboot_notifier);
 
 	/* A kmem cache lets us meet the alignment requirements of fx_save. */
@@ -4300,7 +4336,8 @@ int kvm_init(void *opaque, unsigned vcpu_size, unsigned vcpu_align,
 	if (r)
 		goto out_free;
 
-	kvm_chardev_ops.owner = module;
+    //这三个file_operations->owner都是当前module
+  	kvm_chardev_ops.owner = module;
 	kvm_vm_fops.owner = module;
 	kvm_vcpu_fops.owner = module;
 
