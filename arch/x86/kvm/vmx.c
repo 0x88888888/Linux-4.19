@@ -1026,9 +1026,10 @@ struct vcpu_vmx {
 	 * need to be switched when transitioning to/from the kernel; a NULL
 	 * value indicates that host state is loaded.
 	 *
-	 * 
+	 * 在vmx_create_vcpu中分配
 	 */
 	struct loaded_vmcs    vmcs01;//没有嵌套虚拟化的时候
+	//在vmx_create_vcpu中设置为指向vmcs01
 	struct loaded_vmcs   *loaded_vmcs; //指向当前的VMCS区域，根据是否嵌套虚拟化指向不同的vmcs
 	struct loaded_vmcs   *loaded_cpu_state;//
 	bool                  __launched; /* temporary, used in vmx_vcpu_run */
@@ -1378,16 +1379,45 @@ static bool cpu_has_load_perf_global_ctrl;
 static DECLARE_BITMAP(vmx_vpid_bitmap, VMX_NR_VPIDS);
 static DEFINE_SPINLOCK(vmx_vpid_lock);
 
+/*
+ * vmcs的一些MSR寄存器的值
+ */
 static struct vmcs_config {
 	int size;
 	int order;
+	/*
+	 * MSR_IA32_VMX_BASIC
+	 * 在setup_vmcs_config中设置
+	 * 
+	 */
 	u32 basic_cap;
 	u32 revision_id;
+    /*
+	 * MSR_IA32_VMX_PINBASED_CTLS
+	 * 在setup_vmcs_config中设置
+	 */
 	u32 pin_based_exec_ctrl;
+    /*
+	 * MSR_IA32_VMX_PROCBASED_CTLS
+	 * 在setup_vmcs_config中设置
+	 */
 	u32 cpu_based_exec_ctrl;
+    /*
+	 * MSR_IA32_VMX_PROCBASED_CTLS2
+	 * 在setup_vmcs_config中设置
+	 */
 	u32 cpu_based_2nd_exec_ctrl;
+    /*
+	 * MSR_IA32_VMX_EXIT_CTLS
+	 * 在setup_vmcs_config中设置
+	 */	
 	u32 vmexit_ctrl;
+    /*
+	 * MSR_IA32_VMX_ENTRY_CTLS
+	 * 在setup_vmcs_config中设置
+	 */	
 	u32 vmentry_ctrl;
+	
 	struct nested_vmx_msrs nested;
 } vmcs_config;
 
@@ -3197,11 +3227,13 @@ static void vmx_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
 
-	//vcpu是否已经运行在cpu上了
+	//vcpu是否已经在这个cpu上运行过了
 	bool already_loaded = vmx->loaded_vmcs->cpu == cpu;
 
-	if (!already_loaded) { //
+	if (!already_loaded) { //如果没有在cpuid==cpu上运行过，需要clear一下
+	    // clear一下
 		loaded_vmcs_clear(vmx->loaded_vmcs);
+		
 		local_irq_disable();
 		crash_disable_local_vmclear(cpu);
 
@@ -4712,7 +4744,8 @@ static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf)
 	u32 _vmentry_control = 0;
 
 	memset(vmcs_conf, 0, sizeof(*vmcs_conf));
-	
+
+	//会产生VM Exit的最小配置
 	min = CPU_BASED_HLT_EXITING |
 #ifdef CONFIG_X86_64
 	      CPU_BASED_CR8_LOAD_EXITING |
@@ -4731,6 +4764,7 @@ static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf)
 	opt = CPU_BASED_TPR_SHADOW |
 	      CPU_BASED_USE_MSR_BITMAPS |
 	      CPU_BASED_ACTIVATE_SECONDARY_CONTROLS;
+	
 	//读取MSR_IA32_VMX_PROCBASED_CTLS 到_cpu_based_exec_control
 	if (adjust_vmx_controls(min, opt, MSR_IA32_VMX_PROCBASED_CTLS,
 				&_cpu_based_exec_control) < 0)
@@ -4742,7 +4776,8 @@ static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf)
 					   ~CPU_BASED_CR8_STORE_EXITING;
 #endif
 
-    
+
+    //启动SECONDARY_CONTROLS
 	if (_cpu_based_exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS) {
 		min2 = 0;
 		opt2 = SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
@@ -4799,8 +4834,11 @@ static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf)
 		pr_warn_once("EPT CAP should not exist if not support "
 				"1-setting enable EPT VM-execution control\n");
 	}
+
+	
 	if (!(_cpu_based_2nd_exec_control & SECONDARY_EXEC_ENABLE_VPID) &&
 		vmx_capability.vpid) {
+		
 		vmx_capability.vpid = 0;
 		pr_warn_once("VPID CAP should not exist if not support "
 				"1-setting enable VPID VM-execution control\n");
@@ -4835,6 +4873,7 @@ static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf)
 				&_vmentry_control) < 0)
 		return -EIO;
 
+    //读取MSR_IA32_VMX_BASIC
 	rdmsr(MSR_IA32_VMX_BASIC, vmx_msr_low, vmx_msr_high);
 
 	/* IA-32 SDM Vol 3B: VMCS size is never greater than 4kB. */
@@ -4851,6 +4890,7 @@ static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf)
 	if (((vmx_msr_high >> 18) & 15) != 6)
 		return -EIO;
 
+    //根据读取出来各种MSR寄存器,来设置vmcs_conf
 	vmcs_conf->size = vmx_msr_high & 0x1fff;
 	vmcs_conf->order = get_order(vmcs_conf->size);
 	vmcs_conf->basic_cap = vmx_msr_high & ~0x1fff;
@@ -7364,7 +7404,7 @@ static int handle_machine_check(struct kvm_vcpu *vcpu)
 /*
  * vcpu_run()
  *  vcpu_enter_guest()
- *   vmx_handle_exit()
+ *   vmx_handle_exit() [EXIT_REASON_EXCEPTION_NMI]
  *    handle_exception()
  */
 static int handle_exception(struct kvm_vcpu *vcpu)
@@ -7429,7 +7469,7 @@ static int handle_exception(struct kvm_vcpu *vcpu)
 		cr2 = vmcs_readl(EXIT_QUALIFICATION);
 		/* EPT won't cause page fault directly */
 		WARN_ON_ONCE(!vcpu->arch.apf.host_apf_reason && enable_ept);
-	    //走起
+	    //走起,建立shadow page table?
 		return kvm_handle_page_fault(vcpu, error_code, cr2, NULL, 0);
 	}
 
@@ -7775,6 +7815,13 @@ static void vmx_set_dr7(struct kvm_vcpu *vcpu, unsigned long val)
 	vmcs_writel(GUEST_DR7, val);
 }
 
+/*
+ * vcpu_run()
+ *  vcpu_enter_guest()
+ *   vmx_handle_exit()
+ *    handle_cpuid()
+ *处理quest os的cpuid指令，不需要返回QEMU去处理，在KVM中就能处理了
+ */
 static int handle_cpuid(struct kvm_vcpu *vcpu)
 {
 	return kvm_emulate_cpuid(vcpu);
@@ -8044,6 +8091,7 @@ static int handle_ept_violation(struct kvm_vcpu *vcpu)
 			(exit_qualification & INTR_INFO_UNBLOCK_NMI))
 		vmcs_set_bits(GUEST_INTERRUPTIBILITY_INFO, GUEST_INTR_STATE_NMI);
 
+    //guest os的物理地址
 	gpa = vmcs_read64(GUEST_PHYSICAL_ADDRESS);
 	trace_kvm_page_fault(gpa, exit_qualification);
 
@@ -9821,6 +9869,7 @@ static int (*const kvm_vmx_exit_handlers[])(struct kvm_vcpu *vcpu) = {
 	[EXIT_REASON_MCE_DURING_VMENTRY]      = handle_machine_check,
 	[EXIT_REASON_GDTR_IDTR]		      = handle_desc,
 	[EXIT_REASON_LDTR_TR]		      = handle_desc,
+	//下面两个函数处理EPT 缺页异常
 	[EXIT_REASON_EPT_VIOLATION]	      = handle_ept_violation,
 	[EXIT_REASON_EPT_MISCONFIG]           = handle_ept_misconfig,
 	[EXIT_REASON_PAUSE_INSTRUCTION]       = handle_pause,
@@ -10565,6 +10614,10 @@ static int vmx_handle_exit(struct kvm_vcpu *vcpu)
 		}
 	}
 
+    /*
+     * 有些VM Exit状况在KVM内部就能处理了，不需要切换到QEMU中
+     * 有些事件如PIO和MMIO端口的读写,则需要分发到QEMU中处理
+     */
 	if (exit_reason < kvm_vmx_max_exit_handlers
 	    && kvm_vmx_exit_handlers[exit_reason])
 		return kvm_vmx_exit_handlers[exit_reason](vcpu); //跳入异常处理函数
@@ -14324,11 +14377,13 @@ static int pi_pre_block(struct kvm_vcpu *vcpu)
  * vcpu_run()
  *  vcpu_block()
  *   vmx_pre_block()
+ *
+ * 用于判断vcpu是否可以被block
  */
 static int vmx_pre_block(struct kvm_vcpu *vcpu)
 {
 	if (pi_pre_block(vcpu)) //有外部中断,返回
-		return 1;
+		return 1;//vcpu不能被block
 
 	if (kvm_lapic_hv_timer_in_use(vcpu))
 		kvm_lapic_switch_to_sw_timer(vcpu);

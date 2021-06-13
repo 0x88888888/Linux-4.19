@@ -5549,7 +5549,8 @@ static int emulator_pio_in_out(struct kvm_vcpu *vcpu, int size,
 	vcpu->arch.pio.count  = count;
 	vcpu->arch.pio.size = size;
 
-	if (!kernel_pio(vcpu, vcpu->arch.pio_data)) {
+
+	if (!kernel_pio(vcpu, vcpu->arch.pio_data)) {//在内核态处理了，无需返回用户态的QEMU去处理这个IO了
 		vcpu->arch.pio.count = 0;
 		return 1;
 	}
@@ -5561,6 +5562,7 @@ static int emulator_pio_in_out(struct kvm_vcpu *vcpu, int size,
 	vcpu->run->io.count = count;
 	vcpu->run->io.port = port;
 
+    //需要返回用户态的QEMU去处理IO了
 	return 0;
 }
 
@@ -6600,6 +6602,7 @@ static int kvm_fast_pio_in(struct kvm_vcpu *vcpu, int size,
 
 	vcpu->arch.complete_userspace_io = complete_fast_pio_in;
 
+    //需要返回用户态的QEMU去处理IO了
 	return 0;
 }
 
@@ -7899,7 +7902,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 	 * notified with kvm_vcpu_kick.
 	 */
 	if (kvm_lapic_enabled(vcpu) && vcpu->arch.apicv_active)
-		kvm_x86_ops->sync_pir_to_irr(vcpu);
+		kvm_x86_ops->sync_pir_to_irr(vcpu); //vmx_sync_pir_to_irr
 
 	if (vcpu->mode == EXITING_GUEST_MODE || kvm_request_pending(vcpu)
 	    || need_resched() || signal_pending(current)) {
@@ -7973,7 +7976,10 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 
 	kvm_before_interrupt(vcpu);
 	
-	//vmx_handle_external_intr,处理外部中断
+	/*
+	 * vmx_handle_external_intr,处理外部中断,
+	 * 到vmx_handle_exit中基本上不用处理外部中断了
+	 */
 	kvm_x86_ops->handle_external_intr(vcpu);
 	kvm_after_interrupt(vcpu);
 
@@ -8023,6 +8029,7 @@ static inline int vcpu_block(struct kvm *kvm, struct kvm_vcpu *vcpu)
 	    (!kvm_x86_ops->pre_block || kvm_x86_ops->pre_block(vcpu) == 0 /* vmx_pre_block */)) {
 	    
 		srcu_read_unlock(&kvm->srcu, vcpu->srcu_idx);
+		//这里
 		kvm_vcpu_block(vcpu);
 		vcpu->srcu_idx = srcu_read_lock(&kvm->srcu);
 
@@ -9503,6 +9510,7 @@ int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
 {
 	int i;
 
+    //共有4K,2M,1G 3种类型
 	for (i = 0; i < KVM_NR_PAGE_SIZES; ++i) {
 		struct kvm_lpage_info *linfo;
 		unsigned long ugfn;
@@ -9521,10 +9529,11 @@ int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
 		slot->arch.rmap[i] =
 			kvcalloc(lpages, sizeof(*slot->arch.rmap[i]),
 				 GFP_KERNEL);
-		if (!slot->arch.rmap[i])
+		
+		if (!slot->arch.rmap[i])//分配失败
 			goto out_free;
 		
-		if (i == 0)
+		if (i == 0)//是4k的正常page，不要走到下面去分配linfo了
 			continue;
 
 		linfo = kvcalloc(lpages, sizeof(*linfo), GFP_KERNEL);
@@ -9538,22 +9547,30 @@ int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
 		
 		if ((slot->base_gfn + npages) & (KVM_PAGES_PER_HPAGE(level) - 1))
 			linfo[lpages - 1].disallow_lpage = 1;
-		
+
+		//在qemu进程中对应的virtual address 的page number
 		ugfn = slot->userspace_addr >> PAGE_SHIFT;
 		/*
 		 * If the gfn and userspace address are not aligned wrt each
 		 * other, or if explicitly asked to, disable large page
 		 * support for this slot
+		 *
+		 * slot->base_gfn ^ ugfn 异或运算，如果这两个数字有不一样的，就会为非0
+		 * (slot->base_gfn ^ ugfn) & (KVM_PAGES_PER_HPAGE(level) - 1) 这个运算表示什么？？？
+		 *
 		 */
 		if ((slot->base_gfn ^ ugfn) & (KVM_PAGES_PER_HPAGE(level) - 1) ||
 		    !kvm_largepages_enabled()) {
 			unsigned long j;
 
-			for (j = 0; j < lpages; ++j)
+			for (j = 0; j < lpages; ++j)//不支持large page了
 				linfo[j].disallow_lpage = 1;
 		}
 	}
 
+    /* 
+     * 填写好slot->arch.gfn_track[...]
+     */
 	if (kvm_page_track_create_memslot(slot, npages))
 		goto out_free;
 
@@ -9655,7 +9672,7 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
 {
 	int nr_mmu_pages = 0;
 
-	if (!kvm->arch.n_requested_mmu_pages)//所需要的物理页面数量,所以页表映射到这些物理页面的 页表也需要变
+	if (!kvm->arch.n_requested_mmu_pages)//mmu所需要的物理页面数量,所以页表映射到这些物理页面的 页表也需要变
 		nr_mmu_pages = kvm_mmu_calculate_mmu_pages(kvm);
 
 	if (nr_mmu_pages)
@@ -9687,8 +9704,10 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
 	 * new and it's also covered when dealing with the new slot.
 	 *
 	 * FIXME: const-ify all uses of struct kvm_memory_slot.
+	 *
+	 * 
 	 */
-	if (change != KVM_MR_DELETE)
+	if (change != KVM_MR_DELETE)//弄个一个写保护
 		kvm_mmu_slot_apply_flags(kvm, (struct kvm_memory_slot *) new);
 }
 

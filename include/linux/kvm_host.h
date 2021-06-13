@@ -273,7 +273,7 @@ struct kvm_vcpu {
 	struct list_head blocked_vcpu_list;
 
 	struct mutex mutex;
-	//这个为一个大小的page,在kvm_vcpu_init中设置
+	//这个为一个大小的page,在kvm_vcpu_init中设置,是KVM和QEMU共享的数据块
 	struct kvm_run *run;
 
 	int guest_xcr0_loaded;
@@ -281,10 +281,14 @@ struct kvm_vcpu {
 	struct pid __rcu *pid;
 	int sigset_active;
 	sigset_t sigset;
+	/*
+	 *KVM虚拟机中的页表、MMU等运行时状态信息
+	 */
 	struct kvm_vcpu_stat stat;
 	unsigned int halt_poll_ns;
 	bool valid_wakeup;
 
+//有定义
 #ifdef CONFIG_HAS_IOMEM
 	int mmio_needed;
 	int mmio_read_completed;
@@ -294,6 +298,7 @@ struct kvm_vcpu {
 	struct kvm_mmio_fragment mmio_fragments[KVM_MAX_MMIO_FRAGMENTS];
 #endif
 
+//有定义
 #ifdef CONFIG_KVM_ASYNC_PF
 	struct {
 		u32 queued;
@@ -303,6 +308,7 @@ struct kvm_vcpu {
 	} async_pf;
 #endif
 
+//有定义
 #ifdef CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT
 	/*
 	 * Cpu relax intercept or pause loop exit optimization
@@ -315,6 +321,7 @@ struct kvm_vcpu {
 		bool dy_eligible;
 	} spin_loop;
 #endif
+
 	bool preempted;
     //体系结构相关的vcpu的状态
 	struct kvm_vcpu_arch arch;
@@ -338,6 +345,9 @@ static inline int kvm_vcpu_exiting_guest_mode(struct kvm_vcpu *vcpu)
  */
 #define KVM_MEM_MAX_NR_PAGES ((1UL << 31) - 1)
 
+/*
+ * 建立了GPA到HVA的映射关系
+ */
 struct kvm_memory_slot {
     /* 
      * 虚机内存区间的物理页框号，内存插槽slot添加一块内存之后，
@@ -358,10 +368,16 @@ struct kvm_memory_slot {
 	struct kvm_arch_memory_slot arch;
 	//内存区间对应的主机虚拟地址
 	unsigned long userspace_addr;
+	/* 
+	 * KVM_MEM_LOG_DIRTY_PAGES和KVM_MEM_READONLY
+	 */
 	u32 flags;
 	short id;
 };
 
+/*
+ * kvm_memory_slot->dirty_bitmap需要的字节大小
+ */
 static inline unsigned long kvm_dirty_bitmap_bytes(struct kvm_memory_slot *memslot)
 {
 	return ALIGN(memslot->npages, BITS_PER_LONG) / 8;
@@ -450,9 +466,12 @@ static inline int kvm_arch_vcpu_memslots_id(struct kvm_vcpu *vcpu)
  * Note:
  * memslots are not sorted by id anymore, please use id_to_memslot()
  * to get the memslot by its id.
+ *
+ * kvm->memslots 指向这个kvm_memslots数组
  */
 struct kvm_memslots {
 	u64 generation;
+	//每一个kvm_memslots对应很多个kvm_memory_slot
 	struct kvm_memory_slot memslots[KVM_MEM_SLOTS_NUM];
 	/* The mapping table from slot id to the index in memslots[]. */
 	short id_to_index[KVM_MEM_SLOTS_NUM];
@@ -468,6 +487,9 @@ struct kvm {
 	spinlock_t mmu_lock;
 	struct mutex slots_lock;
 	struct mm_struct *mm; /* userspace tied to this vm */
+	/*
+	 * guest os 物理地址与host 的qemu进程的虚拟内存地址的对应关系
+	 */
 	struct kvm_memslots __rcu *memslots[KVM_ADDRESS_SPACE_NUM];
     //虚拟机中的所有vCPU对象
 	struct kvm_vcpu *vcpus[KVM_MAX_VCPUS];
@@ -489,6 +511,10 @@ struct kvm {
 	 * 它的作用是将内核中实现的模拟设备链接起来，有多种总线类型如KVM_MMIO_BUS,KMV_PIO_BUS
 	 */
 	struct kvm_io_bus __rcu *buses[KVM_NR_BUSES];
+
+    /*
+     * 有定义
+     */
 #ifdef CONFIG_HAVE_KVM_EVENTFD
 	struct {
 		spinlock_t        lock;
@@ -516,12 +542,20 @@ struct kvm {
 #endif
 
 	struct mutex irq_lock;
+
+/*
+ * 有定义
+ */
 #ifdef CONFIG_HAVE_KVM_IRQCHIP
 	/*
 	 * Update side is protected by irq_lock.
 	 */
 	struct kvm_irq_routing_table __rcu *irq_routing;
 #endif
+
+/*
+ * 有定义
+ */
 #ifdef CONFIG_HAVE_KVM_IRQFD
 	struct hlist_head irq_ack_notifier_list;
 #endif
@@ -531,7 +565,11 @@ struct kvm {
 	unsigned long mmu_notifier_seq;
 	long mmu_notifier_count;
 #endif
+
 	long tlbs_dirty;
+    /*
+     * 本vm所有的设备对象kvm_device
+     */
 	struct list_head devices;
 	struct dentry *debugfs_dentry;
 	struct kvm_stat_data **debugfs_stat_data;
@@ -680,6 +718,9 @@ static inline struct kvm_memslots *kvm_vcpu_memslots(struct kvm_vcpu *vcpu)
 	return __kvm_memslots(vcpu->kvm, as_id);
 }
 
+/*
+ * 返回slots[id]
+ */
 static inline struct kvm_memory_slot *
 id_to_memslot(struct kvm_memslots *slots, int id)
 {
@@ -1061,6 +1102,14 @@ __gfn_to_memslot(struct kvm_memslots *slots, gfn_t gfn)
 	return search_memslots(slots, gfn);
 }
 
+/*
+ * tdp_page_fault()
+ *	try_async_pf() 
+ *   __gfn_to_pfn_memslot(atomic==false)
+ *    __gfn_to_hva_many()
+ *     __gfn_to_hva_memslot()
+ * 从guest page frame number 转成 host 中qemu进程的 virtual page frame number
+ */
 static inline unsigned long
 __gfn_to_hva_memslot(struct kvm_memory_slot *slot, gfn_t gfn)
 {
@@ -1148,6 +1197,7 @@ static inline int mmu_notifier_retry(struct kvm *kvm, unsigned long mmu_seq)
 }
 #endif
 
+//有定义
 #ifdef CONFIG_HAVE_KVM_IRQ_ROUTING
 
 #define KVM_MAX_IRQ_ROUTES 4096 /* might need extension/rework in the future */
@@ -1268,7 +1318,13 @@ struct kvm_device {
 	struct list_head vm_node;
 };
 
-/* create, destroy, and name are mandatory */
+/* create, destroy, and name are mandatory
+ *
+ * 所有的kvm_device_ops都在kvm_device_ops_table[]中
+ *
+ * kvm_mpic_ops
+ * kvm_vfio_ops
+ */ 
 struct kvm_device_ops {
 	const char *name;
 

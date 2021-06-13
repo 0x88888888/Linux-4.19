@@ -354,8 +354,13 @@ struct kvm_mmu_root_info {
  * x86 supports 4 paging modes (5-level 64-bit, 4-level 64-bit, 3-level 32-bit,
  * and 2-level 32-bit).  The kvm_mmu structure abstracts the details of the
  * current mmu mode.
+ *
+ * 这一系列的函数指针在init_kvm_tdp_mmu中被赋值(开启ept的情况)
  */
 struct kvm_mmu {
+    /*
+     * 在init_kvm_tdp_mmu中设置为 vmx_set_cr3
+     */
 	void (*set_cr3)(struct kvm_vcpu *vcpu, unsigned long root);
 	unsigned long (*get_cr3)(struct kvm_vcpu *vcpu);
 	u64 (*get_pdptr)(struct kvm_vcpu *vcpu, int index);
@@ -386,6 +391,8 @@ struct kvm_mmu {
 	 * 这样通过mmu可以找到ept页结构的入口点。root_hpa就是这个入口，
 	 * 它存放的是一个物理页地址，这个物理页的内容是spt，
 	 * root_hpa也可以看做是指向根spt的指针。
+	 *
+	 * 指向ept的第一级页表的物理地址,类似CR3
 	 */
 	hpa_t root_hpa;
 	union kvm_mmu_page_role base_role;
@@ -479,6 +486,9 @@ enum {
 	KVM_DEBUGREG_RELOAD = 4,
 };
 
+/*
+ * Memory Type Range Registers
+ */
 struct kvm_mtrr_range {
 	u64 base;
 	u64 mask;
@@ -530,6 +540,9 @@ struct kvm_vcpu_hv {
 	cpumask_t tlb_lush;
 };
 
+/*
+ * kvm_vcpu中的成员
+ */
 struct kvm_vcpu_arch {
 	/*
 	 * rip and regs accesses must go through
@@ -560,7 +573,11 @@ struct kvm_vcpu_arch {
 	unsigned long apic_attention;
 	int32_t apic_arb_prio;
 	/*
+	 * KVM_MP_STATE_RUNNABLE
 	 * KVM_MP_STATE_UNINITIALIZED之类的
+	 * KVM_MP_STATE_INIT_RECEIVED
+	 * KVM_MP_STATE_HALTED
+	 * KVM_MP_STATE_SIPI_RECEIVED
 	 */
 	int mp_state;
 	u64 ia32_misc_enable_msr;
@@ -576,6 +593,8 @@ struct kvm_vcpu_arch {
 	 * If the vcpu runs in guest mode with two level paging this still saves
 	 * the paging mode of the l1 guest. This context is always used to
 	 * handle faults.
+	 *
+	 * host给vcpu准备的虚拟mmu,开启ept的时候
 	 */
 	struct kvm_mmu mmu;
 
@@ -586,12 +605,16 @@ struct kvm_vcpu_arch {
 	 * of the an L2 guest. This context is only initialized for page table
 	 * walking and not for faulting since we never handle l2 page faults on
 	 * the host.
+	 *
+	 * 嵌套虚拟化的时候用
 	 */
 	struct kvm_mmu nested_mmu;
 
 	/*
 	 * Pointer to the mmu context currently used for
 	 * gva_to_gpa translations.
+	 * 
+	 * 指向kvm_vcpu_arch->nested_mmu或者kvm_vcpu_arch->mmu
 	 */
 	struct kvm_mmu *walk_mmu;
 
@@ -639,9 +662,10 @@ struct kvm_vcpu_arch {
 
 	int halt_request; /* real mode on Intel only */
 
+    //数组cpuid_entries[]中的数量
 	int cpuid_nent;
 	/*
-	 * guest os cpuid指令的的返回值
+	 * guest os cpuid指令的的返回值，由QEMU在启动时候设置
 	 */
 	struct kvm_cpuid_entry2 cpuid_entries[KVM_MAX_CPUID_ENTRIES];
 
@@ -689,6 +713,9 @@ struct kvm_vcpu_arch {
 	bool nmi_injected;    /* Trying to inject an NMI this entry */
 	bool smi_pending;    /* SMI queued after currently running handler */
 
+    /*
+     * Memory Type Range Registers
+     */
 	struct kvm_mtrr mtrr_state;
 	u64 pat;
 
@@ -781,6 +808,7 @@ struct kvm_vcpu_arch {
 };
 
 struct kvm_lpage_info {
+	//表示是否支持large page,如果为1，表示不支持large page
 	int disallow_lpage;
 };
 
@@ -790,11 +818,14 @@ struct kvm_arch_memory_slot {
 	 * 在rmap_add中操作
 	 *
 	 * KVM_NR_PAGE_SIZES是qemu为虚机分配的不同大小的页的种类，
-	 * 比如2M，1G等，这里的宏定义为3种。kvm需要为不同页大小的页都维护其对应的EPT页表项。
+	 * 比如4K,2M，1G等，这里的宏定义为3种。kvm需要为不同页大小的页都维护其对应的EPT页表项。
 	 * 每个rmap[i]是一个数组，它的内存是页对应的EPT页表地址，
 	 * 整个数组在内存注册时会分配内存空间，
      */
 	struct kvm_rmap_head *rmap[KVM_NR_PAGE_SIZES];
+	/*
+	 * 保存大页的信息
+	 */
 	struct kvm_lpage_info *lpage_info[KVM_NR_PAGE_SIZES - 1];
 	unsigned short *gfn_track[KVM_PAGE_TRACK_MAX];
 };
@@ -946,6 +977,9 @@ struct kvm_vm_stat {
 	ulong max_mmu_page_hash_collisions;
 };
 
+/*
+ * KVM虚拟机中的页表、MMU等运行时状态信息
+ */
 struct kvm_vcpu_stat {
 	u64 pf_fixed;
 	u64 pf_guest;
@@ -1066,6 +1100,7 @@ struct kvm_x86_ops {
 
 	void (*run)(struct kvm_vcpu *vcpu);
 	int (*handle_exit)(struct kvm_vcpu *vcpu);
+	
 	void (*skip_emulated_instruction)(struct kvm_vcpu *vcpu);
 	void (*set_interrupt_shadow)(struct kvm_vcpu *vcpu, int mask);
 	u32 (*get_interrupt_shadow)(struct kvm_vcpu *vcpu);
@@ -1101,6 +1136,11 @@ struct kvm_x86_ops {
 	bool (*rdtscp_supported)(void);
 	bool (*invpcid_supported)(void);
 
+    /*
+     * vmx_set_cr3, 设置VMCS的EPT_POINTER
+     * 这个函数指针在init_kvm_tdp_mmu() 会赋值给
+     * vcpu->arch.mmu.set_cr3
+     */
 	void (*set_tdp_cr3)(struct kvm_vcpu *vcpu, unsigned long cr3);
 
 	void (*set_supported_cpuid)(u32 func, struct kvm_cpuid_entry2 *entry);

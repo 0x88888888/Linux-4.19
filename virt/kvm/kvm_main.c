@@ -987,6 +987,9 @@ static struct kvm_memslots *install_new_memslots(struct kvm *kvm,
  *   kvm_vm_ioctl_set_memory_region()
  *    kvm_set_memory_region()
  *     __kvm_set_memory_region()
+ *
+ * 做好guest os的物理内存地址与qemu进程 virtal address的对应关系的管理
+ * 并没有分配任何的物理page，分配物理page要在ept异常中搞定
  */
 int __kvm_set_memory_region(struct kvm *kvm,
 			    const struct kvm_userspace_memory_region *mem)
@@ -1088,10 +1091,12 @@ int __kvm_set_memory_region(struct kvm *kvm,
 				continue;
 			if (!((base_gfn + npages <= slot->base_gfn) ||
 			      (base_gfn >= slot->base_gfn + slot->npages)))
-				goto out;
+				goto out;//找到可以放入的，对应的slot了
 		}
 	}
 
+    //走到这里，说明没有找到对应的slot，需要新创建slots，分配slot
+    
 	/* Free page dirty bitmap if unneeded */
 	if (!(new.flags & KVM_MEM_LOG_DIRTY_PAGES))
 		new.dirty_bitmap = NULL;
@@ -1100,6 +1105,9 @@ int __kvm_set_memory_region(struct kvm *kvm,
 	if (change == KVM_MR_CREATE) { //新建，需要相应的slots
 		new.userspace_addr = mem->userspace_addr;
 
+        /*
+         * 
+         */
 		if (kvm_arch_create_memslot(kvm, &new, npages))
 			goto out_free;
 	}
@@ -1110,10 +1118,12 @@ int __kvm_set_memory_region(struct kvm *kvm,
 			goto out_free;
 	}
 
+    //分配一个新的kvm_memslots出来
 	slots = kvzalloc(sizeof(struct kvm_memslots), GFP_KERNEL);
 	if (!slots)
 		goto out_free;
-	
+
+	//复制一个slots过来
 	memcpy(slots, __kvm_memslots(kvm, as_id), sizeof(struct kvm_memslots));
 
 	if ((change == KVM_MR_DELETE) || (change == KVM_MR_MOVE)) {
@@ -1382,18 +1392,29 @@ static bool memslot_is_readonly(struct kvm_memory_slot *slot)
 	return slot->flags & KVM_MEM_READONLY;
 }
 
+/*
+ * tdp_page_fault()
+ *	try_async_pf() 
+ *   __gfn_to_pfn_memslot(atomic==false)
+ *    __gfn_to_hva_many()
+ *
+ * 从guest page frame number 转成 host 中qemu进程的 virtual page frame number
+ */
 static unsigned long __gfn_to_hva_many(struct kvm_memory_slot *slot, gfn_t gfn,
 				       gfn_t *nr_pages, bool write)
 {
+    //根本就没有和qemu进程建立gpa到hva对应的映射管理关系
 	if (!slot || slot->flags & KVM_MEMSLOT_INVALID)
 		return KVM_HVA_ERR_BAD;
 
-	if (memslot_is_readonly(slot) && write)
+    
+	if (memslot_is_readonly(slot) && write)//权限矛盾了
 		return KVM_HVA_ERR_RO_BAD;
 
 	if (nr_pages)
 		*nr_pages = slot->npages - (gfn - slot->base_gfn);
 
+    //从guest page frame number 转成 host 中qemu进程的 virtual page frame number
 	return __gfn_to_hva_memslot(slot, gfn);
 }
 
@@ -1463,6 +1484,14 @@ static inline int check_user_page_hwpoison(unsigned long addr)
  * The fast path to get the writable pfn which will be stored in @pfn,
  * true indicates success, otherwise false is returned.  It's also the
  * only part that runs if we can are in atomic context.
+ *
+ * tdp_page_fault()
+ *	try_async_pf() 
+ *   __gfn_to_pfn_memslot()
+ *    hva_to_pfn() 
+ *     hva_to_pfn_fast()
+ *
+ * 已经在ept页表中分配好page的情况，直接更具hva获取pfn就是了
  */
 static bool hva_to_pfn_fast(unsigned long addr, bool write_fault,
 			    bool *writable, kvm_pfn_t *pfn)
@@ -1474,10 +1503,13 @@ static bool hva_to_pfn_fast(unsigned long addr, bool write_fault,
 	 * Fast pin a writable pfn only if it is a write fault request
 	 * or the caller allows to map a writable pfn for a read fault
 	 * request.
+	 *
+	 * 只能是写操作
 	 */
 	if (!(write_fault || writable))
 		return false;
 
+    //终于分配物理page了
 	npages = __get_user_pages_fast(addr, 1, 1, page);
 	if (npages == 1) {
 		*pfn = page_to_pfn(page[0]);
@@ -1493,6 +1525,14 @@ static bool hva_to_pfn_fast(unsigned long addr, bool write_fault,
 /*
  * The slow path to get the pfn of the specified host virtual address,
  * 1 indicates success, -errno is returned if error is detected.
+ *
+ * tdp_page_fault()
+ *	try_async_pf() 
+ *   __gfn_to_pfn_memslot()
+ *    hva_to_pfn()
+ *     hva_to_pfn_slow()
+ *
+ * 在没有做好ept中page到hva映射的情况下，用这个来分配page，并且做好映射
  */
 static int hva_to_pfn_slow(unsigned long addr, bool *async, bool write_fault,
 			   bool *writable, kvm_pfn_t *pfn)
@@ -1511,6 +1551,7 @@ static int hva_to_pfn_slow(unsigned long addr, bool *async, bool write_fault,
 	if (async)
 		flags |= FOLL_NOWAIT;
 
+    //分配好物理page，并且做好映射
 	npages = get_user_pages_unlocked(addr, 1, &page, flags);
 	if (npages != 1)
 		return npages;
@@ -1602,6 +1643,13 @@ static int hva_to_pfn_remapped(struct vm_area_struct *vma,
  * 1): @write_fault = true
  * 2): @write_fault = false && @writable, @writable will tell the caller
  *     whether the mapping is writable.
+ *
+ * tdp_page_fault()
+ *	try_async_pf() 
+ *   __gfn_to_pfn_memslot()
+ *    hva_to_pfn()
+ *
+ * 从host qemu进程的virtual page frame number 转成 host 的 physical page frame number
  */
 static kvm_pfn_t hva_to_pfn(unsigned long addr, bool atomic, bool *async,
 			bool write_fault, bool *writable)
@@ -1611,15 +1659,18 @@ static kvm_pfn_t hva_to_pfn(unsigned long addr, bool atomic, bool *async,
 	int npages, r;
 
 	/* we can do it either atomically or asynchronously, not both */
+	/*这里二者不能同时为真*/
 	BUG_ON(atomic && async);
 
-	if (hva_to_pfn_fast(addr, write_fault, writable, &pfn))
+    /*已经在ept页表中分配好page的情况，直接根据hva获取pfn就是了*/
+	if (hva_to_pfn_fast(addr, write_fault, writable, &pfn)) 
 		return pfn;
 
 	if (atomic)
 		return KVM_PFN_ERR_FAULT;
 
-	npages = hva_to_pfn_slow(addr, async, write_fault, writable, &pfn);
+    /*如果前面没有成功(也就是没有分配物理page)，则调用hva_to_pfn_slow*/
+	npages = hva_to_pfn_slow(addr, async, write_fault, writable, &pfn); //查tlb缓存
 	if (npages == 1)
 		return pfn;
 
@@ -1641,6 +1692,7 @@ retry:
 			goto retry;
 		if (r < 0)
 			pfn = KVM_PFN_ERR_FAULT;
+		
 	} else {
 		if (async && vma_is_valid(vma, write_fault))
 			*async = true;
@@ -1651,13 +1703,19 @@ exit:
 	return pfn;
 }
 
+/*
+ * tdp_page_fault()
+ *	try_async_pf() 
+ *   __gfn_to_pfn_memslot(atomic==false)第一次调用
+ */
 kvm_pfn_t __gfn_to_pfn_memslot(struct kvm_memory_slot *slot, gfn_t gfn,
 			       bool atomic, bool *async, bool write_fault,
 			       bool *writable)
 {
+    //从gfn得到qemu对应的hva
 	unsigned long addr = __gfn_to_hva_many(slot, gfn, NULL, write_fault);
 
-	if (addr == KVM_HVA_ERR_RO_BAD) {
+	if (addr == KVM_HVA_ERR_RO_BAD) {//写操作不对了
 		if (writable)
 			*writable = false;
 		return KVM_PFN_ERR_RO_FAULT;
@@ -1675,6 +1733,7 @@ kvm_pfn_t __gfn_to_pfn_memslot(struct kvm_memory_slot *slot, gfn_t gfn,
 		writable = NULL;
 	}
 
+    //从host qemu进程的virtual page frame number 转成 host 的 physical page frame number
 	return hva_to_pfn(addr, atomic, async, write_fault,
 			  writable);
 }
@@ -3051,6 +3110,8 @@ static struct kvm_device_ops *kvm_device_ops_table[KVM_DEV_TYPE_MAX] = {
  *  kvm_init(opaque==&vmx_x86_ops)
  *   kvm_vfio_ops_init()
  *    kvm_register_device_ops(ops=kvm_vfio_ops, KVM_DEV_TYPE_VFIO)
+ *
+ * x86只有kvm_vfio_ops_init这么一个地方调用到kvm_register_device_ops
  */
 int kvm_register_device_ops(struct kvm_device_ops *ops, u32 type)
 {

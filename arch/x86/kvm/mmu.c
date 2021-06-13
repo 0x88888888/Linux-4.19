@@ -931,6 +931,12 @@ static void walk_shadow_page_lockless_end(struct kvm_vcpu *vcpu)
 	local_irq_enable();
 }
 
+/* 
+ * mmu_topup_memory_caches()
+ *  mmu_topup_memory_cache()
+ *
+ * 确保base_cache有足够的空间
+ */
 static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
 				  struct kmem_cache *base_cache, int min)
 {
@@ -984,6 +990,8 @@ static void mmu_free_memory_cache_page(struct kvm_mmu_memory_cache *mc)
 /*
  * tdp_page_fault()
  *　mmu_topup_memory_caches()
+ *
+ * 确保pte_list_desc_cache，mmu_page_header_cache有足够的空间
  */
 static int mmu_topup_memory_caches(struct kvm_vcpu *vcpu)
 {
@@ -1193,6 +1201,9 @@ gfn_to_memslot_dirty_bitmap(struct kvm_vcpu *vcpu, gfn_t gfn,
 	return slot;
 }
 
+/*
+ * 
+ */
 static int mapping_level(struct kvm_vcpu *vcpu, gfn_t large_gfn,
 			 bool *force_pt_level)
 {
@@ -1497,6 +1508,8 @@ static void drop_large_spte(struct kvm_vcpu *vcpu, u64 *sptep)
  *   shadow page.
  *
  * Return true if tlb need be flushed.
+ *
+ * 设置写保护
  */
 static bool spte_write_protect(u64 *sptep, bool pt_protect)
 {
@@ -1515,6 +1528,7 @@ static bool spte_write_protect(u64 *sptep, bool pt_protect)
 	return mmu_spte_update(sptep, spte);
 }
 
+//设置写保护
 static bool __rmap_write_protect(struct kvm *kvm,
 				 struct kvm_rmap_head *rmap_head,
 				 bool pt_protect)
@@ -3060,6 +3074,7 @@ static int mmu_set_spte(struct kvm_vcpu *vcpu, u64 *sptep, unsigned pte_access,
 
 	set_spte_ret = set_spte(vcpu, sptep, pte_access, level, gfn, pfn,
 				speculative, true, host_writable);
+	
 	if (set_spte_ret & SET_SPTE_WRITE_PROTECTED_PT) {
 		if (write_fault)
 			ret = RET_PF_EMULATE;
@@ -3366,6 +3381,10 @@ static bool page_fault_can_be_fast(u32 error_code)
 /*
  * Returns true if the SPTE was fixed successfully. Otherwise,
  * someone else modified the SPTE from its original value.
+ *
+ * tdp_page_fault()
+ *  fast_page_fault()
+ *   fast_pf_fix_direct_spte()
  */
 static bool
 fast_pf_fix_direct_spte(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp,
@@ -3421,6 +3440,8 @@ static bool is_access_allowed(u32 fault_err_code, u64 spte)
  *
  * tdp_page_fault()
  *  fast_page_fault()
+ *
+ * 只有当GFN对应的物理页存在且violation是由读写操作引起的，才可以使用快速处理
  */
 static bool fast_page_fault(struct kvm_vcpu *vcpu, gva_t gva, int level,
 			    u32 error_code)
@@ -3437,14 +3458,17 @@ static bool fast_page_fault(struct kvm_vcpu *vcpu, gva_t gva, int level,
 	if (!page_fault_can_be_fast(error_code))
 		return false;
 
+    //标记vcpu->mode == READING_SHADOW_PAGE_TABLES
 	walk_shadow_page_lockless_begin(vcpu);
 
 	do {
 		u64 new_spte;
 
+        //遍历vcpu->arch.mmu.root_hpa这个ept
 		for_each_shadow_entry_lockless(vcpu, gva, iterator, spte)
+		    
 			if (!is_shadow_present_pte(spte) ||
-			    iterator.level < level)
+			    iterator.level < level)//被swap到外存去或者level不对
 				break;
 
 		sp = page_header(__pa(iterator.sptep));
@@ -4096,6 +4120,14 @@ bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu)
 	return kvm_x86_ops->interrupt_allowed(vcpu);
 }
 
+/*
+ * tdp_page_fault()
+ *  try_async_pf() 
+ *
+ * 根据GFN获取对应的PFN，这个过程具体来说需要首先获取GFN对应的slot，转化成HVA，
+ * 接着就是正常的HOST地址翻译的过程了，
+ * 如果HVA对应的地址并不在内存中，还需要HOST自己处理缺页中断
+ */
 static bool try_async_pf(struct kvm_vcpu *vcpu, bool prefault, gfn_t gfn,
 			 gva_t gva, kvm_pfn_t *pfn, bool write, bool *writable)
 {
@@ -4110,16 +4142,21 @@ static bool try_async_pf(struct kvm_vcpu *vcpu, bool prefault, gfn_t gfn,
 		return false;
 	}
 
+    //根据gfn得到对应的kvm_memory_slot对象
 	slot = kvm_vcpu_gfn_to_memslot(vcpu, gfn);
 	async = false;
+	//
 	*pfn = __gfn_to_pfn_memslot(slot, gfn, false, &async, write, writable);
 	if (!async)
 		return false; /* *pfn has correct page already */
 
 	if (!prefault && kvm_can_do_async_pf(vcpu)) {
+		
 		trace_kvm_try_async_get_page(gva, gfn);
+		
 		if (kvm_find_async_pf_gfn(vcpu, gfn)) {
 			trace_kvm_async_pf_doublefault(gva, gfn);
+			//标记vcpu->request |= KVM_REQ_APF_HALT
 			kvm_make_request(KVM_REQ_APF_HALT, vcpu);
 			return true;
 		} else if (kvm_arch_setup_async_pf(vcpu, gva, gfn))
@@ -4186,7 +4223,9 @@ check_hugepage_cache_consistency(struct kvm_vcpu *vcpu, gfn_t gfn, int level)
  *   vmx_handle_exit()
  *    handle_ept_violation()
  *     kvm_mmu_page_fault()
- *      tdp_page_fault()
+ *      tdp_page_fault( prefault==false)
+ *
+ * 设置ept
  */
 static int tdp_page_fault(struct kvm_vcpu *vcpu, gva_t gpa, u32 error_code,
 			  bool prefault)
@@ -4195,8 +4234,10 @@ static int tdp_page_fault(struct kvm_vcpu *vcpu, gva_t gpa, u32 error_code,
 	int r;
 	int level;
 	bool force_pt_level;
+	//得到guest physical address的物理page number
 	gfn_t gfn = gpa >> PAGE_SHIFT;
 	unsigned long mmu_seq;
+	//发生异常时，是否是write操作
 	int write = error_code & PFERR_WRITE_MASK;
 	bool map_writable;
 
@@ -4205,12 +4246,17 @@ static int tdp_page_fault(struct kvm_vcpu *vcpu, gva_t gpa, u32 error_code,
 	if (page_fault_handle_page_track(vcpu, error_code, gfn))
 		return RET_PF_EMULATE;
 
+
+    /*
+     * 确保pte_list_desc_cache，mmu_page_header_cache有足够的空间
+     */
 	r = mmu_topup_memory_caches(vcpu);
 	if (r)
 		return r;
 
 	force_pt_level = !check_hugepage_cache_consistency(vcpu, gfn,
 							   PT_DIRECTORY_LEVEL);
+	
 	level = mapping_level(vcpu, gfn, &force_pt_level);
 	if (likely(!force_pt_level)) {
 		if (level > PT_DIRECTORY_LEVEL &&
@@ -4219,12 +4265,18 @@ static int tdp_page_fault(struct kvm_vcpu *vcpu, gva_t gpa, u32 error_code,
 		gfn &= ~(KVM_PAGES_PER_HPAGE(level) - 1);
 	}
 
+    /*
+     * 这里函数里没有分配物理page哦
+     *
+     * 只有当GFN对应的物理页存在且violation是由读写操作引起的，才可以使用快速处理
+     */
 	if (fast_page_fault(vcpu, gpa, level, error_code))
 		return RET_PF_RETRY;
 
 	mmu_seq = vcpu->kvm->mmu_notifier_seq;
 	smp_rmb();
 
+    //这个很重要,qemu进程与ept页表进行同步
 	if (try_async_pf(vcpu, prefault, gfn, gpa, &pfn, write, &map_writable))
 		return RET_PF_RETRY;
 
@@ -4234,12 +4286,14 @@ static int tdp_page_fault(struct kvm_vcpu *vcpu, gva_t gpa, u32 error_code,
 	spin_lock(&vcpu->kvm->mmu_lock);
 	if (mmu_notifier_retry(vcpu->kvm, mmu_seq))
 		goto out_unlock;
+	
 	if (make_mmu_pages_available(vcpu) < 0)
 		goto out_unlock;
+	
 	if (likely(!force_pt_level))
 		transparent_hugepage_adjust(vcpu, &gfn, &pfn, &level);
 
-	//这个
+	//这个就是映射到ept中了，此前前面的都是在qemu进程的页表中做管理操作
 	r = __direct_map(vcpu, write, map_writable, level, gfn, pfn, prefault);
 	spin_unlock(&vcpu->kvm->mmu_lock);
 
@@ -4920,7 +4974,9 @@ static void init_kvm_tdp_mmu(struct kvm_vcpu *vcpu)
 	context->invlpg = nonpaging_invlpg;
 	context->update_pte = nonpaging_update_pte;
 	context->shadow_root_level = kvm_x86_ops->get_tdp_level(vcpu);
+	//表示启用EPT
 	context->direct_map = true;
+	//设置为vmx_set_cr3
 	context->set_cr3 = kvm_x86_ops->set_tdp_cr3;
 	context->get_cr3 = get_cr3;
 	context->get_pdptr = kvm_pdptr_read;
@@ -5026,6 +5082,7 @@ kvm_calc_shadow_ept_root_page_role(struct kvm_vcpu *vcpu, bool accessed_dirty)
 	return role;
 }
 
+//nest的时候调用
 void kvm_init_shadow_ept_mmu(struct kvm_vcpu *vcpu, bool execonly,
 			     bool accessed_dirty, gpa_t new_eptp)
 {
@@ -5167,6 +5224,7 @@ kvm_mmu_calc_root_page_role(struct kvm_vcpu *vcpu)
 void kvm_mmu_reset_context(struct kvm_vcpu *vcpu)
 {
 	kvm_mmu_unload(vcpu);
+	
 	kvm_init_mmu(vcpu, true);
 }
 EXPORT_SYMBOL_GPL(kvm_mmu_reset_context);
@@ -5188,6 +5246,7 @@ int kvm_mmu_load(struct kvm_vcpu *vcpu)
 	if (r)
 		goto out;
 	r = mmu_alloc_roots(vcpu);
+	
 	kvm_mmu_sync_roots(vcpu);
 	if (r)
 		goto out;
@@ -5479,8 +5538,10 @@ int kvm_mmu_page_fault(struct kvm_vcpu *vcpu, gva_t cr2, u64 error_code,
 	}
 
 	r = RET_PF_INVALID;
-	if (unlikely(error_code & PFERR_RSVD_MASK)) {
+	if (unlikely(error_code & PFERR_RSVD_MASK)) { //处理MMIO引发的缺页情况
+		
 		r = handle_mmio_page_fault(vcpu, cr2, direct);
+		
 		if (r == RET_PF_EMULATE)
 			goto emulate;
 	}
@@ -5664,6 +5725,8 @@ static int alloc_mmu_pages(struct kvm_vcpu *vcpu)
 	 * When emulating 32-bit mode, cr3 is only 32 bits even on x86_64.
 	 * Therefore we need to allocate shadow page tables in the first
 	 * 4GB of memory, which happens to fit the DMA32 zone.
+	 *
+	 * 这个page必须在小于4G的物理地址内分配了
 	 */
 	page = alloc_page(GFP_KERNEL | __GFP_DMA32);
 	if (!page)
@@ -5845,6 +5908,7 @@ void kvm_zap_gfn_range(struct kvm *kvm, gfn_t gfn_start, gfn_t gfn_end)
 	spin_unlock(&kvm->mmu_lock);
 }
 
+//设置写保护
 static bool slot_rmap_write_protect(struct kvm *kvm,
 				    struct kvm_rmap_head *rmap_head)
 {
@@ -6199,6 +6263,13 @@ out:
 }
 
 /*
+ * kvm_vm_ioctl_set_memory_region()
+ *  kvm_set_memory_region()
+ * 	 __kvm_set_memory_region()
+ *    kvm_arch_commit_memory_region()
+ *     kvm_mmu_calculate_mmu_pages()
+ *
+ *
  * Caculate mmu pages needed for kvm.
  */
 unsigned int kvm_mmu_calculate_mmu_pages(struct kvm *kvm)

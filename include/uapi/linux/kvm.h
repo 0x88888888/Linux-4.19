@@ -96,9 +96,15 @@ struct kvm_memory_region {
 /* for KVM_SET_USER_MEMORY_REGION */
 struct kvm_userspace_memory_region {
 	__u32 slot;
+	/*
+	 * KVM_MEM_LOG_DIRTY_PAGES
+	 * KVM_MEM_READONLY
+	 */
 	__u32 flags;
+	//guest os的物理地址
 	__u64 guest_phys_addr;
 	__u64 memory_size; /* bytes */
+	//qemu进程中与guest_phys_addr对应的虚拟地址
 	__u64 userspace_addr; /* start of the userspace allocated memory */
 };
 
@@ -106,6 +112,8 @@ struct kvm_userspace_memory_region {
  * The bit 0 ~ bit 15 of kvm_memory_region::flags are visible for userspace,
  * other bits are reserved for kvm internal use which are defined in
  * include/linux/kvm_host.h.
+ *
+ * 这两个标记用于kvm_userspace_memory_region->flags和
  */
 #define KVM_MEM_LOG_DIRTY_PAGES	(1UL << 0)
 #define KVM_MEM_READONLY	(1UL << 1)
@@ -244,7 +252,10 @@ struct kvm_hyperv_exit {
 /* Encounter unexpected vm-exit due to delivery event. */
 #define KVM_INTERNAL_ERROR_DELIVERY_EV	3
 
-/* for KVM_RUN, returned by mmap(vcpu_fd, offset=0) */
+/* for KVM_RUN, returned by mmap(vcpu_fd, offset=0) 
+ *
+ * 作为kvm_vcpu->run的存在，作为qemu和kvm的共享内存
+ */
 struct kvm_run {
 	/* in */
 	__u8 request_interrupt_window;
