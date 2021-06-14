@@ -4522,17 +4522,19 @@ set_identity_unlock:
 		r = -EINVAL;
 		if (kvm->created_vcpus)
 			goto create_irqchip_unlock;
-
+        //创建kvm_pic对象
 		r = kvm_pic_init(kvm);
-		if (r)
+		if (r) //创建失败
 			goto create_irqchip_unlock;
 
+        //创建kvm_ipapic
 		r = kvm_ioapic_init(kvm);
-		if (r) {
+		if (r) { //创建失败
 			kvm_pic_destroy(kvm);
 			goto create_irqchip_unlock;
 		}
 
+        //用default_routing设置 中断路由
 		r = kvm_setup_default_irq_routing(kvm);
 		if (r) {
 			kvm_ioapic_destroy(kvm);

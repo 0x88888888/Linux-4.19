@@ -602,7 +602,7 @@ int kvm_pic_init(struct kvm *kvm)
 		return -ENOMEM;
 	spin_lock_init(&s->lock);
 	s->kvm = kvm;
-	//初始化master slave 
+
 	s->pics[0].elcr_mask = 0xf8;
 	s->pics[1].elcr_mask = 0xde;
 	s->pics[0].pics_state = s;

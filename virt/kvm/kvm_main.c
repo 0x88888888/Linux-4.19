@@ -845,6 +845,15 @@ static int kvm_vm_release(struct inode *inode, struct file *filp)
 /*
  * Allocation size is twice as large as the actual dirty bitmap size.
  * See x86's kvm_vm_ioctl_get_dirty_log() why this is needed.
+ *
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_set_memory_region()
+ *    kvm_set_memory_region()
+ *     __kvm_set_memory_region()
+ *      kvm_create_dirty_bitmap()
+ *
+ * 创建modify log bitmap
  */
 static int kvm_create_dirty_bitmap(struct kvm_memory_slot *memslot)
 {
@@ -1113,6 +1122,7 @@ int __kvm_set_memory_region(struct kvm *kvm,
 	}
 
 	/* Allocate page dirty bitmap if needed */
+	//确定是否需要有modified log bitmap
 	if ((new.flags & KVM_MEM_LOG_DIRTY_PAGES) && !new.dirty_bitmap) {
 		if (kvm_create_dirty_bitmap(&new) < 0)
 			goto out_free;

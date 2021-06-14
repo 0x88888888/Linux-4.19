@@ -173,10 +173,15 @@ struct pte_list_desc {
 };
 
 struct kvm_shadow_walk_iterator {
+	//寻找的GuestOS的物理页帧，即(u64)gfn << PAGE_SHIFT 
 	u64 addr;
+	//当前EPT页表基地址
 	hpa_t shadow_addr;
+	//指向下一级EPT页表的指针
 	u64 *sptep;
+	//当前所处的页表级别
 	int level;
+	//对应于addr的表项在当前页表的索引 
 	unsigned index;
 };
 
@@ -269,6 +274,11 @@ kvm_mmu_calc_root_page_role(struct kvm_vcpu *vcpu);
 void kvm_mmu_set_mmio_spte_mask(u64 mmio_mask, u64 mmio_value)
 {
 	BUG_ON((mmio_mask & mmio_value) != mmio_value);
+	/*	 
+     * 设置 shadow_mmio_value和shdow_mmio_mask
+     * 如果是MMIO访问，在EPT violation处理的时候，设置相应的EPT entry的属性有shadow_mmio_value，并且没有读的权限，这个权限是相互矛盾的
+     * 然后guest再次访问的时候，会发生EPT misconfig,在ept misconfig处理函数中，应该是不处理，然后返回QEMU，处理MMIO，
+     */
 	shadow_mmio_value = mmio_value | SPTE_SPECIAL_MASK;
 	shadow_mmio_mask = mmio_mask | SPTE_SPECIAL_MASK;
 }
@@ -346,6 +356,15 @@ static unsigned int kvm_current_mmio_generation(struct kvm_vcpu *vcpu)
 	return kvm_vcpu_memslots(vcpu)->generation & MMIO_GEN_MASK;
 }
 
+/*
+ * tdp_page_fault()
+ *  __direct_map()
+ *   link_shadow_page() 
+ *    mmu_set_spte()
+ *     set_spte()
+ *      set_mmio_spte()
+ *       mark_mmio_spte()
+ */
 static void mark_mmio_spte(struct kvm_vcpu *vcpu, u64 *sptep, u64 gfn,
 			   unsigned access)
 {
@@ -353,6 +372,7 @@ static void mark_mmio_spte(struct kvm_vcpu *vcpu, u64 *sptep, u64 gfn,
 	u64 mask = generation_mmio_spte_mask(gen);
 	u64 gpa = gfn << PAGE_SHIFT;
 
+    //标记上相互矛盾的选项，再次访问这个ept entry的时候会发生 ept msiconfig异常
 	access &= ACC_WRITE_MASK | ACC_USER_MASK;
 	mask |= shadow_mmio_value | access;
 	mask |= gpa | shadow_nonpresent_or_rsvd_mask;
@@ -384,6 +404,14 @@ static unsigned get_mmio_spte_access(u64 spte)
 	return (spte & ~mask) & ~PAGE_MASK;
 }
 
+/*
+ * tdp_page_fault()
+ *  __direct_map()
+ *   link_shadow_page() 
+ *    mmu_set_spte()
+ *     set_spte()
+ *      set_mmio_spte()
+ */
 static bool set_mmio_spte(struct kvm_vcpu *vcpu, u64 *sptep, gfn_t gfn,
 			  kvm_pfn_t pfn, unsigned access)
 {
@@ -2934,6 +2962,13 @@ static bool kvm_is_mmio_pfn(kvm_pfn_t pfn)
 #define SET_SPTE_WRITE_PROTECTED_PT	BIT(0)
 #define SET_SPTE_NEED_REMOTE_TLB_FLUSH	BIT(1)
 
+/*
+ * tdp_page_fault()
+ *  __direct_map()
+ *   link_shadow_page() 
+ *    mmu_set_spte()
+ *     set_spte()
+ */
 static int set_spte(struct kvm_vcpu *vcpu, u64 *sptep,
 		    unsigned pte_access, int level,
 		    gfn_t gfn, kvm_pfn_t pfn, bool speculative,
@@ -3072,6 +3107,7 @@ static int mmu_set_spte(struct kvm_vcpu *vcpu, u64 *sptep, unsigned pte_access,
 			was_rmapped = 1;
 	}
 
+    //设置ept entry
 	set_spte_ret = set_spte(vcpu, sptep, pte_access, level, gfn, pfn,
 				speculative, true, host_writable);
 	
@@ -3083,6 +3119,7 @@ static int mmu_set_spte(struct kvm_vcpu *vcpu, u64 *sptep, unsigned pte_access,
 	if (set_spte_ret & SET_SPTE_NEED_REMOTE_TLB_FLUSH || flush)
 		kvm_flush_remote_tlbs(vcpu->kvm);
 
+    
 	if (unlikely(is_mmio_spte(*sptep)))
 		ret = RET_PF_EMULATE;
 
@@ -3944,7 +3981,10 @@ static bool mmio_info_in_cache(struct kvm_vcpu *vcpu, u64 addr, bool direct)
 	return vcpu_match_mmio_gva(vcpu, addr);
 }
 
-/* return true if reserved bit is detected on spte. */
+/* return true if reserved bit is detected on spte. 
+ *
+ * 得到addr对应的ept entry
+ */
 static bool
 walk_shadow_page_get_mmio_spte(struct kvm_vcpu *vcpu, u64 addr, u64 *sptep)
 {
@@ -3994,9 +4034,10 @@ exit:
  * vcpu_run()
  *  vcpu_enter_guest()
  *   vmx_handle_exit()
- *    handle_ept_violation()
+ *    handle_ept_misconfig()
  *     kvm_mmu_page_fault()
  *      handle_mmio_page_fault()
+ *
  */
 static int handle_mmio_page_fault(struct kvm_vcpu *vcpu, u64 addr, bool direct)
 {
@@ -4006,6 +4047,7 @@ static int handle_mmio_page_fault(struct kvm_vcpu *vcpu, u64 addr, bool direct)
 	if (mmio_info_in_cache(vcpu, addr, direct))
 		return RET_PF_EMULATE;
 
+    //得到addr对应的ept entry
 	reserved = walk_shadow_page_get_mmio_spte(vcpu, addr, &spte);
 	if (WARN_ON(reserved))
 		return -EINVAL;
@@ -4021,6 +4063,7 @@ static int handle_mmio_page_fault(struct kvm_vcpu *vcpu, u64 addr, bool direct)
 			addr = 0;
 
 		trace_handle_mmio_page_fault(addr, gfn, access);
+		//需要去用户空间的QMEU处理
 		vcpu_cache_mmio_info(vcpu, addr, gfn, access);
 		return RET_PF_EMULATE;
 	}
@@ -4122,7 +4165,7 @@ bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu)
 
 /*
  * tdp_page_fault()
- *  try_async_pf() 
+ *  try_async_pf(prefault==false)
  *
  * 根据GFN获取对应的PFN，这个过程具体来说需要首先获取GFN对应的slot，转化成HVA，
  * 接着就是正常的HOST地址翻译的过程了，
@@ -4145,7 +4188,7 @@ static bool try_async_pf(struct kvm_vcpu *vcpu, bool prefault, gfn_t gfn,
     //根据gfn得到对应的kvm_memory_slot对象
 	slot = kvm_vcpu_gfn_to_memslot(vcpu, gfn);
 	async = false;
-	//
+	//得到在host physical page frame number
 	*pfn = __gfn_to_pfn_memslot(slot, gfn, false, &async, write, writable);
 	if (!async)
 		return false; /* *pfn has correct page already */
@@ -4153,7 +4196,8 @@ static bool try_async_pf(struct kvm_vcpu *vcpu, bool prefault, gfn_t gfn,
 	if (!prefault && kvm_can_do_async_pf(vcpu)) {
 		
 		trace_kvm_try_async_get_page(gva, gfn);
-		
+
+	    //已经在vcpu->arch.apf.gfns[kvm_async_pf_gfn_slot(vcpu, gfn)]中了
 		if (kvm_find_async_pf_gfn(vcpu, gfn)) {
 			trace_kvm_async_pf_doublefault(gva, gfn);
 			//标记vcpu->request |= KVM_REQ_APF_HALT
@@ -4276,10 +4320,11 @@ static int tdp_page_fault(struct kvm_vcpu *vcpu, gva_t gpa, u32 error_code,
 	mmu_seq = vcpu->kvm->mmu_notifier_seq;
 	smp_rmb();
 
-    //这个很重要,qemu进程与ept页表进行同步
+    //这个很重要,得到pfn(host的physical frame number)
 	if (try_async_pf(vcpu, prefault, gfn, gpa, &pfn, write, &map_writable))
 		return RET_PF_RETRY;
 
+    //检查是否pfn是否是abnormal的
 	if (handle_abnormal_pfn(vcpu, 0, gfn, pfn, ACC_ALL, &r))
 		return r;
 
@@ -5543,7 +5588,7 @@ int kvm_mmu_page_fault(struct kvm_vcpu *vcpu, gva_t cr2, u64 error_code,
 		r = handle_mmio_page_fault(vcpu, cr2, direct);
 		
 		if (r == RET_PF_EMULATE)
-			goto emulate;
+			goto emulate;//要返回到用户空间的QEMU去处理
 	}
 
 	if (r == RET_PF_INVALID) { //通常走这里

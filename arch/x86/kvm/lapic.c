@@ -1038,7 +1038,7 @@ static int __apic_accept_irq(struct kvm_lapic *apic, int delivery_mode,
 	switch (delivery_mode) {
 	case APIC_DM_LOWEST:
 		vcpu->arch.apic_arb_prio++;
-	case APIC_DM_FIXED:
+	case APIC_DM_FIXED://看这个算了，太多，看不过来
 		if (unlikely(trig_mode && !level))
 			break;
 
@@ -1060,7 +1060,7 @@ static int __apic_accept_irq(struct kvm_lapic *apic, int delivery_mode,
 				apic_clear_vector(vector, apic->regs + APIC_TMR);
 		}
 
-		if (vcpu->arch.apicv_active)
+		if (vcpu->arch.apicv_active) //vmx_deliver_posted_interrupt
 			kvm_x86_ops->deliver_posted_interrupt(vcpu, vector);
 		else {
 			kvm_lapic_set_irr(vector, apic);
@@ -2317,6 +2317,7 @@ int kvm_create_lapic(struct kvm_vcpu *vcpu)
 
 	vcpu->arch.apic = apic;
 
+    //apic 寄存器page， 用于virtual apic
 	apic->regs = (void *)get_zeroed_page(GFP_KERNEL);
 	if (!apic->regs) {
 		printk(KERN_ERR "malloc apic regs error for vcpu %x\n",
@@ -2327,6 +2328,7 @@ int kvm_create_lapic(struct kvm_vcpu *vcpu)
 
 	hrtimer_init(&apic->lapic_timer.timer, CLOCK_MONOTONIC,
 		     HRTIMER_MODE_ABS_PINNED);
+	
 	apic->lapic_timer.timer.function = apic_timer_fn;
 
 	/*

@@ -6155,19 +6155,31 @@ static void seg_setup(int seg)
 	vmcs_write32(sf->ar_bytes, ar);
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_create_vcpu()
+ *    kvm_arch_vcpu_create()
+ *     vmx_create_vcpu()
+ *      alloc_apic_access_page()
+ *  
+ */
 static int alloc_apic_access_page(struct kvm *kvm)
 {
 	struct page *page;
 	int r = 0;
 
-	mutex_lock(&kvm->slots_lock);
+	mutex_lock(&kvm->slots_lock); 
 	if (kvm->arch.apic_access_page_done)
-		goto out;
+		goto out; //已经设置过,所有的vcpu共享这个page
+
+	//映射好apic 在guest 的物理地址和host 的vitrual address
 	r = __x86_set_memory_region(kvm, APIC_ACCESS_PAGE_PRIVATE_MEMSLOT,
 				    APIC_DEFAULT_PHYS_BASE, PAGE_SIZE);
 	if (r)
 		goto out;
 
+    //得到物理page
 	page = gfn_to_page(kvm, APIC_DEFAULT_PHYS_BASE >> PAGE_SHIFT);
 	if (is_error_page(page)) {
 		r = -EFAULT;
@@ -6566,6 +6578,13 @@ static int vmx_deliver_nested_posted_interrupt(struct kvm_vcpu *vcpu,
  * notification to vcpu and hardware will sync PIR to vIRR atomically.
  * 2. If target vcpu isn't running(root mode), kick it to pick up the
  * interrupt from PIR in next vmentry.
+ *
+ * kvm_lapic_reg_write()
+ *  apic_send_ipi()
+ *   kvm_irq_delivery_to_apic()
+ *    kvm_apic_set_irq()
+ *     __apic_accept_irq()
+ *      vmx_deliver_posted_interrupt()
  */
 static void vmx_deliver_posted_interrupt(struct kvm_vcpu *vcpu, int vector)
 {
@@ -6583,6 +6602,7 @@ static void vmx_deliver_posted_interrupt(struct kvm_vcpu *vcpu, int vector)
 	if (pi_test_and_set_on(&vmx->pi_desc))
 		return;
 
+	//注入中断到vcpu
 	if (!kvm_vcpu_trigger_posted_interrupt(vcpu, false))
 		kvm_vcpu_kick(vcpu);
 }
@@ -6872,6 +6892,11 @@ static void ept_set_mmio_spte_mask(void)
 	/*
 	 * EPT Misconfigurations can be generated if the value of bits 2:0
 	 * of an EPT paging-structure entry is 110b (write/execute).
+	 *
+	 * 设置 shadow_mmio_value和shdow_mmio_mask
+	 * 如果是MMIO访问，在EPT violation处理的时候，设置相应的EPT entry的属性有shadow_mmio_value，并且没有读的权限，这个权限是相互矛盾的
+	 * 然后guest再次访问的时候，会发生EPT misconfig,在ept misconfig处理函数中，应该是不处理，然后返回QEMU，处理MMIO，
+	 * 配置这种ept entry,guest os访问时会产生VM Exit
 	 */
 	kvm_mmu_set_mmio_spte_mask(VMX_EPT_RWX_MASK,
 				   VMX_EPT_MISCONFIG_WX_VALUE);
@@ -7076,10 +7101,12 @@ static void vmx_vcpu_reset(struct kvm_vcpu *vcpu, bool init_event)
 	vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, 0);  /* 22.2.1 */
 
 	if (cpu_has_vmx_tpr_shadow() && !init_event) {
+		
 		vmcs_write64(VIRTUAL_APIC_PAGE_ADDR, 0);
-		if (cpu_need_tpr_shadow(vcpu))
+		if (cpu_need_tpr_shadow(vcpu))//CPU_BASE_TPR_SHADOW有set			
 			vmcs_write64(VIRTUAL_APIC_PAGE_ADDR,
-				     __pa(vcpu->arch.apic->regs));
+				     __pa(vcpu->arch.apic->regs)); //写入virtual apic page的物理地址
+		
 		vmcs_write32(TPR_THRESHOLD, 0);
 	}
 
@@ -9870,8 +9897,9 @@ static int (*const kvm_vmx_exit_handlers[])(struct kvm_vcpu *vcpu) = {
 	[EXIT_REASON_GDTR_IDTR]		      = handle_desc,
 	[EXIT_REASON_LDTR_TR]		      = handle_desc,
 	//下面两个函数处理EPT 缺页异常
-	[EXIT_REASON_EPT_VIOLATION]	      = handle_ept_violation,
-	[EXIT_REASON_EPT_MISCONFIG]           = handle_ept_misconfig,
+	[EXIT_REASON_EPT_VIOLATION]	      = handle_ept_violation, //ept entry 没有配置的时候
+	[EXIT_REASON_EPT_MISCONFIG]           = handle_ept_misconfig,//ept entry配置错误的时候，MMIO 
+	
 	[EXIT_REASON_PAUSE_INSTRUCTION]       = handle_pause,
 	[EXIT_REASON_MWAIT_INSTRUCTION]	      = handle_mwait,
 	[EXIT_REASON_MONITOR_TRAP_FLAG]       = handle_monitor_trap,
@@ -11629,8 +11657,10 @@ static struct kvm_vcpu *vmx_create_vcpu(struct kvm *kvm, unsigned int id)
 	vmx_vcpu_setup(vmx);
 	vmx_vcpu_put(&vmx->vcpu);
 	put_cpu();
-	
+
+	//apic 虚拟化
 	if (cpu_need_virtualize_apic_accesses(&vmx->vcpu)) {
+		//分配、设置apic access page
 		err = alloc_apic_access_page(kvm);
 		if (err)
 			goto free_vmcs;
