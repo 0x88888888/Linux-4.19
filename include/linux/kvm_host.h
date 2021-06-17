@@ -525,6 +525,8 @@ struct kvm {
 	/*
 	 * 在kvm_assign_ioeventfd_idx() 和 kvm_deassign_ioeventfd_idx
 	 * 中操作
+	 *
+	 * 链接_ioeventfd对象,在ioeventfd_write中唤醒
 	 */
 	struct list_head ioeventfds;
 #endif

@@ -825,6 +825,7 @@ static int kvm_assign_ioeventfd_idx(struct kvm *kvm,
 	struct _ioeventfd *p;
 	int ret;
 
+    //弄出一个eventfd_ctx来
 	eventfd = eventfd_ctx_fdget(args->fd);
 	if (IS_ERR(eventfd))
 		return PTR_ERR(eventfd);
@@ -855,7 +856,7 @@ static int kvm_assign_ioeventfd_idx(struct kvm *kvm,
 		goto unlock_fail;
 	}
 
-    //操作函数
+    //绑定操作函数
 	kvm_iodevice_init(&p->dev, &ioeventfd_ops);
 
 	ret = kvm_io_bus_register_dev(kvm, bus_idx, p->addr, p->length,
@@ -996,7 +997,7 @@ fail:
 
 /*
  * kvm_vm_compat_ioctl()
- *  kvm_vm_ioctl()
+ *  kvm_vm_ioctl()  [KVM_IOEVENTFD]
  *   kvm_ioeventfd()
  */
 int

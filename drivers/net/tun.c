@@ -1693,7 +1693,14 @@ err_xdp:
 	return NULL;
 }
 
-/* Get packet from user space buffer */
+/*
+ * tun_chr_write_iter()
+ *  tun_get_user()
+ *
+ * Get packet from user space buffer 
+ *
+ * 向tun设备写入数据(tun是一个虚拟的网络设备，写入数据这个过程，相当于网卡接受了来自网络的数据)
+ */
 static ssize_t tun_get_user(struct tun_struct *tun, struct tun_file *tfile,
 			    void *msg_control, struct iov_iter *from,
 			    int noblock, bool more)
@@ -1955,6 +1962,9 @@ static ssize_t tun_get_user(struct tun_struct *tun, struct tun_file *tfile,
 	return total_len;
 }
 
+/*
+ * 向tun设备写入数据(tun是一个虚拟的网络设备，写入数据这个过程，相当于网卡接受了来自网络的数据,收包流程)
+ */
 static ssize_t tun_chr_write_iter(struct kiocb *iocb, struct iov_iter *from)
 {
 	struct file *file = iocb->ki_filp;
@@ -2142,6 +2152,12 @@ out:
 	return ptr;
 }
 
+/*
+ * tun_chr_read_iter()
+ *  tun_do_read()
+ *
+ * 
+ */
 static ssize_t tun_do_read(struct tun_struct *tun, struct tun_file *tfile,
 			   struct iov_iter *to,
 			   int noblock, void *ptr)
@@ -2181,6 +2197,10 @@ static ssize_t tun_do_read(struct tun_struct *tun, struct tun_file *tfile,
 	return ret;
 }
 
+/*
+ *
+ * 别的程序对tun设备读操作，相当于网卡发送数据,发包流程
+ */
 static ssize_t tun_chr_read_iter(struct kiocb *iocb, struct iov_iter *to)
 {
 	struct file *file = iocb->ki_filp;
