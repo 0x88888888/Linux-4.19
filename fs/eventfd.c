@@ -101,12 +101,20 @@ static int eventfd_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
+/*
+ * vfs_poll()
+ *  eventfd_poll()
+ */
 static __poll_t eventfd_poll(struct file *file, poll_table *wait)
 {
 	struct eventfd_ctx *ctx = file->private_data;
 	__poll_t events = 0;
 	u64 count;
 
+
+    /*
+     * 等待
+     */
 	poll_wait(file, &ctx->wqh, wait);
 
 	/*
@@ -159,6 +167,13 @@ static __poll_t eventfd_poll(struct file *file, poll_table *wait)
 	return events;
 }
 
+
+/*
+ * vfs_read()
+ *  __vfs_read()
+ *   eventfd_read()
+ *    eventfd_ctx_do_read()
+ */
 static void eventfd_ctx_do_read(struct eventfd_ctx *ctx, __u64 *cnt)
 {
 	*cnt = (ctx->flags & EFD_SEMAPHORE) ? 1 : ctx->count;
@@ -194,6 +209,11 @@ int eventfd_ctx_remove_wait_queue(struct eventfd_ctx *ctx, wait_queue_entry_t *w
 }
 EXPORT_SYMBOL_GPL(eventfd_ctx_remove_wait_queue);
 
+/*
+ * vfs_read()
+ *  __vfs_read()
+ *   eventfd_read()
+ */
 static ssize_t eventfd_read(struct file *file, char __user *buf, size_t count,
 			    loff_t *ppos)
 {
@@ -209,11 +229,11 @@ static ssize_t eventfd_read(struct file *file, char __user *buf, size_t count,
 	res = -EAGAIN;
 	if (ctx->count > 0)
 		res = sizeof(ucnt);
-	else if (!(file->f_flags & O_NONBLOCK)) {
-		__add_wait_queue(&ctx->wqh, &wait);
+	else if (!(file->f_flags & O_NONBLOCK)) {//此次读操作，可以被block
+		__add_wait_queue(&ctx->wqh, &wait);//放到等待队列
 		for (;;) {
 			set_current_state(TASK_INTERRUPTIBLE);
-			if (ctx->count > 0) {
+			if (ctx->count > 0) {//有的读，直接跳出for循环了
 				res = sizeof(ucnt);
 				break;
 			}
@@ -222,25 +242,31 @@ static ssize_t eventfd_read(struct file *file, char __user *buf, size_t count,
 				break;
 			}
 			spin_unlock_irq(&ctx->wqh.lock);
-			schedule();
+			schedule();//切换出去
 			spin_lock_irq(&ctx->wqh.lock);
 		}
 		__remove_wait_queue(&ctx->wqh, &wait);
 		__set_current_state(TASK_RUNNING);
 	}
-	if (likely(res > 0)) {
+	
+	if (likely(res > 0)) {//被唤醒了，可以进行read了
 		eventfd_ctx_do_read(ctx, &ucnt);
 		if (waitqueue_active(&ctx->wqh))
 			wake_up_locked_poll(&ctx->wqh, EPOLLOUT);
 	}
 	spin_unlock_irq(&ctx->wqh.lock);
 
+    //写到用户态去
 	if (res > 0 && put_user(ucnt, (__u64 __user *)buf))
 		return -EFAULT;
 
 	return res;
 }
 
+/*
+ * vfs_write()
+ *  __vfs_write()
+ */
 static ssize_t eventfd_write(struct file *file, const char __user *buf, size_t count,
 			     loff_t *ppos)
 {
@@ -255,15 +281,16 @@ static ssize_t eventfd_write(struct file *file, const char __user *buf, size_t c
 		return -EFAULT;
 	if (ucnt == ULLONG_MAX)
 		return -EINVAL;
+	
 	spin_lock_irq(&ctx->wqh.lock);
 	res = -EAGAIN;
 	if (ULLONG_MAX - ctx->count > ucnt)
 		res = sizeof(ucnt);
-	else if (!(file->f_flags & O_NONBLOCK)) {
+	else if (!(file->f_flags & O_NONBLOCK)) {//可以等待
 		__add_wait_queue(&ctx->wqh, &wait);
 		for (res = 0;;) {
 			set_current_state(TASK_INTERRUPTIBLE);
-			if (ULLONG_MAX - ctx->count > ucnt) {
+			if (ULLONG_MAX - ctx->count > ucnt) {//有空间可以write,break掉
 				res = sizeof(ucnt);
 				break;
 			}
@@ -278,9 +305,10 @@ static ssize_t eventfd_write(struct file *file, const char __user *buf, size_t c
 		__remove_wait_queue(&ctx->wqh, &wait);
 		__set_current_state(TASK_RUNNING);
 	}
+	//被唤醒了
 	if (likely(res > 0)) {
 		ctx->count += ucnt;
-		if (waitqueue_active(&ctx->wqh))
+		if (waitqueue_active(&ctx->wqh))//去唤醒等在ctx->wqh上的线程们
 			wake_up_locked_poll(&ctx->wqh, EPOLLIN);
 	}
 	spin_unlock_irq(&ctx->wqh.lock);
@@ -380,6 +408,10 @@ struct eventfd_ctx *eventfd_ctx_fileget(struct file *file)
 }
 EXPORT_SYMBOL_GPL(eventfd_ctx_fileget);
 
+/*
+ * SYSCALL_DEFINE2(eventfd2)
+ *  do_eventfd()
+ */
 static int do_eventfd(unsigned int count, int flags)
 {
 	struct eventfd_ctx *ctx;
@@ -392,6 +424,7 @@ static int do_eventfd(unsigned int count, int flags)
 	if (flags & ~EFD_FLAGS_SET)
 		return -EINVAL;
 
+    //分配一个eventfd_ctx对象出来
 	ctx = kmalloc(sizeof(*ctx), GFP_KERNEL);
 	if (!ctx)
 		return -ENOMEM;
@@ -401,6 +434,7 @@ static int do_eventfd(unsigned int count, int flags)
 	ctx->count = count;
 	ctx->flags = flags;
 
+    //得到一个未使用的fd，并且将这个fd与eventfd_fops关联起来,设置file->prviate_data=ctx
 	fd = anon_inode_getfd("[eventfd]", &eventfd_fops, ctx,
 			      O_RDWR | (flags & EFD_SHARED_FCNTL_FLAGS));
 	if (fd < 0)

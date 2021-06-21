@@ -289,6 +289,8 @@ int  __attribute__((weak)) kvm_arch_update_irqfd_routing(
  *  kvm_vm_ioctl()
  *   kvm_irqfd()
  *    kvm_irqfd_assign()
+ *
+ * 将fd与vm的 一个irq号关联起来
  */
 static int
 kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
@@ -308,13 +310,14 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
 		return -ENOMEM;
 
 	irqfd->kvm = kvm;
-	irqfd->gsi = args->gsi;
+	irqfd->gsi = args->gsi;//中断好
 	INIT_LIST_HEAD(&irqfd->list);
+	
 	INIT_WORK(&irqfd->inject, irqfd_inject);
 	INIT_WORK(&irqfd->shutdown, irqfd_shutdown);
 	seqcount_init(&irqfd->irq_entry_sc);
 
-	f = fdget(args->fd);
+	f = fdget(args->fd);//相应的文件描述符
 	if (!f.file) {
 		ret = -EBADF;
 		goto out;
@@ -326,6 +329,7 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
 		goto fail;
 	}
 
+    //关联起来
 	irqfd->eventfd = eventfd;
 
 	if (args->flags & KVM_IRQFD_FLAG_RESAMPLE) {
@@ -405,12 +409,17 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
 	/*
 	 * Check if there was an event already pending on the eventfd
 	 * before we registered, and trigger it as if we didn't miss it.
+	 *
+	 * 会调用到eventfd_poll
 	 */
 	events = vfs_poll(f.file, &irqfd->pt);
 
 	if (events & EPOLLIN)
 		schedule_work(&irqfd->inject);
 
+/* 
+ * 有定义
+ */
 #ifdef CONFIG_HAVE_KVM_IRQ_BYPASS
 	if (kvm_arch_has_irq_bypass()) {
 		irqfd->consumer.token = (void *)irqfd->eventfd;
@@ -577,6 +586,8 @@ kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd *args)
  * kvm_vm_compat_ioctl()
  *  kvm_vm_ioctl()
  *   kvm_irqfd()
+ *
+ * irqfd 是用host主机通知vm的一种方式
  */
 int
 kvm_irqfd(struct kvm *kvm, struct kvm_irqfd *args)
@@ -587,6 +598,7 @@ kvm_irqfd(struct kvm *kvm, struct kvm_irqfd *args)
 	if (args->flags & KVM_IRQFD_FLAG_DEASSIGN)
 		return kvm_irqfd_deassign(kvm, args);
 
+    //将fd与vm的 一个irq号关联起来
 	return kvm_irqfd_assign(kvm, args);
 }
 
@@ -744,12 +756,20 @@ ioeventfd_in_range(struct _ioeventfd *p, gpa_t addr, int len, const void *val)
 }
 
 /* MMIO/PIO writes trigger an event if the addr/val match 
+ *  
+ * handle_io()
+ *  ....
+ *   kernel_pio()
+ *    kvm_io_bus_write()
+ * 	   __kvm_io_bus_write()
+ * 	    kvm_iodevice_write()
  *
- * kernel_pio()
- *  kvm_io_bus_write()
- *   __kvm_io_bus_write()
- *    kvm_iodevice_write()
- *     ioeventfd_write()
+ * handle_io()
+ *  ...
+ *   vcpu_mmio_write()
+ *    kvm_io_bus_write()
+ * 	   __kvm_io_bus_write()
+ * 	    kvm_iodevice_write()
  */
 static int
 ioeventfd_write(struct kvm_vcpu *vcpu, struct kvm_io_device *this, gpa_t addr,
@@ -760,7 +780,7 @@ ioeventfd_write(struct kvm_vcpu *vcpu, struct kvm_io_device *this, gpa_t addr,
 	if (!ioeventfd_in_range(p, addr, len, val))
 		return -EOPNOTSUPP;
 
-    //唤醒io event线程
+    //唤醒QEMU中等待在这个fd上的task_struct
 	eventfd_signal(p->eventfd, 1);
 	return 0;
 }
@@ -825,7 +845,7 @@ static int kvm_assign_ioeventfd_idx(struct kvm *kvm,
 	struct _ioeventfd *p;
 	int ret;
 
-    //弄出一个eventfd_ctx来
+    //返回fd对应的file->private_data
 	eventfd = eventfd_ctx_fdget(args->fd);
 	if (IS_ERR(eventfd))
 		return PTR_ERR(eventfd);
@@ -837,9 +857,9 @@ static int kvm_assign_ioeventfd_idx(struct kvm *kvm,
 	}
 
 	INIT_LIST_HEAD(&p->list);
-	p->addr    = args->addr;
+	p->addr    = args->addr;//QENU要监听的MMI地址或者IO端口地址
 	p->bus_idx = bus_idx;
-	p->length  = args->len;
+	p->length  = args->len;//QENU要监听的MMI地址或者IO端口地址 长度
 	p->eventfd = eventfd;
 
 	/* The datamatch feature is optional, otherwise this is a wildcard */
@@ -859,6 +879,7 @@ static int kvm_assign_ioeventfd_idx(struct kvm *kvm,
     //绑定操作函数
 	kvm_iodevice_init(&p->dev, &ioeventfd_ops);
 
+    //放到kvm->bus[bus_idx]中去
 	ret = kvm_io_bus_register_dev(kvm, bus_idx, p->addr, p->length,
 				      &p->dev);
 	if (ret < 0)
@@ -951,7 +972,7 @@ kvm_assign_ioeventfd(struct kvm *kvm, struct kvm_ioeventfd *args)
 
 	bus_idx = ioeventfd_bus_from_flags(args->flags);
 	/* must be natural-word sized, or 0 to ignore length */
-	switch (args->len) {
+	switch (args->len) { //eventfd监控的内存或者io地址长度
 	case 0:
 	case 1:
 	case 2:
@@ -963,7 +984,7 @@ kvm_assign_ioeventfd(struct kvm *kvm, struct kvm_ioeventfd *args)
 	}
 
 	/* check for range overflow */
-	if (args->addr + args->len < args->addr)
+	if (args->addr + args->len < args->addr) //地址没有回绕
 		return -EINVAL;
 
 	/* check for extra flags that we don't understand */

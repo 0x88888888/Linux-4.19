@@ -46,12 +46,18 @@ struct kvm_kernel_irqfd_resampler {
 struct kvm_kernel_irqfd {
 	/* Used for MSI fast-path */
 	struct kvm *kvm;
+	/* 
+	 * 唤醒函数irqfd_wakeup
+	 */
 	wait_queue_entry_t wait;
 	/* Update side is protected by irqfds.lock */
 	struct kvm_kernel_irq_routing_entry irq_entry;
 	seqcount_t irq_entry_sc;
 	/* Used for level IRQ fast-path */
 	int gsi;
+	/*
+	 * irqfd_inject
+	 */
 	struct work_struct inject;
 	/* The resampler used by this irqfd (resampler-only) */
 	struct kvm_kernel_irqfd_resampler *resampler;
@@ -62,7 +68,13 @@ struct kvm_kernel_irqfd {
 	/* Used for setup/shutdown */
 	struct eventfd_ctx *eventfd;
 	struct list_head list;
+	/*
+	 *  处理函数 irqfd_ptable_queue_proc
+	 */
 	poll_table pt;
+	/*
+	 * irqfd_shutdown
+	 */
 	struct work_struct shutdown;
 	struct irq_bypass_consumer consumer;
 	struct irq_bypass_producer *producer;

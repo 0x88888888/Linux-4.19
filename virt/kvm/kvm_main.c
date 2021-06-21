@@ -3298,7 +3298,7 @@ static long kvm_vm_ioctl(struct file *filp,
 		break;
 	}
 #endif
-	case KVM_IRQFD: {
+	case KVM_IRQFD: { //irqfd 是用host主机通知vm的一种方式
 		struct kvm_irqfd data;
 
 		r = -EFAULT;
@@ -3785,9 +3785,18 @@ static int kvm_io_bus_get_first_dev(struct kvm_io_bus *bus,
 }
 
 /*
- * kernel_pio()
- *  kvm_io_bus_write()
- *   __kvm_io_bus_write()
+ * handle_io()
+ *  ....
+ *   kernel_pio()
+ *    kvm_io_bus_write()
+ *     __kvm_io_bus_write()
+ *
+ * handle_io()
+ *  ...
+ *   vcpu_mmio_write()
+ *    kvm_io_bus_write()
+ *     __kvm_io_bus_write()
+ *
  */
 static int __kvm_io_bus_write(struct kvm_vcpu *vcpu, struct kvm_io_bus *bus,
 			      struct kvm_io_range *range, const void *val)
@@ -3799,7 +3808,7 @@ static int __kvm_io_bus_write(struct kvm_vcpu *vcpu, struct kvm_io_bus *bus,
 		return -EOPNOTSUPP;
 
 	while (idx < bus->dev_count &&
-		kvm_io_bus_cmp(range, &bus->range[idx]) == 0) {
+		kvm_io_bus_cmp(range, &bus->range[idx]) == 0) {//匹配上
 		if (!kvm_iodevice_write(vcpu, bus->range[idx].dev, range->addr,
 					range->len, val))
 			return idx;
@@ -3809,10 +3818,19 @@ static int __kvm_io_bus_write(struct kvm_vcpu *vcpu, struct kvm_io_bus *bus,
 	return -EOPNOTSUPP;
 }
 
-/* kvm_io_bus_write - called under kvm->slots_lock .
+/*  
  *
- * kernel_pio()
- *  kvm_io_bus_write()
+ * handle_io()
+ *  ....
+ *   kernel_pio()
+ *    kvm_io_bus_write()
+ *
+ * handle_io()
+ *  ...
+ *   vcpu_mmio_write()
+ *    kvm_io_bus_write()
+ *
+ * kvm_io_bus_write - called under kvm->slots_lock .
  */
 int kvm_io_bus_write(struct kvm_vcpu *vcpu, enum kvm_bus bus_idx, gpa_t addr,
 		     int len, const void *val)
@@ -3914,7 +3932,14 @@ int kvm_io_bus_read(struct kvm_vcpu *vcpu, enum kvm_bus bus_idx, gpa_t addr,
 }
 
 
-/* Caller must hold slots_lock. */
+/* Caller must hold slots_lock. 
+ *
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_ioeventfd()
+ *    kvm_assign_ioeventfd()
+ *     kvm_io_bus_register_dev()
+ */
 int kvm_io_bus_register_dev(struct kvm *kvm, enum kvm_bus bus_idx, gpa_t addr,
 			    int len, struct kvm_io_device *dev)
 {
@@ -3922,6 +3947,7 @@ int kvm_io_bus_register_dev(struct kvm *kvm, enum kvm_bus bus_idx, gpa_t addr,
 	struct kvm_io_bus *new_bus, *bus;
 	struct kvm_io_range range;
 
+    //获取kvm->buses[bus_idx]
 	bus = kvm_get_bus(kvm, bus_idx);
 	if (!bus)
 		return -ENOMEM;
@@ -3945,11 +3971,15 @@ int kvm_io_bus_register_dev(struct kvm *kvm, enum kvm_bus bus_idx, gpa_t addr,
 		if (kvm_io_bus_cmp(&bus->range[i], &range) > 0)
 			break;
 
+    //将老的数据复制过来
 	memcpy(new_bus, bus, sizeof(*bus) + i * sizeof(struct kvm_io_range));
 	new_bus->dev_count++;
 	new_bus->range[i] = range;
+	//range填进去
 	memcpy(new_bus->range + i + 1, bus->range + i,
 		(bus->dev_count - i) * sizeof(struct kvm_io_range));
+
+    //整个复制过来
 	rcu_assign_pointer(kvm->buses[bus_idx], new_bus);
 	synchronize_srcu_expedited(&kvm->srcu);
 	kfree(bus);

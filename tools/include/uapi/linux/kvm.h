@@ -669,8 +669,11 @@ enum {
 
 struct kvm_ioeventfd {
 	__u64 datamatch;
+	//QENU要监听的MMI地址或者IO端口地址
 	__u64 addr;        /* legal pio/mmio address */
+	//QENU要监听的MMI地址或者IO端口地址 长度
 	__u32 len;         /* 1, 2, 4, or 8 bytes; or 0 to ignore length */
+	//eventfd对应的文件描述符
 	__s32 fd;
 	__u32 flags;
 	__u8  pad[36];

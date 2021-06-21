@@ -82,18 +82,19 @@ static inline int kvm_iodevice_read(struct kvm_vcpu *vcpu,
 }
 
 /*
- * emulator_cmpxchg_emulated()
- *	emulator_write_emulated()
- *	 emulator_read_write( ops==write_emulator)
- *	  emulator_read_write_onepage( ops==write_emulator)
- *	   write_mmio()
- *		vcpu_mmio_write()
- *       kvm_iodevice_write()
+ * handle_io()
+ *  ....
+ *   kernel_pio()
+ *    kvm_io_bus_write()
+ * 	   __kvm_io_bus_write()
+ *      kvm_iodevice_write()
  *
- * kernel_pio()
- *  kvm_io_bus_write()
- *   __kvm_io_bus_write()
- *    kvm_iodevice_write()
+ * handle_io()
+ *  ...
+ *   vcpu_mmio_write()
+ *    kvm_io_bus_write()
+ * 	   __kvm_io_bus_write()
+ *      kvm_iodevice_write()
  */
 static inline int kvm_iodevice_write(struct kvm_vcpu *vcpu,
 				     struct kvm_io_device *dev, gpa_t addr,

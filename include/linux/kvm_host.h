@@ -538,6 +538,7 @@ struct kvm {
 	refcount_t users_count;
 	//有定义
 #ifdef CONFIG_KVM_MMIO
+    //kvm_coalesced_mmio_init中设置为一个page的地址
 	struct kvm_coalesced_mmio_ring *coalesced_mmio_ring;
 	spinlock_t ring_lock;
 	struct list_head coalesced_zones;

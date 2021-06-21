@@ -521,6 +521,7 @@ static int virtio_pci_probe(struct pci_dev *pci_dev,
 	if (!vp_dev)
 		return -ENOMEM;
 
+    //设置pci_dev->dev->driver_data= vp_dev
 	pci_set_drvdata(pci_dev, vp_dev);
 	vp_dev->vdev.dev.parent = &pci_dev->dev;
 	vp_dev->vdev.dev.release = virtio_pci_release_dev;
@@ -528,12 +529,14 @@ static int virtio_pci_probe(struct pci_dev *pci_dev,
 	INIT_LIST_HEAD(&vp_dev->virtqueues);
 	spin_lock_init(&vp_dev->lock);
 
-	/* enable the device */
+	/* enable the device 
+	 *  
+	 */
 	rc = pci_enable_device(pci_dev);
 	if (rc)
 		goto err_enable_device;
 
-    //默认值是force
+    //默认值是false
 	if (force_legacy) {
 		rc = virtio_pci_legacy_probe(vp_dev);
 		/* Also try modern mode if we can't map BAR0 (no IO space). */
@@ -541,7 +544,7 @@ static int virtio_pci_probe(struct pci_dev *pci_dev,
 			rc = virtio_pci_modern_probe(vp_dev);
 		if (rc)
 			goto err_probe;
-	} else {
+	} else {//走这里
 		rc = virtio_pci_modern_probe(vp_dev);
 		if (rc == -ENODEV)
 			rc = virtio_pci_legacy_probe(vp_dev);

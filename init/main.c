@@ -1200,6 +1200,7 @@ static void __init do_initcalls(void)
      * 6. __initcall(memblock_init_debugfs)
      *
      * 6. module_init(init_kprobes)
+     * 6. module_init(tun_init)
      *
      * 6. module_init(virtio_net_driver_init)
      * 6. module_init(vhost_init)
