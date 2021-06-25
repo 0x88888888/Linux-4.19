@@ -1301,6 +1301,8 @@ void pci_unregister_driver(struct pci_driver *dev);
  * Helper macro for PCI drivers which do not do anything special in module
  * init/exit. This eliminates a lot of boilerplate. Each module may only
  * use this macro once, and calling it replaces module_init() and module_exit()
+ *
+ * module_driver在include/linux/device.h中定义
  */
 #define module_pci_driver(__pci_driver) \
 	module_driver(__pci_driver, pci_register_driver, pci_unregister_driver)

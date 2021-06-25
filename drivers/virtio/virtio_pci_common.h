@@ -32,10 +32,16 @@
 #include <linux/spinlock.h>
 
 struct virtio_pci_vq_info {
-	/* the actual virtqueue */
+	/* the actual virtqueue 
+	 * 实际类型是vring_virtqueue
+	 * 取名为vvq是不是更好啊?
+     */
 	struct virtqueue *vq;
 
-	/* the list node for the virtqueues list */
+	/* the list node for the virtqueues list
+	 * 链接到virtio_pci_vq_info-node
+	 *       virtio_pci_device->vqs
+	 */
 	struct list_head node;
 
 	/* MSI-X vector (or none) */
@@ -77,6 +83,10 @@ struct virtio_pci_device {
 
 	/* a list of queues so we can dispatch IRQs */
 	spinlock_t lock;
+	/*
+	 * 链接到virtio_pci_vq_info->node
+	 * 
+	*/
 	struct list_head virtqueues;
 
 	/* array of all queues for house-keeping */
@@ -97,6 +107,10 @@ struct virtio_pci_device {
 	/* Whether we have vector per vq */
 	bool per_vq_vectors;
 
+    /*
+     * setup_vq
+     * 设置virtqueue的函数
+     */
 	struct virtqueue *(*setup_vq)(struct virtio_pci_device *vp_dev,
 				      struct virtio_pci_vq_info *info,
 				      unsigned idx,

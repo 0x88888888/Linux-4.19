@@ -2776,6 +2776,16 @@ static int kvm_mmu_prepare_zap_page(struct kvm *kvm, struct kvm_mmu_page *sp,
 	return ret;
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_vm_ioctl_set_memory_region()
+ *    kvm_set_memory_region()
+ * 	   __kvm_set_memory_region()
+ *      kvm_arch_commit_memory_region()
+ *       kvm_mmu_change_mmu_pages()
+ *        kvm_mmu_commit_zap_page()
+ */
 static void kvm_mmu_commit_zap_page(struct kvm *kvm,
 				    struct list_head *invalid_list)
 {
@@ -2835,9 +2845,10 @@ void kvm_mmu_change_mmu_pages(struct kvm *kvm, unsigned int goal_nr_mmu_pages)
 	if (kvm->arch.n_used_mmu_pages > goal_nr_mmu_pages) {
 		/* Need to free some mmu pages to achieve the goal. */
 		while (kvm->arch.n_used_mmu_pages > goal_nr_mmu_pages)
-			if (!prepare_zap_oldest_mmu_page(kvm, &invalid_list))
+			if (!prepare_zap_oldest_mmu_page(kvm, &invalid_list))//选出一部分被mmu使用的page
 				break;
 
+        //释放掉一部分被mmu使用的page
 		kvm_mmu_commit_zap_page(kvm, &invalid_list);
 		goal_nr_mmu_pages = kvm->arch.n_used_mmu_pages;
 	}
@@ -3234,6 +3245,8 @@ static void direct_pte_prefetch(struct kvm_vcpu *vcpu, u64 *sptep)
  *     kvm_mmu_page_fault()
  *      tdp_page_fault()
  *       __direct_map()
+ *
+ * 构建ept页表
  */
 static int __direct_map(struct kvm_vcpu *vcpu, int write, int map_writable,
 			int level, gfn_t gfn, kvm_pfn_t pfn, bool prefault)
@@ -5763,8 +5776,12 @@ static int alloc_mmu_pages(struct kvm_vcpu *vcpu)
 	struct page *page;
 	int i;
 
-	if (tdp_enabled)//ept必须启动
+	if (tdp_enabled)//ept必须是没有启动
 		return 0;
+    /*
+     * 从上面这个判断可以看出，只有在使用shadow page table的时候才走下面的代码
+     * 如果启用ept,就直接返回了
+    */
 
 	/*
 	 * When emulating 32-bit mode, cr3 is only 32 bits even on x86_64.
@@ -5806,6 +5823,7 @@ int kvm_mmu_create(struct kvm_vcpu *vcpu)
 	for (i = 0; i < KVM_MMU_NUM_PREV_ROOTS; i++)
 		vcpu->arch.mmu.prev_roots[i] = KVM_MMU_ROOT_INFO_INVALID;
 
+    //返回0
 	return alloc_mmu_pages(vcpu);
 }
 

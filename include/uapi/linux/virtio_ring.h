@@ -79,7 +79,10 @@
  * 一个 I/O request可能包含了多个不连续的内存块，每个内存块需要一个vring_desc来描述
  */
 struct vring_desc {
-	/* Address (guest-physical). */
+	/* Address (guest-physical). 
+	 *
+	 * guest os 物理地址
+     */
 	__virtio64 addr;
 	/* Length. */
 	/*
@@ -91,8 +94,8 @@ struct vring_desc {
 	/* The flags as indicated above.  
 	 *
 	 * VRING_DESC_F_NEXT,
-	 * VRING_DESC_F_WRITE,
-	 * VRING_DESC_F_INDIRECT,
+	 * VRING_DESC_F_WRITE, 对qemu(host os)侧的设备而言，只写
+	 * VRING_DESC_F_INDIRECT,这段IO由不连续的的vring_desc构成
 	 * 
 	 * 
 	 */
@@ -114,7 +117,7 @@ struct vring_avail {
      */
 	__virtio16 flags;
 	/*
-	 * 在驱动侧(guest)下一个可以在ring[]中放vring_desc的位置
+	 * 在驱动侧(guest os)下一个可以在vring_avail->ring[]数组中填写的索引
 	 */
 	__virtio16 idx;
 	/*
@@ -135,7 +138,7 @@ struct vring_avail {
 struct vring_used_elem {
 	/* Index of start of used descriptor chain. 
 	 *
-	 * 指示vring->vring_used[]中的索引
+	 * 指示vring->desc[]中的索引
      */
 	__virtio32 id;
 	/* Total length of the descriptor chain which was used (written to) */
@@ -148,6 +151,7 @@ struct vring_used {
      * VRING_USED_F_NO_NOTIFY,
 	 */     
 	__virtio16 flags;
+	//和vring_avail->idx的作用类似,不过是在qemu(或者host os)中，有设备来填写
 	__virtio16 idx;
 	struct vring_used_elem ring[];
 };
@@ -158,16 +162,21 @@ struct vring_used {
  * 作为vring_virtqueue成员,在__vring_new_virtqueue中分配
  *
  * vring对象在vring_init中初始化
+ *
+ * virtio_pci_device->virtqueues->vq->vring
  */
 struct vring {
     //avail->ring[]中有num个vring_desc
 	unsigned int num;
     /*描述符数组*/
 	struct vring_desc *desc;
-    /*guest提供给设备的描述符*/
-	struct vring_avail *avail;
-    /*指向host使用过的buffers*/
-	struct vring_used *used;
+    /*guest os virtio驱动设置的，供后端设备(在qemu或者host kernel)中使用的*/
+	struct vring_avail *avail;//avail后面还会有一个used_event,2个字节
+    /*
+     *后端设备(在qemu或者host kernel中)设置，
+     *这样前端驱动(guest os中的virtio驱动)可以知道哪些vring_desc被后端设备使用了
+     */
+	struct vring_used *used;//used后面还会有一个avail_event,2个字节
 };
 
 /* Alignment requirements for vring elements.
@@ -207,10 +216,8 @@ struct vring {
 #define vring_avail_event(vr) (*(__virtio16 *)&(vr)->used->ring[(vr)->num])
 
 /*
- * vm_find_vqs()
- *	vm_setup_vq()
- *	 vring_create_virtqueue()
- *    vring_init()
+ * vring_create_virtqueue()
+ *  vring_init()
  */
 static inline void vring_init(struct vring *vr, unsigned int num, void *p,
 			      unsigned long align)
@@ -225,9 +232,10 @@ static inline void vring_init(struct vring *vr, unsigned int num, void *p,
 }
 
 static inline unsigned vring_size(unsigned int num, unsigned long align)
-{
+{                                              /* 3个2字节是vring_avail->flags+vring_avail->idx+ used_event */
 	return ((sizeof(struct vring_desc) * num + sizeof(__virtio16) * (3 + num)
 		 + align - 1) & ~(align - 1))
+		  /* 3个2字节是vring_used->flags+vring_used->idx+ avail_event */
 		+ sizeof(__virtio16) * 3 + sizeof(struct vring_used_elem) * num;
 }
 

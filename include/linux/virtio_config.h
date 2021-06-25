@@ -62,6 +62,9 @@ struct irq_affinity;
  * @get_vq_affinity: get the affinity for a virtqueue (optional).
  */
 typedef void vq_callback_t(struct virtqueue *);
+/*
+ * virtio 设备的配置操作
+ */
 struct virtio_config_ops {
 	void (*get)(struct virtio_device *vdev, unsigned offset,
 		    void *buf, unsigned len);
@@ -183,12 +186,24 @@ struct virtqueue *virtio_find_single_vq(struct virtio_device *vdev,
 	return vq;
 }
 
+
+/*
+ * kernel_init()
+ *	kernel_init_freeable()
+ *	 do_basic_setup()
+ *	  do_initcalls()
+ *	   ...
+ *		virtballoon_probe()
+ *		 init_vqs()
+ *        virtio_find_vqs(callbacks[] = { balloon_ack, balloon_ack, stats_request })
+ */ 
 static inline
 int virtio_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 			struct virtqueue *vqs[], vq_callback_t *callbacks[],
 			const char * const names[],
 			struct irq_affinity *desc)
 {
+    // vp_modern_find_vqs
 	return vdev->config->find_vqs(vdev, nvqs, vqs, callbacks, names, NULL, desc);
 }
 
@@ -198,6 +213,7 @@ int virtio_find_vqs_ctx(struct virtio_device *vdev, unsigned nvqs,
 			const char * const names[], const bool *ctx,
 			struct irq_affinity *desc)
 {
+    
 	return vdev->config->find_vqs(vdev, nvqs, vqs, callbacks, names, ctx,
 				      desc);
 }

@@ -332,6 +332,7 @@ int register_virtio_device(struct virtio_device *dev)
 		goto out;
 
 	dev->index = err;
+	//设置设备的名称类似 vitio0,vitio1这种字符串
 	dev_set_name(&dev->dev, "virtio%u", dev->index);
 
 	spin_lock_init(&dev->config_lock);
@@ -339,7 +340,10 @@ int register_virtio_device(struct virtio_device *dev)
 	dev->config_change_pending = false;
 
 	/* We always start by resetting the device, in case a previous
-	 * driver messed it up.  This also tests that code path a little. */
+	 * driver messed it up.  This also tests that code path a little. 
+	 *
+	 * 使用设备之前，重置设备?
+	 */
 	dev->config->reset(dev);
 
 	/* Acknowledge that we've seen the device. */

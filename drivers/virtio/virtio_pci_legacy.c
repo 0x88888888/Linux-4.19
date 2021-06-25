@@ -111,6 +111,7 @@ static u16 vp_config_vector(struct virtio_pci_device *vp_dev, u16 vector)
 	return ioread16(vp_dev->ioaddr + VIRTIO_MSI_CONFIG_VECTOR);
 }
 
+
 static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
 				  struct virtio_pci_vq_info *info,
 				  unsigned index,
@@ -124,17 +125,27 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
 	int err;
 	u64 q_pfn;
 
-	/* Select the queue we're interested in */
+	/* Select the queue we're interested in 
+	 *
+	 * 写入选择的virtqueu的index
+	 */
 	iowrite16(index, vp_dev->ioaddr + VIRTIO_PCI_QUEUE_SEL);
 
-	/* Check if queue is either not available or already active. */
+	/* Check if queue is either not available or already active. 
+	 *
+	 * virtqueue 的个数
+	 */
 	num = ioread16(vp_dev->ioaddr + VIRTIO_PCI_QUEUE_NUM);
 	if (!num || ioread32(vp_dev->ioaddr + VIRTIO_PCI_QUEUE_PFN))
 		return ERR_PTR(-ENOENT);
 
+    //misx中断号
 	info->msix_vector = msix_vec;
 
-	/* create the vring */
+	/*
+	 * create the vring 
+	 * 创建vring用于guest os内核的virtio balloon 驱动和qemu(或者host 内核)中的virtio ballon设备共享数据
+	 */
 	vq = vring_create_virtqueue(index, num,
 				    VIRTIO_PCI_VRING_ALIGN, &vp_dev->vdev,
 				    true, false, ctx,
@@ -142,6 +153,7 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
 	if (!vq)
 		return ERR_PTR(-ENOMEM);
 
+    //page frame number
 	q_pfn = virtqueue_get_desc_addr(vq) >> VIRTIO_PCI_QUEUE_ADDR_SHIFT;
 	if (q_pfn >> 32) {
 		dev_err(&vp_dev->pci_dev->dev,
@@ -151,7 +163,10 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
 		goto out_del_vq;
 	}
 
-	/* activate the queue */
+	/*
+	 * activate the queue 
+	 * 将pfn写入VIRTIO_PCI_QUEUE_PFN
+	 */
 	iowrite32(q_pfn, vp_dev->ioaddr + VIRTIO_PCI_QUEUE_PFN);
 
 	vq->priv = (void __force *)vp_dev->ioaddr + VIRTIO_PCI_QUEUE_NOTIFY;

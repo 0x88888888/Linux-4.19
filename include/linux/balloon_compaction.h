@@ -73,6 +73,15 @@ extern void balloon_page_enqueue(struct balloon_dev_info *b_dev_info,
 				 struct page *page);
 extern struct page *balloon_page_dequeue(struct balloon_dev_info *b_dev_info);
 
+/*
+ * kernel_init()
+ *  kernel_init_freeable()
+ *   do_basic_setup()
+ *    do_initcalls()
+ *     ...
+ *      virtballoon_probe()
+ *       balloon_devinfo_init()
+ */ 
 static inline void balloon_devinfo_init(struct balloon_dev_info *balloon)
 {
 	balloon->isolated_pages = 0;

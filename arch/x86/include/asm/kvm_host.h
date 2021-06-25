@@ -952,6 +952,11 @@ struct kvm_arch {
 
 	u64 disabled_quirks;
 
+   /*
+    * KVM_IRQCHIP_NONE, 用户空间
+	* KVM_IRQCHIP_KERNEL,   内核空间
+	* KVM_IRQCHIP_SPLIT,    部分在用户空间，部分在内核空间
+    */
 	enum kvm_irqchip_mode irqchip_mode;
 	u8 nr_reserved_ioapic_pins;
 

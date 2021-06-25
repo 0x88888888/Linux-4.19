@@ -306,6 +306,23 @@ static u16 vp_config_vector(struct virtio_pci_device *vp_dev, u16 vector)
 	return vp_ioread16(&vp_dev->common->msix_config);
 }
 
+/*
+ * kernel_init()
+ *  kernel_init_freeable()
+ *   do_basic_setup()
+ *	  do_initcalls()
+ *	   ...
+ *	    virtballoon_probe()
+ *		 init_vqs()
+ *		  virtio_find_vqs()
+ *		   vp_modern_find_vqs()
+ *		    vp_find_vqs()
+ *			 vp_find_vqs_intx()
+ *            vp_setup_vq()
+ *             setup_vq()
+ *
+ * 创建，并且初始化一个virtqueue
+ */
 static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
 				  struct virtio_pci_vq_info *info,
 				  unsigned index,
@@ -314,28 +331,46 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
 				  bool ctx,
 				  u16 msix_vec)
 {
+
+   /*
+    * 先得到virtio balloon 的用来设置配置数据的一段mmio地址
+    * 直接读写这些地址，guest os会产生VM Exit，然后进入QEMU中，
+    * 由qemu中的virtio_pci_common_read/write来处理这些操作
+    */
 	struct virtio_pci_common_cfg __iomem *cfg = vp_dev->common;
 	struct virtqueue *vq;
 	u16 num, off;
 	int err;
 
+    //index不能越界哦
 	if (index >= vp_ioread16(&cfg->num_queues))
 		return ERR_PTR(-ENOENT);
 
-	/* Select the queue we're interested in */
+	/*
+	 * Select the queue we're interested in 
+	 *
+	 * 将index写到配置区域中去
+	 */
 	vp_iowrite16(index, &cfg->queue_select);
 
-	/* Check if queue is either not available or already active. */
+	/* Check if queue is either not available or already active. 
+	 *
+	 * 读取queue大小，并且该队列没有enable
+	 */
 	num = vp_ioread16(&cfg->queue_size);
 	if (!num || vp_ioread16(&cfg->queue_enable))
 		return ERR_PTR(-ENOENT);
 
-	if (num & (num - 1)) {
+	if (num & (num - 1)) {//只能是,2,4,8,16...这种
 		dev_warn(&vp_dev->pci_dev->dev, "bad queue size %u", num);
 		return ERR_PTR(-EINVAL);
 	}
 
-	/* get offset of notification word for this vq */
+	/* get offset of notification word for this vq 
+	 *
+	 * 这个值表示virtio驱动在通知后端virto设备时应该写的地址在notify_base中的偏移
+	 * QEMU只是简单以队列的索引返回,所以在进行通知时,只需要队列索引号 *notify_offset_multiplier即可
+	 */
 	off = vp_ioread16(&cfg->queue_notify_off);
 
 	info->msix_vector = msix_vec;
@@ -357,6 +392,7 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
 	vp_iowrite64_twopart(virtqueue_get_used_addr(vq),
 			     &cfg->queue_used_lo, &cfg->queue_used_hi);
 
+   //将notify_base写入到virtqueue->priv
 	if (vp_dev->notify_base) {
 		/* offset should not wrap */
 		if ((u64)off * vp_dev->notify_offset_multiplier + 2
@@ -402,6 +438,17 @@ err_map_notify:
 	return ERR_PTR(err);
 }
 
+/*
+ * kernel_init()
+ *  kernel_init_freeable()
+ *   do_basic_setup()
+ *    do_initcalls()
+ *     ...
+ *      virtballoon_probe()
+ *       init_vqs()
+ *        virtio_find_vqs(callbacks[] = { balloon_ack, balloon_ack, stats_request })
+ *         vp_modern_find_vqs(callbacks[] = { balloon_ack, balloon_ack, stats_request })
+ */ 
 static int vp_modern_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 			      struct virtqueue *vqs[],
 			      vq_callback_t *callbacks[],
@@ -648,6 +695,9 @@ int virtio_pci_modern_probe(struct virtio_pci_device *vp_dev)
 					    IORESOURCE_IO | IORESOURCE_MEM,
 					    &vp_dev->modern_bars);
 
+   /*
+    * 依据vp_dev->modern_bars的信息从ioport_resouce或者iomem_resouce中分配区间
+    */
 	err = pci_request_selected_regions(pci_dev, vp_dev->modern_bars,
 					   "virtio-pci-modern");
 	if (err)
@@ -701,8 +751,10 @@ int virtio_pci_modern_probe(struct virtio_pci_device *vp_dev)
 
 	/* Again, we don't know how much we should map, but PAGE_SIZE
 	 * is more than enough for all existing devices.
+	 *
+	 * 设置vp_dev->vdev.config
 	 */
-	if (device) {
+	if (device) {//通常应该走这里
 		vp_dev->device = map_capability(pci_dev, device, 0, 4,
 						0, PAGE_SIZE,
 						&vp_dev->device_len);
@@ -714,7 +766,9 @@ int virtio_pci_modern_probe(struct virtio_pci_device *vp_dev)
 		vp_dev->vdev.config = &virtio_pci_config_nodev_ops;
 	}
 
+    //
 	vp_dev->config_vector = vp_config_vector;
+	//设置virtqueue的函数
 	vp_dev->setup_vq = setup_vq;
 	vp_dev->del_vq = del_vq;
 

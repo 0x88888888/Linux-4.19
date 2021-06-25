@@ -62,6 +62,8 @@ struct vring_desc_state {
 
 /*
  *  在__vring_new_virtqueue中分配
+ *
+ * 
  */
 struct vring_virtqueue {
 	struct virtqueue vq;
@@ -75,39 +77,55 @@ struct vring_virtqueue {
 	/* Can we use weak barriers? */
 	bool weak_barriers;
 
-	/* Other side has made a mess, don't try any more. */
+	/* Other side has made a mess, don't try any more. 
+	 *
+	 * 表示对端(virtio设备端,即qemu端或者host内核端)已经不是正常状态了
+	 */
 	bool broken;
 
 	/* Host supports indirect buffers 
 	 *
-	 * host是否支持indirect方式
+	 * 表示对端(virtio设备端,即qemu端或者host内核端)支持indirect方式
 	 */
 	bool indirect;
 
-	/* Host publishes avail event idx */
+	/* Host publishes avail event idx 
+	 *
+	 * 表示对端是否使用了avail event index特性
+	 */
 	bool event;
 
-	/* Head of free buffer list. */
+	/* Head of free buffer list. 
+	 * descriptor table中第一个可用项
+	 */
 	unsigned int free_head;
 	/* Number we've added since last sync. 
 	 *
-	 * 上次同步之后添加的个数
+	 * 上次通知对端之后增加的avail ring的个数
 	 */
 	unsigned int num_added;
 
 	/* Last used index we've seen. 
 	 *
 	 * vring_virtqueue->last_used_idx表示当前guest(驱动)侧已经回收到的位置
+	 * 这个值记录的是used ring的index,在驱动侧获取uesd ring的时候使用
 	 */
 	u16 last_used_idx;
 
-	/* Last written value to avail->flags */
+	/* Last written value to avail->flags 
+	 * 最后一次写入到avail->flags中的值
+	 */
 	u16 avail_flags_shadow;
 
-	/* Last written value to avail->idx in guest byte order */
+	/* Last written value to avail->idx in guest byte order 
+	 * 最后一次写入到avail->idx中的值
+	 */
 	u16 avail_idx_shadow;
 
-	/* How to notify other side. FIXME: commonalize hcalls! */
+	/* How to notify other side. FIXME: commonalize hcalls! 
+	 * 通知对端的函数
+	 * 这个函数应该是vp_notify()
+	 */
 	bool (*notify)(struct virtqueue *vq);
 
 	/* DMA, allocation, and size information */
@@ -215,6 +233,12 @@ static dma_addr_t vring_map_single(const struct vring_virtqueue *vq,
 			      cpu_addr, size, direction);
 }
 
+/*
+ * virtqueue_get_buf()
+ *  virtqueue_get_buf_ctx()
+ *   detach_buf()
+ *    vring_unmap_one()
+ */
 static void vring_unmap_one(const struct vring_virtqueue *vq,
 			    struct vring_desc *desc)
 {
@@ -249,6 +273,12 @@ static int vring_mapping_error(const struct vring_virtqueue *vq,
 	return dma_mapping_error(vring_dma_dev(vq), addr);
 }
 
+/* 
+ * virtqueue_add()
+ *  alloc_indirect()
+ *
+ * 分配total_sg个vring_desc结构
+ */
 static struct vring_desc *alloc_indirect(struct virtqueue *_vq,
 					 unsigned int total_sg, gfp_t gfp)
 {
@@ -271,19 +301,24 @@ static struct vring_desc *alloc_indirect(struct virtqueue *_vq,
 	return desc;
 }
 
-static inline int virtqueue_add(struct virtqueue *_vq,
-				struct scatterlist *sgs[],
-				unsigned int total_sg,
-				unsigned int out_sgs,
-				unsigned int in_sgs,
-				void *data,
+/* 
+ *
+ *
+ * 向dscriptor table添加请求数据
+ */
+static inline int virtqueue_add(struct virtqueue *_vq, /* 要添加数据的 virtqueue*/
+				struct scatterlist *sgs[], /* 数据 */
+				unsigned int total_sg, /* sgs的长度 */
+				unsigned int out_sgs, /* 驱动写入的数据 */
+				unsigned int in_sgs, /* 驱动提供给设备的空间，即设备写这个空间 */
+				void *data, //表示本次请求的上下文，通常用来表示具体的vitio设备,如virtio balloon设备
 				void *ctx,
 				gfp_t gfp)
 {
 	struct vring_virtqueue *vq = to_vvq(_vq);
 	struct scatterlist *sg;
-	struct vring_desc *desc;
-	unsigned int i, n, avail, descs_used, uninitialized_var(prev), err_idx;
+	struct vring_desc *desc;//会新分配一个vring_desc数组，用于存放数据
+	unsigned int i, n, avail, descs_used/* 将要使用的descriptor个数 */, uninitialized_var(prev), err_idx;
 	int head;
 	bool indirect;
 
@@ -292,6 +327,7 @@ static inline int virtqueue_add(struct virtqueue *_vq,
 	BUG_ON(data == NULL);
 	BUG_ON(ctx && vq->indirect);
 
+    //对端不能处于不正常状态
 	if (unlikely(vq->broken)) {
 		END_USE(vq);
 		return -EIO;
@@ -317,6 +353,7 @@ static inline int virtqueue_add(struct virtqueue *_vq,
 	/* If the host supports indirect descriptor tables, and we have multiple
 	 * buffers, then go indirect. FIXME: tune this threshold */
 	if (vq->indirect && total_sg > 1 && vq->vq.num_free)
+		//分配total_sg个vring_desc
 		desc = alloc_indirect(_vq, total_sg, gfp);
 	else {
 		desc = NULL;
@@ -336,6 +373,7 @@ static inline int virtqueue_add(struct virtqueue *_vq,
 		descs_used = total_sg;
 	}
 
+    //要使用的vring_desc的数量，要比当前空闲的descriptor数量小才行
 	if (vq->vq.num_free < descs_used) {
 		pr_debug("Can't add buf len %i - avail = %i\n",
 			 descs_used, vq->vq.num_free);
@@ -344,31 +382,39 @@ static inline int virtqueue_add(struct virtqueue *_vq,
 		 * host should service the ring ASAP. */
 		if (out_sgs)
 			vq->notify(&vq->vq);
-		if (indirect)
+		
+		if (indirect)//释放掉已经申请的descriptor的空间
 			kfree(desc);
 		END_USE(vq);
 		return -ENOSPC;
 	}
 
+    //将out_sgs中的数据填写到vring_desc
 	for (n = 0; n < out_sgs; n++) {
 		for (sg = sgs[n]; sg; sg = sg_next(sg)) {
+			//
 			dma_addr_t addr = vring_map_one_sg(vq, sg, DMA_TO_DEVICE);
 			if (vring_mapping_error(vq, addr))
 				goto unmap_release;
 
+            //还有下个vring_desc
 			desc[i].flags = cpu_to_virtio16(_vq->vdev, VRING_DESC_F_NEXT);
 			desc[i].addr = cpu_to_virtio64(_vq->vdev, addr);
 			desc[i].len = cpu_to_virtio32(_vq->vdev, sg->length);
 			prev = i;
+			//下一个空闲的vring_desc
 			i = virtio16_to_cpu(_vq->vdev, desc[i].next);
 		}
 	}
+
+	//将in_sgs中的数据填写到vring_desc
 	for (; n < (out_sgs + in_sgs); n++) {
 		for (sg = sgs[n]; sg; sg = sg_next(sg)) {
 			dma_addr_t addr = vring_map_one_sg(vq, sg, DMA_FROM_DEVICE);
 			if (vring_mapping_error(vq, addr))
 				goto unmap_release;
 
+            //对端设备看到VRING_DESC_F_WRITE,知道，开始了in数据
 			desc[i].flags = cpu_to_virtio16(_vq->vdev, VRING_DESC_F_NEXT | VRING_DESC_F_WRITE);
 			desc[i].addr = cpu_to_virtio64(_vq->vdev, addr);
 			desc[i].len = cpu_to_virtio32(_vq->vdev, sg->length);
@@ -376,7 +422,9 @@ static inline int virtqueue_add(struct virtqueue *_vq,
 			i = virtio16_to_cpu(_vq->vdev, desc[i].next);
 		}
 	}
-	/* Last one doesn't continue. */
+	/* Last one doesn't continue. 
+	 * 结束了，清空掉VRING_DESC_F_NEXT，让对端知道数据已经结束
+	 */
 	desc[prev].flags &= cpu_to_virtio16(_vq->vdev, ~VRING_DESC_F_NEXT);
 
 	if (indirect) {
@@ -394,6 +442,7 @@ static inline int virtqueue_add(struct virtqueue *_vq,
 	}
 
 	/* We're using some buffers from the free list. */
+	//剩余空闲的vring_desc的个数
 	vq->vq.num_free -= descs_used;
 
 	/* Update free pointer */
@@ -412,6 +461,7 @@ static inline int virtqueue_add(struct virtqueue *_vq,
 	/* Put entry in available array (but don't update avail->idx until they
 	 * do sync). */
 	avail = vq->avail_idx_shadow & (vq->vring.num - 1);
+	//将第一个vring_desc的索引写到vq->vring.avail->ring[avail]中去
 	vq->vring.avail->ring[avail] = cpu_to_virtio16(_vq->vdev, head);
 
 	/* Descriptors and available array need to be set before we expose the
@@ -419,6 +469,7 @@ static inline int virtqueue_add(struct virtqueue *_vq,
 	virtio_wmb(vq->weak_barriers);
 	vq->avail_idx_shadow++;
 	vq->vring.avail->idx = cpu_to_virtio16(_vq->vdev, vq->avail_idx_shadow);
+	//
 	vq->num_added++;
 
 	pr_debug("Added buffer head %i to %p\n", head, vq);
@@ -472,7 +523,9 @@ int virtqueue_add_sgs(struct virtqueue *_vq,
 {
 	unsigned int i, total_sg = 0;
 
-	/* Count them first. */
+	/* Count them first. 
+	 * sgs中的scatterlist个数
+	 */
 	for (i = 0; i < out_sgs + in_sgs; i++) {
 		struct scatterlist *sg;
 		for (sg = sgs[i]; sg; sg = sg_next(sg))
@@ -561,6 +614,9 @@ EXPORT_SYMBOL_GPL(virtqueue_add_inbuf_ctx);
  *
  * This is sometimes useful because the virtqueue_kick_prepare() needs
  * to be serialized, but the actual virtqueue_notify() call does not.
+ *
+ * virtqueue_kick()
+ *  virtqueue_kick_prepare()
  */
 bool virtqueue_kick_prepare(struct virtqueue *_vq)
 {
@@ -585,6 +641,7 @@ bool virtqueue_kick_prepare(struct virtqueue *_vq)
 	vq->last_add_time_valid = false;
 #endif
 
+    //对端是否使用了 avail event index特性
 	if (vq->event) {
 		needs_kick = vring_need_event(virtio16_to_cpu(_vq->vdev, vring_avail_event(&vq->vring)),
 					      new, old);
@@ -634,12 +691,19 @@ EXPORT_SYMBOL_GPL(virtqueue_notify);
  */
 bool virtqueue_kick(struct virtqueue *vq)
 {
-	if (virtqueue_kick_prepare(vq))
-		return virtqueue_notify(vq);
+	if (virtqueue_kick_prepare(vq)) //判断是否需要通知
+		return virtqueue_notify(vq);// 调用vq->notify()进行通知对端
 	return true;
 }
 EXPORT_SYMBOL_GPL(virtqueue_kick);
 
+/*
+ * virtqueue_get_buf()
+ *  virtqueue_get_buf_ctx()
+ *   detach_buf()
+ *
+ * 回收从head开始的vring_desc
+ */
 static void detach_buf(struct vring_virtqueue *vq, unsigned int head,
 		       void **ctx)
 {
@@ -653,13 +717,17 @@ static void detach_buf(struct vring_virtqueue *vq, unsigned int head,
 	i = head;
 
 	while (vq->vring.desc[i].flags & nextflag) {
+		//回收掉(unmap掉内存)
 		vring_unmap_one(vq, &vq->vring.desc[i]);
 		i = virtio16_to_cpu(vq->vq.vdev, vq->vring.desc[i].next);
+	    //空闲的vring_desc数量增加
 		vq->vq.num_free++;
 	}
 
 	vring_unmap_one(vq, &vq->vring.desc[i]);
+	//所有空闲的vring_desc链接起来
 	vq->vring.desc[i].next = cpu_to_virtio16(vq->vq.vdev, vq->free_head);
+	//从新设置可分配的vring_desc
 	vq->free_head = head;
 
 	/* Plus final descriptor */
@@ -709,6 +777,9 @@ static inline bool more_used(const struct vring_virtqueue *vq)
  *
  * Returns NULL if there are no used buffers, or the "data" token
  * handed to virtqueue_add_*().
+ *
+ * virtqueue_get_buf()
+ *  virtqueue_get_buf_ctx()
  */
 void *virtqueue_get_buf_ctx(struct virtqueue *_vq, unsigned int *len,
 			    void **ctx)
@@ -725,6 +796,7 @@ void *virtqueue_get_buf_ctx(struct virtqueue *_vq, unsigned int *len,
 		return NULL;
 	}
 
+    //判断该队列的used ring的idx是否在上一次的基础上增加了
 	if (!more_used(vq)) {
 		pr_debug("No more buffers in queue\n");
 		END_USE(vq);
@@ -734,7 +806,11 @@ void *virtqueue_get_buf_ctx(struct virtqueue *_vq, unsigned int *len,
 	/* Only get used array entries after they have been exposed by host. */
 	virtio_rmb(vq->weak_barriers);
 
+    /*
+     * 保存本次要使用的used ring 的index
+     */
 	last_used = (vq->last_used_idx & (vq->vring.num - 1));
+	//从used ring[]中取出guest os中填写的vring_desc table中的索引i和长度
 	i = virtio32_to_cpu(_vq->vdev, vq->vring.used->ring[last_used].id);
 	*len = virtio32_to_cpu(_vq->vdev, vq->vring.used->ring[last_used].len);
 
@@ -749,11 +825,15 @@ void *virtqueue_get_buf_ctx(struct virtqueue *_vq, unsigned int *len,
 
 	/* detach_buf clears data, so grab it now. */
 	ret = vq->desc_state[i].data;
+	//将从i开始的几个vring_desc回收回来
 	detach_buf(vq, i, ctx);
 	vq->last_used_idx++;
 	/* If we expect an interrupt for the next entry, tell host
 	 * by writing event index and flush out the write before
-	 * the read in the next get_buf call. */
+	 * the read in the next get_buf call.
+	 *
+	 * 设置avail event index为vq->last_used_idx
+	 */
 	if (!(vq->avail_flags_shadow & VRING_AVAIL_F_NO_INTERRUPT))
 		virtio_store_mb(vq->weak_barriers,
 				&vring_used_event(&vq->vring),
@@ -948,6 +1028,11 @@ void *virtqueue_detach_unused_buf(struct virtqueue *_vq)
 }
 EXPORT_SYMBOL_GPL(virtqueue_detach_unused_buf);
 
+/*
+ * vp_interrupt()
+ *  vp_vring_interrupt()
+ *   vring_interrupt()
+ */
 irqreturn_t vring_interrupt(int irq, void *_vq)
 {
 	struct vring_virtqueue *vq = to_vvq(_vq);
@@ -977,8 +1062,8 @@ struct virtqueue *__vring_new_virtqueue(unsigned int index,
 					struct virtio_device *vdev,
 					bool weak_barriers,
 					bool context,
-					bool (*notify)(struct virtqueue *),
-					void (*callback)(struct virtqueue *),
+					bool (*notify)(struct virtqueue *), /* 用来通知virtio设备的函数 */
+					void (*callback)(struct virtqueue *), /* virtio设备使用了descriptor      table之后virtio驱动会调用的函数 */
 					const char *name)
 {
 	unsigned int i;
@@ -990,6 +1075,7 @@ struct virtqueue *__vring_new_virtqueue(unsigned int index,
 	if (!vq)
 		return NULL;
 
+    //复制过来
 	vq->vring = vring;
 	vq->vq.callback = callback;
 	vq->vq.vdev = vdev;
@@ -1009,6 +1095,7 @@ struct virtqueue *__vring_new_virtqueue(unsigned int index,
 
 	//每个virtio_device可以有多个virtqueue对象
 	list_add_tail(&vq->vq.list, &vdev->vqs);
+	
 #ifdef DEBUG
 	vq->in_use = false;
 	vq->last_add_time_valid = false;
@@ -1027,8 +1114,10 @@ struct virtqueue *__vring_new_virtqueue(unsigned int index,
 
 	/* Put everything in free lists. */
 	vq->free_head = 0;
+	//给desc建立链表啊
 	for (i = 0; i < vring.num-1; i++)
 		vq->vring.desc[i].next = cpu_to_virtio16(vdev, i + 1);
+	
 	memset(vq->desc_state, 0, vring.num * sizeof(struct vring_desc_state));
 
 	return &vq->vq;
@@ -1077,11 +1166,26 @@ static void vring_free_queue(struct virtio_device *vdev, size_t size,
 	}
 }
 
- /*
-  * vm_find_vqs()
-  *  vm_setup_vq()
-  *   vring_create_virtqueue()
-  */
+/*
+ * vm_find_vqs()
+ *  vm_setup_vq()
+ *   vring_create_virtqueue()
+ *
+ * kernel_init()
+ *  kernel_init_freeable()
+ *   do_basic_setup()
+ *	  do_initcalls()
+ *	   ...
+ *	    virtballoon_probe()
+ *		 init_vqs()
+ *		  virtio_find_vqs()
+ *		   vp_modern_find_vqs()
+ *		    vp_find_vqs()
+ *			 vp_find_vqs_intx()
+ *            vp_setup_vq()
+ *             setup_vq() 
+ *              vring_create_virtqueue()
+ */
 struct virtqueue *vring_create_virtqueue(
 	unsigned int index,
 	unsigned int num,
@@ -1090,8 +1194,8 @@ struct virtqueue *vring_create_virtqueue(
 	bool weak_barriers,
 	bool may_reduce_num,
 	bool context,
-	bool (*notify)(struct virtqueue *),
-	void (*callback)(struct virtqueue *),
+	bool (*notify)(struct virtqueue *),/* 用来通知virtio设备的函数 */
+	void (*callback)(struct virtqueue *), /* virtio设备使用了descriptor      table之后virtio驱动会调用的函数 */
 	const char *name)
 {
 	struct virtqueue *vq;
@@ -1116,7 +1220,7 @@ struct virtqueue *vring_create_virtqueue(
 			break;
 	}
 
-	if (!num)
+	if (!num)//num为0了
 		return NULL;
 
 	if (!queue) { //前面分配失败，再一次尝试分配
@@ -1128,9 +1232,13 @@ struct virtqueue *vring_create_virtqueue(
 		return NULL;
 
 	queue_size_in_bytes = vring_size(num, vring_align);
-	
+
+	//queue作为vring->desc
 	vring_init(&vring, num, queue, vring_align);
 
+    /*
+     * 创建一个virt_virtqueue
+     */
 	vq = __vring_new_virtqueue(index, vring, vdev, weak_barriers, context,
 				   notify, callback, name);
 	if (!vq) {

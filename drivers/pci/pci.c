@@ -1523,6 +1523,7 @@ static int do_pci_enable_device(struct pci_dev *dev, int bars)
 	if (bridge)
 		pcie_aspm_powersave_config_link(bridge);
 
+    //往配置空间写入配置数据
 	err = pcibios_enable_device(dev, bars);
 	if (err < 0)
 		return err;
@@ -1656,6 +1657,8 @@ EXPORT_SYMBOL(pci_enable_device_mem);
  *
  *  Note we don't actually enable the device many times if we call
  *  this function repeatedly (we just increment the count).
+ *
+ * 做一些底层配置，使能该设备 ,主要是往pci配置空间写入一些配置数据
  */
 int pci_enable_device(struct pci_dev *dev)
 {

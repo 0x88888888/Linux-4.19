@@ -32,10 +32,13 @@
 struct virtqueue {
     /*
      * 链接virtqueue
-     * 设备的vq链表头，一个设备可以有多个vq
+     *
+     * 链接到virtio_pci_device->vdev->vqs->vqs
      */
 	struct list_head list;
-	/*当buffer被使用后调用这个callback函数进行通知*/
+	/*
+	 * 当buffer被使用后调用这个callback函数进行通知
+	 */
 	void (*callback)(struct virtqueue *vq);
 	const char *name;
 	/*
@@ -44,7 +47,7 @@ struct virtqueue {
 	struct virtio_device *vdev;
 	unsigned int index;
 	unsigned int num_free;
-	/*私有指针*/
+	/*私有指针,看vp_notify()*/
 	void *priv;
 };
 
@@ -134,6 +137,8 @@ static inline void *virtqueue_get_used(struct virtqueue *vq)
  * @vqs: the list of virtqueues for this device.
  * @features: the features supported by both driver and device.
  * @priv: private pointer for the driver's use.
+ *
+ * 作为virtio_pci_device->vdev成员
  */
 struct virtio_device {
 	/*virtio bus中的唯一表示*/
@@ -146,11 +151,16 @@ struct virtio_device {
 	struct device dev;
 	/*设备类型唯一标识，用于识别设备driver*/
 	struct virtio_device_id id;
-	/*设备配置操作函数指针*/
+	/*设备配置操作函数指针
+	 *
+	 * virtio_pci_config_ops
+	 */
 	const struct virtio_config_ops *config;
 	const struct vringh_config_ops *vringh_config;
 	/*
 	 * 设备virtio_queue，一个设备可以多个，用于数据传输
+	 *
+	 * 在__vring_new_virtqueue()中设置
 	 *
 	 * 链接到virtqueue->list
 	 */

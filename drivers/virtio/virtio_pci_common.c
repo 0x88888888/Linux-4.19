@@ -58,7 +58,12 @@ static irqreturn_t vp_config_changed(int irq, void *opaque)
 	return IRQ_HANDLED;
 }
 
-/* Notify all virtqueues on an interrupt. */
+/*
+ * vp_interrupt()
+ *  vp_vring_interrupt()
+ *
+ *Notify all virtqueues on an interrupt. 
+ */
 static irqreturn_t vp_vring_interrupt(int irq, void *opaque)
 {
 	struct virtio_pci_device *vp_dev = opaque;
@@ -67,6 +72,7 @@ static irqreturn_t vp_vring_interrupt(int irq, void *opaque)
 	unsigned long flags;
 
 	spin_lock_irqsave(&vp_dev->lock, flags);
+	//去处理了
 	list_for_each_entry(info, &vp_dev->virtqueues, node) {
 		if (vring_interrupt(irq, info->vq) == IRQ_HANDLED)
 			ret = IRQ_HANDLED;
@@ -76,12 +82,16 @@ static irqreturn_t vp_vring_interrupt(int irq, void *opaque)
 	return ret;
 }
 
-/* A small wrapper to also acknowledge the interrupt when it's handled.
+/*
+ * 由QEMU的virtio_pci_notify函数,来触发guest os的这个中断
+ *
+ * A small wrapper to also acknowledge the interrupt when it's handled.
  * I really need an EIO hook for the vring so I can ack the interrupt once we
  * know that we'll be handling the IRQ but before we invoke the callback since
  * the callback may notify the host which results in the host attempting to
  * raise an interrupt that we would then mask once we acknowledged the
- * interrupt. */
+ * interrupt. 
+ */
 static irqreturn_t vp_interrupt(int irq, void *opaque)
 {
 	struct virtio_pci_device *vp_dev = opaque;
@@ -174,6 +184,20 @@ error:
 	return err;
 }
 
+/*
+ * kernel_init()
+ *  kernel_init_freeable()
+ *   do_basic_setup()
+ *	  do_initcalls()
+ *	   ...
+ *	    virtballoon_probe()
+ *		 init_vqs()
+ *		  virtio_find_vqs()
+ *		   vp_modern_find_vqs()
+ *		    vp_find_vqs()
+ *			 vp_find_vqs_intx()
+ *            vp_setup_vq()
+ */
 static struct virtqueue *vp_setup_vq(struct virtio_device *vdev, unsigned index,
 				     void (*callback)(struct virtqueue *vq),
 				     const char *name,
@@ -189,6 +213,7 @@ static struct virtqueue *vp_setup_vq(struct virtio_device *vdev, unsigned index,
 	if (!info)
 		return ERR_PTR(-ENOMEM);
 
+    //setup_vq ,是virtio_pci_modern.c中的那个setup_vq
 	vq = vp_dev->setup_vq(vp_dev, info, index, callback, name, ctx,
 			      msix_vec);
 	if (IS_ERR(vq))
@@ -337,6 +362,8 @@ static int vp_find_vqs_msix(struct virtio_device *vdev, unsigned nvqs,
 			 sizeof *vp_dev->msix_names,
 			 "%s-%s",
 			 dev_name(&vp_dev->vdev.dev), names[i]);
+
+		//中断处理函数
 		err = request_irq(pci_irq_vector(vp_dev->pci_dev, msix_vec),
 				  vring_interrupt, 0,
 				  vp_dev->msix_names[msix_vec],
@@ -351,6 +378,19 @@ error_find:
 	return err;
 }
 
+/*
+ * kernel_init()
+ *  kernel_init_freeable()
+ *   do_basic_setup()
+ *    do_initcalls()
+ *     ...
+ *      virtballoon_probe()
+ *       init_vqs()
+ *        virtio_find_vqs(callbacks[] = { balloon_ack, balloon_ack, stats_request })
+ *         vp_modern_find_vqs(callbacks[] = { balloon_ack, balloon_ack, stats_request })
+ *          vp_find_vqs(callbacks[] = { balloon_ack, balloon_ack, stats_request })
+ *           vp_find_vqs_intx(callbacks[] = { balloon_ack, balloon_ack, stats_request })
+ */
 static int vp_find_vqs_intx(struct virtio_device *vdev, unsigned nvqs,
 		struct virtqueue *vqs[], vq_callback_t *callbacks[],
 		const char * const names[], const bool *ctx)
@@ -362,6 +402,7 @@ static int vp_find_vqs_intx(struct virtio_device *vdev, unsigned nvqs,
 	if (!vp_dev->vqs)
 		return -ENOMEM;
 
+    //设置virtio balloon中断处理函数
 	err = request_irq(vp_dev->pci_dev->irq, vp_interrupt, IRQF_SHARED,
 			dev_name(&vdev->dev), vp_dev);
 	if (err)
@@ -369,6 +410,7 @@ static int vp_find_vqs_intx(struct virtio_device *vdev, unsigned nvqs,
 
 	vp_dev->intx_enabled = 1;
 	vp_dev->per_vq_vectors = false;
+	
 	for (i = 0; i < nvqs; ++i) {
 		if (!names[i]) {
 			vqs[i] = NULL;
@@ -389,14 +431,28 @@ out_del_vqs:
 	return err;
 }
 
-/* the config->find_vqs() implementation */
+/*
+ * kernel_init()
+ *  kernel_init_freeable()
+ *   do_basic_setup()
+ *    do_initcalls()
+ *     ...
+ *      virtballoon_probe()
+ *       init_vqs()
+ *        virtio_find_vqs(callbacks[] = { balloon_ack, balloon_ack, stats_request })
+ *         vp_modern_find_vqs(callbacks[] = { balloon_ack, balloon_ack, stats_request })
+ *          vp_find_vqs(callbacks[] = { balloon_ack, balloon_ack, stats_request })
+ *
+ * the config->find_vqs() implementation 
+ */
 int vp_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 		struct virtqueue *vqs[], vq_callback_t *callbacks[],
 		const char * const names[], const bool *ctx,
 		struct irq_affinity *desc)
 {
 	int err;
-
+    //不同的参数，不同的调用vp_find_vqs_msix
+ 
 	/* Try MSI-X with one vector per queue. */
 	err = vp_find_vqs_msix(vdev, nvqs, vqs, callbacks, names, true, ctx, desc);
 	if (!err)
@@ -405,6 +461,7 @@ int vp_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 	err = vp_find_vqs_msix(vdev, nvqs, vqs, callbacks, names, false, ctx, desc);
 	if (!err)
 		return 0;
+	//virtio balloon走这里
 	/* Finally fall back to regular interrupts. */
 	return vp_find_vqs_intx(vdev, nvqs, vqs, callbacks, names, ctx);
 }
@@ -510,13 +567,26 @@ static void virtio_pci_release_dev(struct device *_d)
 	kfree(vp_dev);
 }
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    ....
+ *     virtio_pci_driver_init(这个函数由宏生成)
+ *      ....
+ *       virtio_pci_probe()
+ */
 static int virtio_pci_probe(struct pci_dev *pci_dev,
 			    const struct pci_device_id *id)
 {
 	struct virtio_pci_device *vp_dev, *reg_dev = NULL;
 	int rc;
 
-	/* allocate our structure and fill it out */
+	/*
+	 * allocate our structure and fill it out 
+	 *
+	 * virtual pci 代理设备
+	 */
 	vp_dev = kzalloc(sizeof(struct virtio_pci_device), GFP_KERNEL);
 	if (!vp_dev)
 		return -ENOMEM;
@@ -530,7 +600,8 @@ static int virtio_pci_probe(struct pci_dev *pci_dev,
 	spin_lock_init(&vp_dev->lock);
 
 	/* enable the device 
-	 *  
+	 * 
+	 * 做一些底层配置，使能该设备
 	 */
 	rc = pci_enable_device(pci_dev);
 	if (rc)
@@ -554,6 +625,7 @@ static int virtio_pci_probe(struct pci_dev *pci_dev,
 
 	pci_set_master(pci_dev);
 
+    //注册设备到系统中
 	rc = register_virtio_device(&vp_dev->vdev);
 	reg_dev = vp_dev;
 	if (rc)
@@ -632,6 +704,12 @@ static struct pci_driver virtio_pci_driver = {
 	.sriov_configure = virtio_pci_sriov_configure,
 };
 
+/*
+ * 在do_initcalls中启动
+ *
+ * module_pci_driver在include/linux/pci.h中定义
+ * 定义出virtio_pci_driver_init函数，由do_initcalls调用
+ */
 module_pci_driver(virtio_pci_driver);
 
 MODULE_AUTHOR("Anthony Liguori <aliguori@us.ibm.com>");

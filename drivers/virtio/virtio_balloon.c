@@ -387,6 +387,15 @@ static void update_balloon_size_func(struct work_struct *work)
 		queue_work(system_freezable_wq, work);
 }
 
+/*
+ * kernel_init()
+ *  kernel_init_freeable()
+ *   do_basic_setup()
+ *    do_initcalls()
+ *     ...
+ *      virtballoon_probe()
+ *       init_vqs()
+ */ 
 static int init_vqs(struct virtio_balloon *vb)
 {
 	struct virtqueue *vqs[3];
@@ -397,8 +406,14 @@ static int init_vqs(struct virtio_balloon *vb)
 	/*
 	 * We expect two virtqueues: inflate and deflate, and
 	 * optionally stat.
+	 *
+	 * 看是否存在VIRTIO_BALLOON_F_STATS_VQ这个feature,来设定vqs的个数
 	 */
 	nvqs = virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_STATS_VQ) ? 3 : 2;
+
+	 
+
+	 //vp_modern_find_vqs,分配vqs
 	err = virtio_find_vqs(vb->vdev, nvqs, vqs, callbacks, names, NULL);
 	if (err)
 		return err;
@@ -558,6 +573,14 @@ static int virtio_balloon_register_shrinker(struct virtio_balloon *vb)
 	return register_shrinker(&vb->shrinker);
 }
 
+/*
+ * kernel_init()
+ *  kernel_init_freeable()
+ *   do_basic_setup()
+ *    do_initcalls()
+ *     ...
+ *      virtballoon_probe()
+ */ 
 static int virtballoon_probe(struct virtio_device *vdev)
 {
 	struct virtio_balloon *vb;
@@ -584,11 +607,16 @@ static int virtballoon_probe(struct virtio_device *vdev)
 
 	balloon_devinfo_init(&vb->vb_dev_info);
 
+    /*
+     * 初始化virtqueue,guest os中的virtio驱动与 qemu(或者kvm)中的设备通过virtqueue来通信
+     */
 	err = init_vqs(vb);
 	if (err)
 		goto out_free_vb;
 
+//有定义
 #ifdef CONFIG_BALLOON_COMPACTION
+    //挂载ballon_fs
 	balloon_mnt = kern_mount(&balloon_fs);
 	if (IS_ERR(balloon_mnt)) {
 		err = PTR_ERR(balloon_mnt);
@@ -602,6 +630,7 @@ static int virtballoon_probe(struct virtio_device *vdev)
 		kern_unmount(balloon_mnt);
 		goto out_del_vqs;
 	}
+	//balloon_aops->migratepage,这个分析
 	vb->vb_dev_info.inode->i_mapping->a_ops = &balloon_aops;
 #endif
 	/*
@@ -613,6 +642,7 @@ static int virtballoon_probe(struct virtio_device *vdev)
 		if (err)
 			goto out_del_vqs;
 	}
+	//设置vdev状态为VIRTIO_CONFIG_S_DRIVER_OK
 	virtio_device_ready(vdev);
 
 	if (towards_target(vb))

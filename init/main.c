@@ -1201,6 +1201,8 @@ static void __init do_initcalls(void)
      *
      * 6. module_init(init_kprobes)
      * 6. module_init(tun_init)
+     * 6. module_pci_driver(virtio_pci_driver)
+     * 6. module_virtio_driver(virtio_balloon_driver)
      *
      * 6. module_init(virtio_net_driver_init)
      * 6. module_init(vhost_init)

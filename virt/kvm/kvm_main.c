@@ -999,6 +999,8 @@ static struct kvm_memslots *install_new_memslots(struct kvm *kvm,
  *
  * 做好guest os的物理内存地址与qemu进程 virtal address的对应关系的管理
  * 并没有分配任何的物理page，分配物理page要在ept异常中搞定
+ *
+ * 对用户态传过来的kvm_userspace_memory_region, 在kvm中进行相应 add, update,delete
  */
 int __kvm_set_memory_region(struct kvm *kvm,
 			    const struct kvm_userspace_memory_region *mem)
@@ -1019,7 +1021,7 @@ int __kvm_set_memory_region(struct kvm *kvm,
 	r = -EINVAL;
 	
     /*
-     * slot的低16位是插槽号，往上是地址空间的id，
+     * slot的低16位是插槽号，往上是address space的id，
      * 将插槽号和地址空间id都取出来
      */
 	as_id = mem->slot >> 16;
@@ -1039,7 +1041,8 @@ int __kvm_set_memory_region(struct kvm *kvm,
 			(void __user *)(unsigned long)mem->userspace_addr,
 			mem->memory_size)))
 		goto out;
-	
+
+    //address space id 和 slot id 只有一个超过最大值了
 	if (as_id >= KVM_ADDRESS_SPACE_NUM || id >= KVM_MEM_SLOTS_NUM)
 		goto out;
 
@@ -1049,13 +1052,16 @@ int __kvm_set_memory_region(struct kvm *kvm,
 
     //从kvm->memslots[]中得到相应的slot
 	slot = id_to_memslot(__kvm_memslots(kvm, as_id), id);
-	
+
+	//在guest os中的物理page number
 	base_gfn = mem->guest_phys_addr >> PAGE_SHIFT;
+	//要操作的page的数量
 	npages = mem->memory_size >> PAGE_SHIFT;
 
 	if (npages > KVM_MEM_MAX_NR_PAGES)
 		goto out;
 
+    //复制过来
 	new = old = *slot;
 
 	new.id = id;
@@ -1075,7 +1081,7 @@ int __kvm_set_memory_region(struct kvm *kvm,
 			if (base_gfn != old.base_gfn)
 				change = KVM_MR_MOVE;
 			else if (new.flags != old.flags)
-				change = KVM_MR_FLAGS_ONLY;
+				change = KVM_MR_FLAGS_ONLY; //只是修改FLAG
 			else { /* Nothing to change. */
 				r = 0;
 				goto out;
@@ -1095,12 +1101,13 @@ int __kvm_set_memory_region(struct kvm *kvm,
 		 * 下面的循环检查是否有overlap
 	     */
 		r = -EEXIST;
+		//遍历kvm->memslots[as_id]
 		kvm_for_each_memslot(slot, __kvm_memslots(kvm, as_id)) {
 			if (slot->id == id)
 				continue;
 			if (!((base_gfn + npages <= slot->base_gfn) ||
 			      (base_gfn >= slot->base_gfn + slot->npages)))
-				goto out;//找到可以放入的，对应的slot了
+				goto out;//要操作的page范围不在slot管理的范围内，就返回吧
 		}
 	}
 
@@ -1115,7 +1122,7 @@ int __kvm_set_memory_region(struct kvm *kvm,
 		new.userspace_addr = mem->userspace_addr;
 
         /*
-         * 
+         * 设置new这个 kvm_memory_slot
          */
 		if (kvm_arch_create_memslot(kvm, &new, npages))
 			goto out_free;
@@ -1136,6 +1143,7 @@ int __kvm_set_memory_region(struct kvm *kvm,
 	//复制一个slots过来
 	memcpy(slots, __kvm_memslots(kvm, as_id), sizeof(struct kvm_memslots));
 
+    //删除或者移动操作
 	if ((change == KVM_MR_DELETE) || (change == KVM_MR_MOVE)) {
 		slot = id_to_memslot(slots, id);
 		slot->flags |= KVM_MEMSLOT_INVALID;

@@ -9228,7 +9228,7 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
 
 	kvm_set_tsc_khz(vcpu, max_tsc_khz);
 
-    //分配kvm_vcpu->arch.mmu
+    //分配kvm_vcpu->arch.mmu,返回0
 	r = kvm_mmu_create(vcpu);
 	if (r < 0)
 		goto fail_free_pio_data;
@@ -9521,12 +9521,13 @@ int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
 	int i;
 
     //共有4K,2M,1G 3种类型
-	for (i = 0; i < KVM_NR_PAGE_SIZES; ++i) {
+	for (i = 0; i < KVM_NR_PAGE_SIZES /*3*/; ++i) {
 		struct kvm_lpage_info *linfo;
 		unsigned long ugfn;
 		int lpages;
 		int level = i + 1;
 
+        //gfn_to_index得到在页表中的某个索引位置
         // 根据内存区间大小计算出页的个数
 		lpages = gfn_to_index(slot->base_gfn + npages - 1,
 				      slot->base_gfn, level) + 1;
@@ -9552,9 +9553,11 @@ int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
 
 		slot->arch.lpage_info[i - 1] = linfo;
 
+        //第一个不支持large page
 		if (slot->base_gfn & (KVM_PAGES_PER_HPAGE(level) - 1))
 			linfo[0].disallow_lpage = 1;
-		
+
+		//最后一个不支持large page
 		if ((slot->base_gfn + npages) & (KVM_PAGES_PER_HPAGE(level) - 1))
 			linfo[lpages - 1].disallow_lpage = 1;
 
@@ -9573,7 +9576,7 @@ int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
 		    !kvm_largepages_enabled()) {
 			unsigned long j;
 
-			for (j = 0; j < lpages; ++j)//不支持large page了
+			for (j = 0; j < lpages; ++j)//通通都不支持large page了
 				linfo[j].disallow_lpage = 1;
 		}
 	}
