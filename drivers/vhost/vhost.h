@@ -91,6 +91,7 @@ struct vhost_virtqueue {
 	struct vring_avail __user *avail;
 	struct vring_used __user *used;
 	const struct vhost_umem_node *meta_iotlb[VHOST_NUM_ADDRS];
+	//eventfd对应的file对象
 	struct file *kick;
 	struct eventfd_ctx *call_ctx;
 	struct eventfd_ctx *error_ctx;
@@ -98,7 +99,11 @@ struct vhost_virtqueue {
 
 	struct vhost_poll poll;
 
-	/* The routine to call when the Guest pings us, or timeout. */
+	/*	 
+	 * The routine to call when the Guest pings us, or timeout. 
+	 *
+	 * handle_tx_kick和handle_rx_kick
+	 */
 	vhost_work_fn_t handle_kick;
 
 	/* Last available index we saw. 

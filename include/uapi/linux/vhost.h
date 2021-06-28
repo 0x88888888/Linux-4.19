@@ -85,8 +85,10 @@ struct vhost_msg_v2 {
 };
 
 struct vhost_memory_region {
+	// guest os的物理地址
 	__u64 guest_phys_addr;
 	__u64 memory_size; /* bytes */
+	// 
 	__u64 userspace_addr;
 	__u64 flags_padding; /* No flags are currently specified. */
 };
@@ -94,9 +96,16 @@ struct vhost_memory_region {
 /* All region addresses and sizes must be 4K aligned. */
 #define VHOST_PAGE_SIZE 0x1000
 
+/*
+ * QEMU通过VHOST_SET_MEM_TABLE将虚拟机的内存布局信息告诉vhost-net
+ * virtio在进行相关的virtio后端操作处理虚拟机物理地址时能够找到对应的QEMU所在的虚拟地址
+ */
 struct vhost_memory {
 	__u32 nregions;
 	__u32 padding;
+	/*
+	 * 每一项表示guest os物理地址与qemu虚拟地址的关系
+	 */
 	struct vhost_memory_region regions[0];
 };
 

@@ -127,6 +127,9 @@ struct vhost_net_virtqueue {
 
 struct vhost_net {
 	struct vhost_dev dev;
+	/*
+	 *VHOST_NET_VQ_TX 和VHOST_NET_VQ_RX
+	 */ 
 	struct vhost_net_virtqueue vqs[VHOST_NET_VQ_MAX];
 	struct vhost_poll poll[VHOST_NET_VQ_MAX];
 	/* Number of TX recently submitted.
@@ -269,6 +272,12 @@ static void vhost_net_clear_ubuf_info(struct vhost_net *n)
 	}
 }
 
+/*
+ * vhost_net_compat_ioctl()
+ *  vhost_net_ioctl()
+ *   vhost_net_set_owner()
+ *    vhost_net_set_ubuf_info()
+ */
 static int vhost_net_set_ubuf_info(struct vhost_net *n)
 {
 	bool zcopy;
@@ -1072,6 +1081,10 @@ static void handle_rx_net(struct vhost_work *work)
 	handle_rx(net);
 }
 
+/*
+ * vfs_open()
+ *  vhost_net_open()
+ */
 static int vhost_net_open(struct inode *inode, struct file *f)
 {
 	struct vhost_net *n;
@@ -1089,13 +1102,14 @@ static int vhost_net_open(struct inode *inode, struct file *f)
 		return -ENOMEM;
 	}
 
-	queue = kmalloc_array(VHOST_NET_BATCH, sizeof(void *),
+	queue = kmalloc_array(VHOST_NET_BATCH/* 64 */, sizeof(void *),
 			      GFP_KERNEL);
 	if (!queue) {
 		kfree(vqs);
 		kvfree(n);
 		return -ENOMEM;
 	}
+	//收包队列
 	n->vqs[VHOST_NET_VQ_RX].rxq.queue = queue;
 
 	dev = &n->dev;
@@ -1113,9 +1127,12 @@ static int vhost_net_open(struct inode *inode, struct file *f)
 		n->vqs[i].rx_ring = NULL;
 		vhost_net_buf_init(&n->vqs[i].rxq);
 	}
+	//初始化vhost_dev，和vqs
 	vhost_dev_init(dev, vqs, VHOST_NET_VQ_MAX);
 
+    //发包处理函数
 	vhost_poll_init(n->poll + VHOST_NET_VQ_TX, handle_tx_net, EPOLLOUT, dev);
+	//收包处理函数
 	vhost_poll_init(n->poll + VHOST_NET_VQ_RX, handle_rx_net, EPOLLIN, dev);
 
 	f->private_data = n;
@@ -1279,6 +1296,11 @@ static struct socket *get_socket(int fd)
 	return ERR_PTR(-ENOTSOCK);
 }
 
+/*
+ * vhost_net_compat_ioctl()
+ *  vhost_net_ioctl()
+ *   vhost_net_set_backend()
+ */
 static long vhost_net_set_backend(struct vhost_net *n, unsigned index, int fd)
 {
 	struct socket *sock, *oldsock;
@@ -1461,27 +1483,41 @@ out_unlock:
 	return -EFAULT;
 }
 
+/*
+ * vhost_net_compat_ioctl()
+ *  vhost_net_ioctl()
+ *   vhost_net_set_owner()
+ *
+ * 把一个打开的vhost-nt fd同进程关联起来
+ */
 static long vhost_net_set_owner(struct vhost_net *n)
 {
 	int r;
 
 	mutex_lock(&n->dev.mutex);
-	if (vhost_dev_has_owner(&n->dev)) {
+	if (vhost_dev_has_owner(&n->dev)) { //vhost_net->dev是否已经有关联的mm
 		r = -EBUSY;
 		goto out;
 	}
+	
 	r = vhost_net_set_ubuf_info(n);
 	if (r)
 		goto out;
+	
 	r = vhost_dev_set_owner(&n->dev);
 	if (r)
 		vhost_net_clear_ubuf_info(n);
+	
 	vhost_net_flush(n);
 out:
 	mutex_unlock(&n->dev.mutex);
 	return r;
 }
 
+/*
+ * vhost_net_compat_ioctl()
+ *  vhost_net_ioctl()
+ */
 static long vhost_net_ioctl(struct file *f, unsigned int ioctl,
 			    unsigned long arg)
 {
@@ -1493,7 +1529,7 @@ static long vhost_net_ioctl(struct file *f, unsigned int ioctl,
 	int r;
 
 	switch (ioctl) {
-	case VHOST_NET_SET_BACKEND:
+	case VHOST_NET_SET_BACKEND: //设置tap为virtio vhost_net方案的后端
 		if (copy_from_user(&backend, argp, sizeof backend))
 			return -EFAULT;
 		return vhost_net_set_backend(n, backend.index, backend.fd);
@@ -1526,7 +1562,7 @@ static long vhost_net_ioctl(struct file *f, unsigned int ioctl,
 	default:
 		mutex_lock(&n->dev.mutex);
 		r = vhost_dev_ioctl(&n->dev, ioctl, argp);
-		if (r == -ENOIOCTLCMD)
+		if (r == -ENOIOCTLCMD) 
 			r = vhost_vring_ioctl(&n->dev, ioctl, argp);
 		else
 			vhost_net_flush(n);
@@ -1583,6 +1619,7 @@ static const struct file_operations vhost_net_fops = {
 #endif
 	.open           = vhost_net_open,
 	.llseek		= noop_llseek,
+	//private_data ==vhost_net对象
 };
 
 static struct miscdevice vhost_net_misc = {

@@ -298,6 +298,11 @@ static void vhost_vq_meta_reset(struct vhost_dev *d)
 		__vhost_vq_meta_reset(d->vqs[i]);
 }
 
+/*
+ *
+ *
+ * 将vhost_virtqueue状态归到初始状态
+ */
 static void vhost_vq_reset(struct vhost_dev *dev,
 			   struct vhost_virtqueue *vq)
 {
@@ -329,6 +334,15 @@ static void vhost_vq_reset(struct vhost_dev *dev,
 	__vhost_vq_meta_reset(vq);
 }
 
+/*
+ * vhost_net_compat_ioctl()
+ *  vhost_net_ioctl()
+ *   vhost_net_set_owner()
+ *    vhost_dev_set_owner()
+ *     kthread_create(.....)
+ *      ......
+ *       vhost_worker()
+ */
 static int vhost_worker(void *data)
 {
 	struct vhost_dev *dev = data;
@@ -348,6 +362,7 @@ static int vhost_worker(void *data)
 			break;
 		}
 
+        //从vhost_dev->work_list上取下来，然后执行work->fn(work)
 		node = llist_del_all(&dev->work_list);
 		if (!node)
 			schedule();
@@ -496,7 +511,14 @@ bool vhost_dev_has_owner(struct vhost_dev *dev)
 }
 EXPORT_SYMBOL_GPL(vhost_dev_has_owner);
 
-/* Caller should have device mutex */
+/*
+ * vhost_net_compat_ioctl()
+ *  vhost_net_ioctl()
+ *   vhost_net_set_owner()
+ *    vhost_dev_set_owner()
+ *
+ * Caller should have device mutex 
+ */
 long vhost_dev_set_owner(struct vhost_dev *dev)
 {
 	struct task_struct *worker;
@@ -510,6 +532,7 @@ long vhost_dev_set_owner(struct vhost_dev *dev)
 
 	/* No owner, become one */
 	dev->mm = get_task_mm(current);
+	//创建vhost_worker线程
 	worker = kthread_create(vhost_worker, dev, "vhost-%d", current->pid);
 	if (IS_ERR(worker)) {
 		err = PTR_ERR(worker);
@@ -523,6 +546,7 @@ long vhost_dev_set_owner(struct vhost_dev *dev)
 	if (err)
 		goto err_cgroup;
 
+    //分配virtqueue的相关空间
 	err = vhost_dev_alloc_iovecs(dev);
 	if (err)
 		goto err_cgroup;
@@ -1317,7 +1341,11 @@ static struct vhost_umem *vhost_umem_alloc(void)
 
 	return umem;
 }
-
+/*
+ * vhost_net_ioctl()
+ *  vhost_dev_ioctl() [VHOST_SET_MEM_TABLE]
+ *   vhost_set_memory()
+ */
 static long vhost_set_memory(struct vhost_dev *d, struct vhost_memory __user *m)
 {
 	struct vhost_memory mem, *newmem;
@@ -1386,6 +1414,10 @@ err:
 	return -EFAULT;
 }
 
+/*
+ * vhost_net_ioctl()
+ *  vhost_vring_ioctl()
+ */
 long vhost_vring_ioctl(struct vhost_dev *d, unsigned int ioctl, void __user *argp)
 {
 	struct file *eventfp, *filep = NULL;
@@ -1508,23 +1540,27 @@ long vhost_vring_ioctl(struct vhost_dev *d, unsigned int ioctl, void __user *arg
 		vq->log_addr = a.log_guest_addr;
 		vq->used = (void __user *)(unsigned long)a.used_user_addr;
 		break;
-	case VHOST_SET_VRING_KICK:
+	case VHOST_SET_VRING_KICK: //告诉前端virtio 驱动发送通知的时候触发的eventfd
 		if (copy_from_user(&f, argp, sizeof f)) {
 			r = -EFAULT;
 			break;
 		}
+		//得到eventfd
 		eventfp = f.fd == -1 ? NULL : eventfd_fget(f.fd);
 		if (IS_ERR(eventfp)) {
 			r = PTR_ERR(eventfp);
 			break;
 		}
+		
+		
 		if (eventfp != vq->kick) {
 			pollstop = (filep = vq->kick) != NULL;
+			//将eventfd对应的file对象赋值到q->kick 
 			pollstart = (vq->kick = eventfp) != NULL;
 		} else
 			filep = eventfp;
 		break;
-	case VHOST_SET_VRING_CALL:
+	case VHOST_SET_VRING_CALL://这个eventfd完成vhost-net后端到虚拟机virtio前端的中断通知
 		if (copy_from_user(&f, argp, sizeof f)) {
 			r = -EFAULT;
 			break;
@@ -1534,6 +1570,7 @@ long vhost_vring_ioctl(struct vhost_dev *d, unsigned int ioctl, void __user *arg
 			r = PTR_ERR(ctx);
 			break;
 		}
+		//交换
 		swap(ctx, vq->call_ctx);
 		break;
 	case VHOST_SET_VRING_ERR:
@@ -1579,7 +1616,7 @@ long vhost_vring_ioctl(struct vhost_dev *d, unsigned int ioctl, void __user *arg
 	if (filep)
 		fput(filep);
 
-	if (pollstart && vq->handle_kick)
+	if (pollstart && vq->handle_kick)//vfs_poll
 		r = vhost_poll_start(&vq->poll, vq->kick);
 
 	mutex_unlock(&vq->mutex);
@@ -1617,7 +1654,12 @@ int vhost_init_device_iotlb(struct vhost_dev *d, bool enabled)
 }
 EXPORT_SYMBOL_GPL(vhost_init_device_iotlb);
 
-/* Caller must have device mutex */
+/*
+ * vhost_net_ioctl()
+ *  vhost_dev_ioctl()
+ *
+ * Caller must have device mutex 
+ */
 long vhost_dev_ioctl(struct vhost_dev *d, unsigned int ioctl, void __user *argp)
 {
 	struct eventfd_ctx *ctx;
@@ -1637,7 +1679,7 @@ long vhost_dev_ioctl(struct vhost_dev *d, unsigned int ioctl, void __user *argp)
 		goto done;
 
 	switch (ioctl) {
-	case VHOST_SET_MEM_TABLE:
+	case VHOST_SET_MEM_TABLE://设置vhost_dev->umem
 		r = vhost_set_memory(d, argp);
 		break;
 	case VHOST_SET_LOG_BASE:
