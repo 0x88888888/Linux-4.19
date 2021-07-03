@@ -644,7 +644,7 @@ static int kvm_create_vm_debugfs(struct kvm *kvm, int fd)
 		return 0;
 
 	snprintf(dir_name, sizeof(dir_name), "%d-%d", task_pid_nr(current), fd);
-	// dir=sys/kernel/debug/kvm
+	// dir=sys/kernel/debug/kvm/%d-%d
 	kvm->debugfs_dentry = debugfs_create_dir(dir_name, kvm_debugfs_dir);
 
 	kvm->debugfs_stat_data = kcalloc(kvm_debugfs_num_entries,
@@ -688,6 +688,9 @@ static struct kvm *kvm_create_vm(unsigned long type)
 	spin_lock_init(&kvm->mmu_lock);
 	mmgrab(current->mm);
 	kvm->mm = current->mm;
+	/*
+	 * 初始化kvm->irqfds, kvm->ioeventfds
+	 */
 	kvm_eventfd_init(kvm);
 	mutex_init(&kvm->lock);
 	mutex_init(&kvm->irq_lock);
@@ -695,6 +698,9 @@ static struct kvm *kvm_create_vm(unsigned long type)
 	refcount_set(&kvm->users_count, 1);
 	INIT_LIST_HEAD(&kvm->devices);
 
+    /*
+     * 初始化kvm->arch下面的成员
+     */ 
 	r = kvm_arch_init_vm(kvm, type);
 	if (r)
 		goto out_err_no_disable;
@@ -730,13 +736,16 @@ static struct kvm *kvm_create_vm(unsigned long type)
 	if (init_srcu_struct(&kvm->irq_srcu))
 		goto out_err_no_irq_srcu;
 	//给虚拟机kvm分配kvm_io_bus
-	for (i = 0; i < KVM_NR_BUSES; i++) {
+	for (i = 0; i < KVM_NR_BUSES /* 4 */; i++) {
 		rcu_assign_pointer(kvm->buses[i],
 			kzalloc(sizeof(struct kvm_io_bus), GFP_KERNEL));
 		if (!kvm->buses[i])
 			goto out_err;
 	}
 
+    /*
+     * kvm->mmu_notifier.ops == kvm_mmu_notifier_ops
+     */
 	r = kvm_init_mmu_notifier(kvm);
 	if (r)
 		goto out_err;
@@ -896,8 +905,10 @@ static void update_memslots(struct kvm_memslots *slots,
 			slots->used_slots++;
 	}
 
+    //根据base_gfn排序
 	while (i < KVM_MEM_SLOTS_NUM - 1 &&
 	       new->base_gfn <= mslots[i + 1].base_gfn) {
+	       
 		if (!mslots[i + 1].npages)
 			break;
 		mslots[i] = mslots[i + 1];
@@ -1096,6 +1107,7 @@ int __kvm_set_memory_region(struct kvm *kvm,
 		new.flags = 0;
 	}
 
+    //创建
 	if ((change == KVM_MR_CREATE) || (change == KVM_MR_MOVE)) {
 		/* Check for overlaps 
 		 * 下面的循环检查是否有overlap
@@ -1123,6 +1135,7 @@ int __kvm_set_memory_region(struct kvm *kvm,
 
         /*
          * 设置new这个 kvm_memory_slot
+         * 填写好slot->arch.rmap[]和slot->arch.lpage_info[]
          */
 		if (kvm_arch_create_memslot(kvm, &new, npages))
 			goto out_free;
@@ -1184,6 +1197,7 @@ int __kvm_set_memory_region(struct kvm *kvm,
 	//将slots放入到kvm->slots[as_id]
 	old_memslots = install_new_memslots(kvm, as_id, slots);
 
+    //计算出并且记录下kvm->arch.n_max_mmu_pages
 	kvm_arch_commit_memory_region(kvm, mem, &old, &new, change);
 
     //释放掉old的东西
@@ -1205,6 +1219,8 @@ EXPORT_SYMBOL_GPL(__kvm_set_memory_region);
  *  kvm_vm_ioctl()
  *   kvm_vm_ioctl_set_memory_region()
  *    kvm_set_memory_region()
+ *
+ * 创建qemu虚拟内存与vm物理内存的映射关系
  */
 int kvm_set_memory_region(struct kvm *kvm,
 			  const struct kvm_userspace_memory_region *mem)
@@ -1212,6 +1228,7 @@ int kvm_set_memory_region(struct kvm *kvm,
 	int r;
 
 	mutex_lock(&kvm->slots_lock);
+	
 	r = __kvm_set_memory_region(kvm, mem);
 	mutex_unlock(&kvm->slots_lock);
 	return r;
@@ -1222,7 +1239,8 @@ EXPORT_SYMBOL_GPL(kvm_set_memory_region);
  * kvm_vm_compat_ioctl()
  *  kvm_vm_ioctl()
  *   kvm_vm_ioctl_set_memory_region()
- * 创建内存
+ * 
+ * 创建qemu虚拟内存与vm物理内存的映射关系
  */
 static int kvm_vm_ioctl_set_memory_region(struct kvm *kvm,
 					  struct kvm_userspace_memory_region *mem)
@@ -1270,6 +1288,11 @@ EXPORT_SYMBOL_GPL(kvm_get_dirty_log);
 
 #ifdef CONFIG_KVM_GENERIC_DIRTYLOG_READ_PROTECT
 /**
+ *
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl_get_dirty_log()
+ *   kvm_get_dirty_log_protect()
+ *
  * kvm_get_dirty_log_protect - get a snapshot of dirty pages, and if any pages
  *	are dirty write protect them for next write.
  * @kvm:	pointer to kvm instance
@@ -1313,23 +1336,29 @@ int kvm_get_dirty_log_protect(struct kvm *kvm,
 	if (!dirty_bitmap)
 		return -ENOENT;
 
+    //需要的字节数量
 	n = kvm_dirty_bitmap_bytes(memslot);
 
+    //dirty_bitmap在分配的时候就分配了2倍的大小
 	dirty_bitmap_buffer = kvm_second_dirty_bitmap(memslot);
 	memset(dirty_bitmap_buffer, 0, n);
 
 	spin_lock(&kvm->mmu_lock);
 	*is_dirty = false;
+
+	//每次处理sizeof(long)这么多
 	for (i = 0; i < n / sizeof(long); i++) {
 		unsigned long mask;
 		gfn_t offset;
 
-		if (!dirty_bitmap[i])
+		if (!dirty_bitmap[i])//不dirty，就continue了
 			continue;
 
 		*is_dirty = true;
 
+        //得到原本的long,并且清0，
 		mask = xchg(&dirty_bitmap[i], 0);
+		
 		dirty_bitmap_buffer[i] = mask;
 
 		if (mask) {
@@ -1340,6 +1369,7 @@ int kvm_get_dirty_log_protect(struct kvm *kvm,
 	}
 
 	spin_unlock(&kvm->mmu_lock);
+	//复制到用户空间去
 	if (copy_to_user(log->dirty_bitmap, dirty_bitmap_buffer, n))
 		return -EFAULT;
 	return 0;
@@ -1765,6 +1795,10 @@ kvm_pfn_t gfn_to_pfn_prot(struct kvm *kvm, gfn_t gfn, bool write_fault,
 }
 EXPORT_SYMBOL_GPL(gfn_to_pfn_prot);
 
+/*
+ * gfn_to_pfn()
+ *  gfn_to_pfn_memslot()
+ */
 kvm_pfn_t gfn_to_pfn_memslot(struct kvm_memory_slot *slot, gfn_t gfn)
 {
 	return __gfn_to_pfn_memslot(slot, gfn, false, NULL, true, NULL);
@@ -1788,6 +1822,11 @@ kvm_pfn_t kvm_vcpu_gfn_to_pfn_atomic(struct kvm_vcpu *vcpu, gfn_t gfn)
 	return gfn_to_pfn_memslot_atomic(kvm_vcpu_gfn_to_memslot(vcpu, gfn), gfn);
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_gfn_to_pfn_atomic);
+
+/*
+ * guset page frame number 对应的memslot
+ * 找到对应的host page frame number
+ */
 
 kvm_pfn_t gfn_to_pfn(struct kvm *kvm, gfn_t gfn)
 {
@@ -1830,6 +1869,7 @@ static struct page *kvm_pfn_to_page(kvm_pfn_t pfn)
 
 	return pfn_to_page(pfn);
 }
+
 
 struct page *gfn_to_page(struct kvm *kvm, gfn_t gfn)
 {
@@ -2718,7 +2758,7 @@ static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
 	mutex_unlock(&kvm->lock);
 
     /*
-	 * 创建vCPU，建立mmu，设置tsc之类的
+	 * 创建vCPU，设置tsc之类的
      * 
      */
 	vcpu = kvm_arch_vcpu_create(kvm, id);
@@ -2734,7 +2774,7 @@ static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
 	if (r)
 		goto vcpu_destroy;
 
-    // 这里函数里应该是什么都没有创建
+    //  创建 /sys/kernel/debug/kvm/{pid-fd}/vcpu-{id}
 	r = kvm_create_vcpu_debugfs(vcpu);
 	if (r)
 		goto vcpu_destroy;
@@ -3210,6 +3250,10 @@ static int kvm_ioctl_create_device(struct kvm *kvm,
 	return 0;
 }
 
+/* 
+ * kvm_dev_ioctl()
+ *  kvm_vm_ioctl_check_extension_generic()
+ */
 static long kvm_vm_ioctl_check_extension_generic(struct kvm *kvm, long arg)
 {
 	switch (arg) {
@@ -3265,7 +3309,7 @@ static long kvm_vm_ioctl(struct file *filp,
 	case KVM_CREATE_VCPU://创建VCPU
 		r = kvm_vm_ioctl_create_vcpu(kvm, arg);
 		break;
-	case KVM_SET_USER_MEMORY_REGION: {//创建内存
+	case KVM_SET_USER_MEMORY_REGION: {//创建qemu虚拟内存与vm物理内存的映射关系
 		struct kvm_userspace_memory_region kvm_userspace_mem;
 
 		r = -EFAULT;
@@ -3325,8 +3369,8 @@ static long kvm_vm_ioctl(struct file *filp,
 		break;
 	}
 	//有定义
-#ifdef CONFIG_HAVE_KVM_MSI
-	case KVM_SIGNAL_MSI: {
+#ifdef CONFIG_HAVE_KVM_MSI 
+	case KVM_SIGNAL_MSI: { // qemu 中kvm_irqchip_send_msi发起
 		struct kvm_msi msi;
 
 		r = -EFAULT;
@@ -3451,7 +3495,7 @@ static long kvm_vm_compat_ioctl(struct file *filp,
 	if (kvm->mm != current->mm)
 		return -EIO;
 	switch (ioctl) {
-	case KVM_GET_DIRTY_LOG: {
+	case KVM_GET_DIRTY_LOG: {//复制出kvm->memslots[]->dirty_bitmap
 		struct compat_kvm_dirty_log compat_log;
 		struct kvm_dirty_log log;
 
@@ -3521,6 +3565,8 @@ static int kvm_dev_ioctl_create_vm(unsigned long type)
 	 * already set, with ->release() being kvm_vm_release().  In error
 	 * cases it will be called by the final fput(file) and will take
 	 * care of doing kvm_put_kvm(kvm).
+	 *
+	 * 在 /sys/kernel/debug/kvm/下创建一些目录和文件
 	 */
 	if (kvm_create_vm_debugfs(kvm, r) < 0) {
 		put_unused_fd(r);

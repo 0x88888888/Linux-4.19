@@ -109,6 +109,9 @@
 #define KVM_HPAGE_MASK(x)	(~(KVM_HPAGE_SIZE(x) - 1))
 #define KVM_PAGES_PER_HPAGE(x)	(KVM_HPAGE_SIZE(x) / PAGE_SIZE)
 
+/*
+ * base_gfn到gfn之间 page的数量,或者是page table entry的数量
+ */
 static inline gfn_t gfn_to_index(gfn_t gfn, gfn_t base_gfn, int level)
 {
 	/* KVM_HPAGE_GFN_SHIFT(PT_PAGE_TABLE_LEVEL) must be 0. */
@@ -362,7 +365,13 @@ struct kvm_mmu {
      * 在init_kvm_tdp_mmu中设置为 vmx_set_cr3
      */
 	void (*set_cr3)(struct kvm_vcpu *vcpu, unsigned long root);
+	 /*
+     * 在init_kvm_tdp_mmu中设置为 get_cr3
+     */
 	unsigned long (*get_cr3)(struct kvm_vcpu *vcpu);
+     /*
+     * 在init_kvm_tdp_mmu中设置为 kvm_get_pdptr
+     */ 
 	u64 (*get_pdptr)(struct kvm_vcpu *vcpu, int index);
 	/*
 	 * tdp_page_fault(kvm host 应该是用这个函数),
@@ -377,6 +386,9 @@ struct kvm_mmu {
 	//kvm_inject_page_fault
 	void (*inject_page_fault)(struct kvm_vcpu *vcpu,
 				  struct x86_exception *fault);
+	/*
+	 * paging64_gva_to_gpa
+	 */
 	gpa_t (*gva_to_gpa)(struct kvm_vcpu *vcpu, gva_t gva, u32 access,
 			    struct x86_exception *exception);
 	gpa_t (*translate_gpa)(struct kvm_vcpu *vcpu, gpa_t gpa, u32 access,
@@ -400,6 +412,10 @@ struct kvm_mmu {
 	 * 当客户机采用不同的分页模式时，页结构的层级页各有不同，root_level表示的是最顶层的页结构是第几级
 	 */
 	u8 root_level;
+	/*
+	 * ept页表或者 shadow page table 层级数量,通常是4
+	 * 在init_kvm_tdp_mmu()中设置
+	 */
 	u8 shadow_root_level;
 	u8 ept_ad;
 	/*
@@ -409,6 +425,10 @@ struct kvm_mmu {
 	 * 在init_kvm_tdp_mmu中设置为true
 	 */ 
 	bool direct_map;
+
+	/*
+	 * 在cached_root_available()中设置
+	 */
 	struct kvm_mmu_root_info prev_roots[KVM_MMU_NUM_PREV_ROOTS];
 
 	/*
@@ -443,6 +463,7 @@ struct kvm_mmu {
 
 	bool nx;
 
+    
 	u64 pdptrs[4]; /* pae */
 };
 
@@ -451,6 +472,9 @@ enum pmc_type {
 	KVM_PMC_FIXED,
 };
 
+/*
+ * 监控计数器 performance monitor counter
+ */
 struct kvm_pmc {
 	enum pmc_type type;
 	u8 idx;
@@ -460,6 +484,9 @@ struct kvm_pmc {
 	struct kvm_vcpu *vcpu;
 };
 
+/*
+ * 处理器的一些监控 performance monintor unit
+ */
 struct kvm_pmu {
 	unsigned nr_arch_gp_counters;
 	unsigned nr_arch_fixed_counters;
@@ -472,6 +499,7 @@ struct kvm_pmu {
 	u64 global_ctrl_mask;
 	u64 reserved_bits;
 	u8 version;
+	
 	struct kvm_pmc gp_counters[INTEL_PMC_MAX_GENERIC];
 	struct kvm_pmc fixed_counters[INTEL_PMC_MAX_FIXED];
 	struct irq_work irq_work;
@@ -562,6 +590,9 @@ struct kvm_vcpu_arch {
 	u32 pkru;
 	u32 hflags;
 	u64 efer;
+	/*
+	 * APIC_DEFAULT_PHYS_BASE | MSR_IA32_APICBASE_ENABLE
+	 */
 	u64 apic_base;
 	/*
 	 * lapic对象,在kvm_create_lapic中分配
@@ -762,6 +793,10 @@ struct kvm_vcpu_arch {
 		u64 msr_val;
 		u32 id;
 		bool send_user_only;
+		/* 
+		 * KVM_PV_REASON_PAGE_NOT_PRESENT
+		 * KVM_PV_REASON_PAGE_READY
+		 */
 		u32 host_apf_reason;
 		unsigned long nested_apf_token;
 		bool delivery_as_pf_vmexit;
@@ -824,7 +859,7 @@ struct kvm_arch_memory_slot {
      */
 	struct kvm_rmap_head *rmap[KVM_NR_PAGE_SIZES];
 	/*
-	 * 保存大页的信息
+	 * 保存是否支持大页
 	 */
 	struct kvm_lpage_info *lpage_info[KVM_NR_PAGE_SIZES - 1];
 	unsigned short *gfn_track[KVM_PAGE_TRACK_MAX];
@@ -878,9 +913,15 @@ enum kvm_irqchip_mode {
 	KVM_IRQCHIP_SPLIT,        /* created with KVM_CAP_SPLIT_IRQCHIP */
 };
 
+/* 
+ * 描述虚拟机的内存和中断
+ *
+ * 作为struct kvm的arch成员
+ */
 struct kvm_arch {
 	unsigned int n_used_mmu_pages;
 	unsigned int n_requested_mmu_pages;
+	//ept时，各级页表最多使用的物理page数量？
 	unsigned int n_max_mmu_pages;
 	unsigned int indirect_shadow_pages;
 	unsigned long mmu_valid_gen;
@@ -900,13 +941,26 @@ struct kvm_arch {
 	atomic_t noncoherent_dma_count;
 #define __KVM_HAVE_ARCH_ASSIGNED_DEVICE
 	atomic_t assigned_device_count;
+
+	/*
+	 * 两个在内核中模拟的中断控制器
+	 */
 	struct kvm_pic *vpic;
 	struct kvm_ioapic *vioapic;
+	
 	struct kvm_pit *vpit;
 	atomic_t vapics_in_nmi_mode;
 	struct mutex apic_map_lock;
+	/*
+	 * 本vm中所有的lapic ,关联lapic 与cpuid的情况
+	 */
 	struct kvm_apic_map *apic_map;
 
+    /*
+     * 在alloc_apic_access_page中设置,表示apic access page 已经分配
+     * slot id == APIC_ACCESS_PAGE_PRIVATE_MEMSLOT
+     * 
+     */
 	bool apic_access_page_done;
 
 	gpa_t wall_clock;
@@ -931,7 +985,9 @@ struct kvm_arch {
 	bool use_master_clock;
 	u64 master_kernel_ns;
 	u64 master_cycle_now;
+	// kvmclock_update_fn
 	struct delayed_work kvmclock_update_work;
+	// kvmclock_sync_fn
 	struct delayed_work kvmclock_sync_work;
 
 	struct kvm_xen_hvm_config xen_hvm_config;
@@ -964,7 +1020,9 @@ struct kvm_arch {
 
 	bool x2apic_format;
 	bool x2apic_broadcast_quirk_disabled;
-
+    /*
+     * 默认为true
+     */
 	bool guest_can_read_msr_platform_info;
 };
 
@@ -1130,6 +1188,7 @@ struct kvm_x86_ops {
 	bool (*guest_apic_has_interrupt)(struct kvm_vcpu *vcpu);
 	void (*load_eoi_exitmap)(struct kvm_vcpu *vcpu, u64 *eoi_exit_bitmap);
 	void (*set_virtual_apic_mode)(struct kvm_vcpu *vcpu);
+	//vmx_set_apic_access_page_addr,设置 vmcs的APIC_ACCESS_ADDR
 	void (*set_apic_access_page_addr)(struct kvm_vcpu *vcpu, hpa_t hpa);
 	void (*deliver_posted_interrupt)(struct kvm_vcpu *vcpu, int vector);
 	int (*sync_pir_to_irr)(struct kvm_vcpu *vcpu);

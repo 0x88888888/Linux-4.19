@@ -87,6 +87,12 @@ static int kvm_set_ioapic_irq(struct kvm_kernel_irq_routing_entry *e,
  *        ioapic_service()
  *         kvm_irq_delivery_to_apic()
  *
+ * kvm_vm_compat_ioctl()
+ *	kvm_vm_ioctl()
+ *	 kvm_send_userspace_msi()
+ *    kvm_set_msi()
+ *     kvm_irq_delivery_to_apic()
+ *
  * 发送IPI中断
  */
 int kvm_irq_delivery_to_apic(struct kvm *kvm, struct kvm_lapic *src,
@@ -103,6 +109,7 @@ int kvm_irq_delivery_to_apic(struct kvm *kvm, struct kvm_lapic *src,
 		irq->delivery_mode = APIC_DM_FIXED;
 	}
 
+    //查找匹配的lapic
 	if (kvm_irq_delivery_to_apic_fast(kvm, src, irq, &r, dest_map))
 		return r;
 
@@ -142,7 +149,7 @@ int kvm_irq_delivery_to_apic(struct kvm *kvm, struct kvm_lapic *src,
 		lowest = kvm_get_vcpu(kvm, idx);
 	}
 
-	if (lowest)
+	if (lowest)//设置KVM_REQ_EVENT
 		r = kvm_apic_set_irq(lowest, irq, dest_map);
 
 	return r;
@@ -177,6 +184,12 @@ static inline bool kvm_msi_route_invalid(struct kvm *kvm,
 	return kvm->arch.x2apic_format && (e->msi.address_hi & 0xff);
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *	kvm_vm_ioctl()
+ *	 kvm_send_userspace_msi()
+ *    kvm_set_msi()
+ */
 int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
 		struct kvm *kvm, int irq_source_id, int level, bool line_status)
 {
@@ -188,6 +201,9 @@ int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
 	if (!level)
 		return -1;
 
+	//MSI中断可以由设备直接发送lapic中断控制器，所以下面的代码就是操作lapic了
+
+    //根据kvm_kernel_irq_routing_entry来设置kvm_lapic_irq
 	kvm_set_msi_irq(kvm, e, &irq);
 
 	return kvm_irq_delivery_to_apic(kvm, NULL, &irq, NULL);

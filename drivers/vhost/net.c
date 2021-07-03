@@ -426,6 +426,12 @@ static void vhost_net_disable_vq(struct vhost_net *n,
 	vhost_poll_stop(poll);
 }
 
+/*
+ * vhost_net_compat_ioctl()
+ *  vhost_net_ioctl()
+ *   vhost_net_set_backend()
+ *    vhost_net_enable_vq()
+ */
 static int vhost_net_enable_vq(struct vhost_net *n,
 				struct vhost_virtqueue *vq)
 {
@@ -902,8 +908,17 @@ err:
 	return r;
 }
 
-/* Expects to be always run from workqueue - which acts as
- * read-size critical section for our kind of RCU. */
+/*
+ * vfs_open()
+ *  vhost_net_open() 在vhost_net_open中设置poll的收包处理函数为handle_rx_net
+ *   ......
+ *    vhost_poll_start()
+ *     handle_rx_net()
+ *      handle_rx()
+ *
+ * Expects to be always run from workqueue - which acts as
+ * read-size critical section for our kind of RCU. 
+ */
 static void handle_rx(struct vhost_net *net)
 {
 	struct vhost_net_virtqueue *nvq = &net->vqs[VHOST_NET_VQ_RX];
@@ -1074,6 +1089,13 @@ static void handle_tx_net(struct vhost_work *work)
 	handle_tx(net);
 }
 
+/*
+ * vfs_open()
+ *  vhost_net_open() 在vhost_net_open中设置poll的收包处理函数为handle_rx_net
+ *   ......
+ *    vhost_poll_start()
+ *     handle_rx_net()
+ */
 static void handle_rx_net(struct vhost_work *work)
 {
 	struct vhost_net *net = container_of(work, struct vhost_net,
@@ -1300,6 +1322,8 @@ static struct socket *get_socket(int fd)
  * vhost_net_compat_ioctl()
  *  vhost_net_ioctl()
  *   vhost_net_set_backend()
+ *
+ * 设置tap为virtio vhost_net方案的后端(将tap设备的fd告知vhost)
  */
 static long vhost_net_set_backend(struct vhost_net *n, unsigned index, int fd)
 {
@@ -1318,6 +1342,9 @@ static long vhost_net_set_backend(struct vhost_net *n, unsigned index, int fd)
 		r = -ENOBUFS;
 		goto err;
 	}
+	/*
+	 * 先得到收包队列的vhost_virtqueue
+	 */
 	vq = &n->vqs[index].vq;
 	nvq = &n->vqs[index];
 	mutex_lock(&vq->mutex);
@@ -1327,6 +1354,9 @@ static long vhost_net_set_backend(struct vhost_net *n, unsigned index, int fd)
 		r = -EFAULT;
 		goto err_vq;
 	}
+	/*
+	 * 得到fd对应的file对象，然后从中得到socket对象
+	 */
 	sock = get_socket(fd);
 	if (IS_ERR(sock)) {
 		r = PTR_ERR(sock);
@@ -1335,7 +1365,8 @@ static long vhost_net_set_backend(struct vhost_net *n, unsigned index, int fd)
 
 	/* start polling new socket */
 	oldsock = vq->private_data;
-	if (sock != oldsock) {
+	if (sock != oldsock) { //如果当前socket对象和old socket对象不一样，说明改变了后端设备
+		//分配vhsot_net_ubuf_ref对象
 		ubufs = vhost_net_ubuf_alloc(vq,
 					     sock && vhost_sock_zcopy(sock));
 		if (IS_ERR(ubufs)) {
@@ -1344,12 +1375,17 @@ static long vhost_net_set_backend(struct vhost_net *n, unsigned index, int fd)
 		}
 
 		vhost_net_disable_vq(n, vq);
+		//将socket对象与vhost_virtqueue关联起来
 		vq->private_data = sock;
 		vhost_net_buf_unproduce(nvq);
+
+		//对vhost_virtqueue进行一些初始化工作
 		r = vhost_vq_init_access(vq);
 		if (r)
 			goto err_used;
+		
 		r = vhost_net_enable_vq(n, vq);
+		
 		if (r)
 			goto err_used;
 		if (index == VHOST_NET_VQ_RX)
@@ -1529,7 +1565,7 @@ static long vhost_net_ioctl(struct file *f, unsigned int ioctl,
 	int r;
 
 	switch (ioctl) {
-	case VHOST_NET_SET_BACKEND: //设置tap为virtio vhost_net方案的后端
+	case VHOST_NET_SET_BACKEND: //设置tap为virtio vhost_net方案的后端(将tap设备的fd告知vhost)
 		if (copy_from_user(&backend, argp, sizeof backend))
 			return -EFAULT;
 		return vhost_net_set_backend(n, backend.index, backend.fd);

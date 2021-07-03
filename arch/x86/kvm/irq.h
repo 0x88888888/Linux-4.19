@@ -60,6 +60,9 @@ struct kvm_kpic_state {
 	struct kvm_pic *pics_state;
 };
 
+/*
+ * 模拟pic中断控制器
+ */
 struct kvm_pic {
 	spinlock_t lock;
 	bool wakeup_needed;

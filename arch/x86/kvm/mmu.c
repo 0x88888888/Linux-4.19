@@ -1672,6 +1672,14 @@ static void kvm_mmu_write_protect_pt_masked(struct kvm *kvm,
  * @mask: indicates which pages we should clear D-bit
  *
  * Used for PML to re-log the dirty GPAs after userspace querying dirty_bitmap.
+ *
+ *
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl_get_dirty_log()
+ *   kvm_get_dirty_log_protect()
+ *    kvm_arch_mmu_enable_log_dirty_pt_masked()
+ *     vmx_enable_log_dirty_pt_masked()
+ *      kvm_mmu_clear_dirty_pt_masked()
  */
 void kvm_mmu_clear_dirty_pt_masked(struct kvm *kvm,
 				     struct kvm_memory_slot *slot,
@@ -1691,6 +1699,11 @@ void kvm_mmu_clear_dirty_pt_masked(struct kvm *kvm,
 EXPORT_SYMBOL_GPL(kvm_mmu_clear_dirty_pt_masked);
 
 /**
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl_get_dirty_log()
+ *   kvm_get_dirty_log_protect()
+ *    kvm_arch_mmu_enable_log_dirty_pt_masked()
+ *
  * kvm_arch_mmu_enable_log_dirty_pt_masked - enable dirty logging for selected
  * PT level pages.
  *
@@ -1704,7 +1717,7 @@ void kvm_arch_mmu_enable_log_dirty_pt_masked(struct kvm *kvm,
 				struct kvm_memory_slot *slot,
 				gfn_t gfn_offset, unsigned long mask)
 {
-	if (kvm_x86_ops->enable_log_dirty_pt_masked)
+	if (kvm_x86_ops->enable_log_dirty_pt_masked) //vmx_enable_log_dirty_pt_masked
 		kvm_x86_ops->enable_log_dirty_pt_masked(kvm, slot, gfn_offset,
 				mask);
 	else
@@ -2092,6 +2105,7 @@ static struct kvm_mmu_page *kvm_mmu_alloc_page(struct kvm_vcpu *vcpu, int direct
 	sp->spt = mmu_memory_cache_alloc(&vcpu->arch.mmu_page_cache);
 	if (!direct)
 		sp->gfns = mmu_memory_cache_alloc(&vcpu->arch.mmu_page_cache);
+	
 	set_page_private(virt_to_page(sp->spt), (unsigned long)sp);
 
 	/*
@@ -2100,6 +2114,7 @@ static struct kvm_mmu_page *kvm_mmu_alloc_page(struct kvm_vcpu *vcpu, int direct
 	 * this feature. See the comments in kvm_zap_obsolete_pages().
 	 */
 	list_add(&sp->link, &vcpu->kvm->arch.active_mmu_pages);
+	
 	kvm_mod_used_mmu_pages(vcpu->kvm, +1);
 	return sp;
 }
@@ -2479,6 +2494,7 @@ static struct kvm_mmu_page *kvm_mmu_get_page(struct kvm_vcpu *vcpu,
 	role.access = access;
 	if (!vcpu->arch.mmu.direct_map
 	    && vcpu->arch.mmu.root_level <= PT32_ROOT_LEVEL) {
+	    
 		quadrant = gaddr >> (PAGE_SHIFT + (PT64_PT_BITS * level));
 		quadrant &= (1 << ((PT32_PT_BITS - PT64_PT_BITS) * level)) - 1;
 		role.quadrant = quadrant;
@@ -3273,6 +3289,7 @@ static int __direct_map(struct kvm_vcpu *vcpu, int write, int map_writable,
 			emulate = mmu_set_spte(vcpu, iterator.sptep, ACC_ALL,
 					       write, level, gfn, pfn, prefault,
 					       map_writable);
+			
 			direct_pte_prefetch(vcpu, iterator.sptep);
 			++vcpu->stat.pf_fixed;
 			break;
@@ -3734,21 +3751,30 @@ static int mmu_check_root(struct kvm_vcpu *vcpu, gfn_t root_gfn)
 	return ret;
 }
 
+/*  
+ * vcpu_enter_guest()
+ *  kvm_mmu_reload()
+ *   kvm_mmu_load()
+ *    mmu_alloc_roots() 开启ept的情况
+ *     mmu_alloc_direct_roots() 
+ */
 static int mmu_alloc_direct_roots(struct kvm_vcpu *vcpu)
 {
 	struct kvm_mmu_page *sp;
 	unsigned i;
 
-	if (vcpu->arch.mmu.shadow_root_level >= PT64_ROOT_4LEVEL) {
+	if (vcpu->arch.mmu.shadow_root_level >= PT64_ROOT_4LEVEL) { //通常应该是这个
 		spin_lock(&vcpu->kvm->mmu_lock);
 		if(make_mmu_pages_available(vcpu) < 0) {
 			spin_unlock(&vcpu->kvm->mmu_lock);
 			return -ENOSPC;
 		}
+		//页表的root 页面
 		sp = kvm_mmu_get_page(vcpu, 0, 0,
 				vcpu->arch.mmu.shadow_root_level, 1, ACC_ALL);
 		++sp->root_count;
 		spin_unlock(&vcpu->kvm->mmu_lock);
+		//ept页目录的物理地址
 		vcpu->arch.mmu.root_hpa = __pa(sp->spt);
 	} else if (vcpu->arch.mmu.shadow_root_level == PT32E_ROOT_LEVEL) {
 		for (i = 0; i < 4; ++i) {
@@ -3774,6 +3800,13 @@ static int mmu_alloc_direct_roots(struct kvm_vcpu *vcpu)
 	return 0;
 }
 
+/*  
+ * vcpu_enter_guest()
+ *  kvm_mmu_reload()
+ *   kvm_mmu_load()
+ *    mmu_alloc_roots() 使用shadow page table的方式
+ *     mmu_alloc_shadow_roots()
+ */
 static int mmu_alloc_shadow_roots(struct kvm_vcpu *vcpu)
 {
 	struct kvm_mmu_page *sp;
@@ -3875,19 +3908,34 @@ static int mmu_alloc_shadow_roots(struct kvm_vcpu *vcpu)
 	return 0;
 }
 
+/*  
+ * vcpu_enter_guest()
+ *  kvm_mmu_reload()
+ *   kvm_mmu_load()
+ *    mmu_alloc_roots()
+ */
 static int mmu_alloc_roots(struct kvm_vcpu *vcpu)
 {
-	if (vcpu->arch.mmu.direct_map)
+	if (vcpu->arch.mmu.direct_map)//启用ept
 		return mmu_alloc_direct_roots(vcpu);
-	else
+	else//使用shadow page table的方式
 		return mmu_alloc_shadow_roots(vcpu);
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ *    vcpu_run()
+ *     vcpu_enter_guest() [KVM_REQ_MMU_SYNC]
+ *      kvm_mmu_sync_roots()
+ */
 void kvm_mmu_sync_roots(struct kvm_vcpu *vcpu)
 {
 	int i;
 	struct kvm_mmu_page *sp;
 
+    //开启ept的时候,vcpu->arch.mmu.direct_map==1
 	if (vcpu->arch.mmu.direct_map)
 		return;
 
@@ -4151,6 +4199,11 @@ static int nonpaging_page_fault(struct kvm_vcpu *vcpu, gva_t gva,
 			     error_code, gfn, prefault);
 }
 
+/*
+ * tdp_page_fault()
+ *	try_async_pf(prefault==false)
+ *   kvm_arch_setup_async_pf()
+ */
 static int kvm_arch_setup_async_pf(struct kvm_vcpu *vcpu, gva_t gva, gfn_t gfn)
 {
 	struct kvm_arch_async_pf arch;
@@ -4163,6 +4216,11 @@ static int kvm_arch_setup_async_pf(struct kvm_vcpu *vcpu, gva_t gva, gfn_t gfn)
 	return kvm_setup_async_pf(vcpu, gva, kvm_vcpu_gfn_to_hva(vcpu, gfn), &arch);
 }
 
+/*
+ * tdp_page_fault()
+ *  try_async_pf(prefault==false)
+ *   kvm_can_do_async_pf()
+ */
 bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu)
 {
 	if (unlikely(!lapic_in_kernel(vcpu) ||
@@ -4173,6 +4231,7 @@ bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu)
 	if (!vcpu->arch.apf.delivery_as_pf_vmexit && is_guest_mode(vcpu))
 		return false;
 
+    //vmx_interrupt_allowed
 	return kvm_x86_ops->interrupt_allowed(vcpu);
 }
 
@@ -4192,6 +4251,7 @@ static bool try_async_pf(struct kvm_vcpu *vcpu, bool prefault, gfn_t gfn,
 
 	/*
 	 * Don't expose private memslots to L2.
+	 *
 	 */
 	if (is_guest_mode(vcpu) && !kvm_is_visible_gfn(vcpu->kvm, gfn)) {
 		*pfn = KVM_PFN_NOSLOT;
@@ -4211,12 +4271,12 @@ static bool try_async_pf(struct kvm_vcpu *vcpu, bool prefault, gfn_t gfn,
 		trace_kvm_try_async_get_page(gva, gfn);
 
 	    //已经在vcpu->arch.apf.gfns[kvm_async_pf_gfn_slot(vcpu, gfn)]中了
-		if (kvm_find_async_pf_gfn(vcpu, gfn)) {
+		if (kvm_find_async_pf_gfn(vcpu, gfn)) {//这个page已经被换出去了,直接返回VM，让VM调度其他进程，加快性能
 			trace_kvm_async_pf_doublefault(gva, gfn);
-			//标记vcpu->request |= KVM_REQ_APF_HALT
+			//标记vcpu->request |= KVM_REQ_APF_HALT,说明这个vCPU需要被调度出去
 			kvm_make_request(KVM_REQ_APF_HALT, vcpu);
 			return true;
-		} else if (kvm_arch_setup_async_pf(vcpu, gva, gfn))
+		} else if (kvm_arch_setup_async_pf(vcpu, gva, gfn))//创建一个worker，读取被置换出去的页面
 			return true;
 	}
 
@@ -4237,6 +4297,7 @@ int kvm_handle_page_fault(struct kvm_vcpu *vcpu, u64 error_code,
 	int r = 1;
 
 	vcpu->arch.l1tf_flush_l1d = true;
+	
 	switch (vcpu->arch.apf.host_apf_reason) {
 	default:
 		trace_kvm_page_fault(fault_address, error_code);
@@ -4378,6 +4439,12 @@ static void nonpaging_init_context(struct kvm_vcpu *vcpu,
 }
 
 /*
+ *
+ * kvm_mmu_new_cr3()
+ *  __kvm_mmu_new_cr3()
+ *   fast_cr3_switch()
+ *    cached_root_available()
+ *
  * Find out if a previously cached root matching the new CR3/role is available.
  * The current root is also inserted into the cache.
  * If a matching root was found, it is assigned to kvm_mmu->root_hpa and true is
@@ -4409,6 +4476,11 @@ static bool cached_root_available(struct kvm_vcpu *vcpu, gpa_t new_cr3,
 	return i < KVM_MMU_NUM_PREV_ROOTS;
 }
 
+/*
+ * kvm_mmu_new_cr3()
+ *  __kvm_mmu_new_cr3()
+ *   fast_cr3_switch()
+ */
 static bool fast_cr3_switch(struct kvm_vcpu *vcpu, gpa_t new_cr3,
 			    union kvm_mmu_page_role new_role,
 			    bool skip_tlb_flush)
@@ -4459,6 +4531,10 @@ static bool fast_cr3_switch(struct kvm_vcpu *vcpu, gpa_t new_cr3,
 	return false;
 }
 
+/*
+ * kvm_mmu_new_cr3()
+ *  __kvm_mmu_new_cr3()
+ */
 static void __kvm_mmu_new_cr3(struct kvm_vcpu *vcpu, gpa_t new_cr3,
 			      union kvm_mmu_page_role new_role,
 			      bool skip_tlb_flush)
@@ -5002,11 +5078,11 @@ kvm_calc_tdp_mmu_root_page_role(struct kvm_vcpu *vcpu)
 }
 
 /*
- * kvm_vm_compat_ioctl()
+ * kvm_vm_compat_ioctl() 
  *  kvm_vm_ioctl()
  *   kvm_vm_ioctl_create_vcpu()
  *    kvm_arch_vcpu_setup()
- *     kvm_mmu_setup()
+ *     kvm_mmu_setup() vCPU刚创建的时候，初始化kvm_mmu
  *      kvm_init_mmu(reset_roots==false)
  *       init_kvm_tdp_mmu()
  *
@@ -5031,6 +5107,8 @@ static void init_kvm_tdp_mmu(struct kvm_vcpu *vcpu)
 	context->sync_page = nonpaging_sync_page;
 	context->invlpg = nonpaging_invlpg;
 	context->update_pte = nonpaging_update_pte;
+
+	//get_ept_level
 	context->shadow_root_level = kvm_x86_ops->get_tdp_level(vcpu);
 	//表示启用EPT
 	context->direct_map = true;
@@ -5040,11 +5118,11 @@ static void init_kvm_tdp_mmu(struct kvm_vcpu *vcpu)
 	context->get_pdptr = kvm_pdptr_read;
 	context->inject_page_fault = kvm_inject_page_fault;
 
-	if (!is_paging(vcpu)) {
+	if (!is_paging(vcpu)) {//没有开启分页模式
 		context->nx = false;
 		context->gva_to_gpa = nonpaging_gva_to_gpa;
 		context->root_level = 0;
-	} else if (is_long_mode(vcpu)) {
+	} else if (is_long_mode(vcpu)) {//通常这里
 		context->nx = is_nx(vcpu);
 		context->root_level = is_la57_mode(vcpu) ?
 				PT64_ROOT_5LEVEL : PT64_ROOT_4LEVEL;
@@ -5064,7 +5142,9 @@ static void init_kvm_tdp_mmu(struct kvm_vcpu *vcpu)
 
 	update_permission_bitmask(vcpu, context, false);
 	update_pkru_bitmask(vcpu, context, false);
+	
 	update_last_nonleaf_level(vcpu, context);
+	
 	reset_tdp_shadow_zero_bits_mask(vcpu, context);
 }
 
@@ -5232,8 +5312,8 @@ static void init_kvm_nested_mmu(struct kvm_vcpu *vcpu)
  * kvm_vm_compat_ioctl()
  *  kvm_vm_ioctl()
  *   kvm_vm_ioctl_create_vcpu()
- *    kvm_arch_vcpu_setup()
- *     kvm_mmu_setup()
+ *    kvm_arch_vcpu_setup() 
+ *     kvm_mmu_setup() //看这个路径
  *      kvm_init_mmu(reset_roots==false)
  *
  * vmx_handle_exit()
@@ -5303,6 +5383,10 @@ int kvm_mmu_load(struct kvm_vcpu *vcpu)
 	r = mmu_topup_memory_caches(vcpu);
 	if (r)
 		goto out;
+
+	/*
+	 * 分为启用ept,和shadow的情况
+	 */
 	r = mmu_alloc_roots(vcpu);
 	
 	kvm_mmu_sync_roots(vcpu);
@@ -5836,6 +5920,7 @@ int kvm_mmu_create(struct kvm_vcpu *vcpu)
  */
 void kvm_mmu_setup(struct kvm_vcpu *vcpu)
 {
+    //vcpu->arch.mmu.root_hpa要是invalid的
 	MMU_WARN_ON(VALID_PAGE(vcpu->arch.mmu.root_hpa));
 
 	/*

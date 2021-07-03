@@ -141,7 +141,14 @@ void kvm_coalesced_mmio_free(struct kvm *kvm)
 	if (kvm->coalesced_mmio_ring)
 		free_page((unsigned long)kvm->coalesced_mmio_ring);
 }
-
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl() KVM_REGISTER_COALESCED_MMIO
+ *   kvm_vm_ioctl_register_coalesced_mmio()
+ * 
+ *
+ * 将多个mmio操作合并在一起,到最后一个mmio操作的时候，再返回给qemu的设备去处理
+ */
 int kvm_vm_ioctl_register_coalesced_mmio(struct kvm *kvm,
 					 struct kvm_coalesced_mmio_zone *zone)
 {

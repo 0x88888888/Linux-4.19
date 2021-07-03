@@ -215,6 +215,15 @@ static void kvm_pit_ack_irq(struct kvm_irq_ack_notifier *kian)
 		kthread_queue_work(pit->worker, &pit->expired);
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ *    vcpu_run()
+ *     vcpu_enter_guest()
+ *      __kvm_migrate_timers()
+ *       __kvm_migrate_pit_timer()
+ */
 void __kvm_migrate_pit_timer(struct kvm_vcpu *vcpu)
 {
 	struct kvm_pit *pit = vcpu->kvm->arch.vpit;

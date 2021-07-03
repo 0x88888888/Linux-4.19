@@ -1038,7 +1038,7 @@ static int __apic_accept_irq(struct kvm_lapic *apic, int delivery_mode,
 	switch (delivery_mode) {
 	case APIC_DM_LOWEST:
 		vcpu->arch.apic_arb_prio++;
-	case APIC_DM_FIXED://看这个算了，太多，看不过来
+	case APIC_DM_FIXED://看这个算了，通常都是这个，太多，看不过来
 		if (unlikely(trig_mode && !level))
 			break;
 
@@ -2100,6 +2100,13 @@ u64 kvm_lapic_get_cr8(struct kvm_vcpu *vcpu)
 	return (tpr & 0xf0) >> 4;
 }
 
+/*
+ * kvm_vcpu_reset()
+ *  kvm_lapic_reset()
+ *   kvm_lapic_set_base(value=APIC_DEFAULT_PHYS_BASE | MSR_IA32_APICBASE_ENABLE)
+ *
+ * 设置vcpu->arch.apic_base和apic->base_address
+ */
 void kvm_lapic_set_base(struct kvm_vcpu *vcpu, u64 value)
 {
 	u64 old_value = vcpu->arch.apic_base;
@@ -2523,6 +2530,15 @@ int kvm_apic_set_state(struct kvm_vcpu *vcpu, struct kvm_lapic_state *s)
 	return 0;
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ *    vcpu_run()
+ *     vcpu_enter_guest()
+ *      __kvm_migrate_timers()
+ *       __kvm_migrate_apic_timer()
+ */
 void __kvm_migrate_apic_timer(struct kvm_vcpu *vcpu)
 {
 	struct hrtimer *timer;
@@ -2639,6 +2655,12 @@ void kvm_lapic_sync_to_vapic(struct kvm_vcpu *vcpu)
 				sizeof(u32));
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl() [KVM_SET_VAPIC_ADDR]
+ *    kvm_lapic_set_vapic_addr()
+ */
 int kvm_lapic_set_vapic_addr(struct kvm_vcpu *vcpu, gpa_t vapic_addr)
 {
 	if (vapic_addr) {

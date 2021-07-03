@@ -325,6 +325,9 @@ struct kvm_vcpu {
 	bool preempted;
     //体系结构相关的vcpu的状态
 	struct kvm_vcpu_arch arch;
+	/*
+	 * 在/sys/kernel/debug/kvm 
+	 */
 	struct dentry *debugfs_dentry;
 };
 
@@ -406,6 +409,10 @@ struct kvm_hv_sint {
 struct kvm_kernel_irq_routing_entry {
 	//可以理解为管脚号，如IR0,IR1,用于匹配中断
 	u32 gsi;
+	/*
+	 * KVM_IRQ_ROUTING_IRQCHIP
+	 * KVM_IRQ_ROUTING_MSI
+	 */
 	u32 type;
 	/*
 	 * kvm_set_pic_irq,
@@ -432,6 +439,9 @@ struct kvm_kernel_irq_routing_entry {
 		struct kvm_s390_adapter_int adapter;
 		struct kvm_hv_sint hv_sint;
 	};
+	/* 
+	 * 链接到kvm_irq_routing_table->map[gsi]
+	 */
 	struct hlist_node link;
 };
 
@@ -442,6 +452,8 @@ struct kvm_irq_routing_table {
 	/*
 	 * Array indexed by gsi. Each entry contains list of irq chips
 	 * the gsi is connected to.
+	 *
+	 * 链接到kvm_kernel_irq_routing_entry->link
 	 */
 	struct hlist_head map[0];
 };
@@ -552,6 +564,8 @@ struct kvm {
 #ifdef CONFIG_HAVE_KVM_IRQCHIP
 	/*
 	 * Update side is protected by irq_lock.
+	 *
+	 * 在kvm_set_irq_routing()中设置
 	 */
 	struct kvm_irq_routing_table __rcu *irq_routing;
 #endif
@@ -574,6 +588,9 @@ struct kvm {
      * 本vm所有的设备对象kvm_device
      */
 	struct list_head devices;
+	/*
+	 * /sys/kernel/debug/kvm 
+	 */
 	struct dentry *debugfs_dentry;
 	struct kvm_stat_data **debugfs_stat_data;
 	struct srcu_struct srcu;

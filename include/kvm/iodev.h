@@ -38,6 +38,7 @@ struct kvm_vcpu;
  * mpic_mmio_ops,
  * kvm_io_gic_ops
  *
+ * 这些函数在 kvm_iodevice_read(),kvm_iodevice_write中调用
  **/
 struct kvm_io_device_ops {
 	int (*read)(struct kvm_vcpu *vcpu,
@@ -55,6 +56,13 @@ struct kvm_io_device_ops {
 
 
 struct kvm_io_device {
+	/*
+	 * ioeventfd_ops,pit_dev_ops
+	 * picdev_master_ops,picdev_slave_ops,picdev_eclr_ops
+	 * ioapic_mmio_ops,apic_mmio_ops
+	 *
+	 * 这些函数在kvm_iodevice_read(),kvm_iodevice_write中调用
+	 */
 	const struct kvm_io_device_ops *ops;
 };
 

@@ -45,6 +45,14 @@ static void pic_lock(struct kvm_pic *s)
 	spin_lock(&s->lock);
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *	kvm_vm_ioctl() [KVM_IRQ_LINE]
+ *	 kvm_vm_ioctl_irq_line(line_status==false) 
+ *	  kvm_set_irq()
+ *	   kvm_pic_set_irq()
+ *      pic_unlock()
+ */
 static void pic_unlock(struct kvm_pic *s)
 	__releases(&s->lock)
 {
@@ -183,6 +191,13 @@ void kvm_pic_update_irq(struct kvm_pic *s)
 	pic_unlock(s);
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl() [KVM_IRQ_LINE]
+ *   kvm_vm_ioctl_irq_line(line_status==false) 
+ *    kvm_set_irq()
+ *     kvm_pic_set_irq()
+ */
 int kvm_pic_set_irq(struct kvm_pic *s, int irq, int irq_source_id, int level)
 {
 	int ret, irq_level;
@@ -196,6 +211,7 @@ int kvm_pic_set_irq(struct kvm_pic *s, int irq, int irq_source_id, int level)
 	pic_update_irq(s);
 	trace_kvm_pic_set_irq(irq >> 3, irq & 7, s->pics[irq >> 3].elcr,
 			      s->pics[irq >> 3].imr, ret == 0);
+	//这里会请求一个KVM_REQ_EVENT,然后在处理KVM_REQ_EVENT的时候inject 中断信息到vmcs中
 	pic_unlock(s);
 
 	return ret;
@@ -591,6 +607,8 @@ static const struct kvm_io_device_ops picdev_eclr_ops = {
  *  kvm_vm_ioctl()
  *   kvm_arch_vm_ioctl()
  *    kvm_pic_init()
+ *
+ * 创建PIC中断控制器
  */
 int kvm_pic_init(struct kvm *kvm)
 {

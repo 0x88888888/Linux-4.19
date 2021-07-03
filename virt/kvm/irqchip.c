@@ -66,6 +66,11 @@ int kvm_irq_map_chip_pin(struct kvm *kvm, unsigned irqchip, unsigned pin)
 	return irq_rt->chip[irqchip][pin];
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()
+ *   kvm_send_userspace_msi()
+ */
 int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi)
 {
 	struct kvm_kernel_irq_routing_entry route;
@@ -115,7 +120,7 @@ int kvm_set_irq(struct kvm *kvm, int irq_source_id, u32 irq, int level,
 
 	while (i--) {
 		int r;
-		//kvm_set_pic_irq或者 kvm_set_ioapic_irq
+		//kvm_set_pic_irq(i8259.c中)或者 kvm_set_ioapic_irq
 		r = irq_set[i].set(&irq_set[i], kvm, irq_source_id, level,
 				   line_status);
 		if (r < 0)
@@ -181,13 +186,15 @@ static int setup_routing_entry(struct kvm *kvm,
 
 	e->gsi = ue->gsi;
 	e->type = ue->type;
-	//设置虚拟中断控制器的中断
+	//设置虚拟中断控制器的中断,设置e->set这个函数
 	r = kvm_set_routing_entry(kvm, e, ue);
 	if (r)
 		return r;
+	
 	if (e->type == KVM_IRQ_ROUTING_IRQCHIP)
 		rt->chip[e->irqchip.irqchip][e->irqchip.pin] = e->gsi;
 
+    //挂到kvm_irq_routing_table->map[]上去
 	hlist_add_head(&e->link, &rt->map[e->gsi]);
 
 	return 0;
@@ -203,10 +210,6 @@ bool __weak kvm_arch_can_set_irq_routing(struct kvm *kvm)
 }
 
 /*
- * kvm_vm_compat_ioctl()
- *  kvm_vm_ioctl()
- *   kvm_set_irq_routing()
- *
  * kvm_vm_compat_ioctl()
  *  kvm_vm_ioctl()  KVM_CREATE_IRQCHIP
  *   kvm_arch_vm_ioctl()
@@ -239,8 +242,8 @@ int kvm_set_irq_routing(struct kvm *kvm,
 		return -ENOMEM;
 
 	new->nr_rt_entries = nr_rt_entries;
-	for (i = 0; i < KVM_NR_IRQCHIPS; i++)
-		for (j = 0; j < KVM_IRQCHIP_NUM_PINS; j++)
+	for (i = 0; i < KVM_NR_IRQCHIPS /*3*/; i++)
+		for (j = 0; j < KVM_IRQCHIP_NUM_PINS/*24*/; j++)
 			new->chip[i][j] = -1;
 
 	for (i = 0; i < nr; ++i) {
@@ -250,6 +253,7 @@ int kvm_set_irq_routing(struct kvm *kvm,
 			goto out;
 
 		r = -EINVAL;
+		
 		switch (ue->type) {
 		case KVM_IRQ_ROUTING_MSI:
 			if (ue->flags & ~KVM_MSI_VALID_DEVID)
@@ -269,8 +273,12 @@ int kvm_set_irq_routing(struct kvm *kvm,
 
 	mutex_lock(&kvm->irq_lock);
 	old = rcu_dereference_protected(kvm->irq_routing, 1);
+	//kvm->irq_routing == new
 	rcu_assign_pointer(kvm->irq_routing, new);
+	
 	kvm_irq_routing_update(kvm);
+
+	//跳过
 	kvm_arch_irq_routing_update(kvm);
 	mutex_unlock(&kvm->irq_lock);
 

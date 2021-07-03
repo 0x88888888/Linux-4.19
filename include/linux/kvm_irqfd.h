@@ -47,16 +47,21 @@ struct kvm_kernel_irqfd {
 	/* Used for MSI fast-path */
 	struct kvm *kvm;
 	/* 
-	 * 唤醒函数irqfd_wakeup
+	 * 唤醒时回调函数为irqfd_wakeup
 	 */
 	wait_queue_entry_t wait;
 	/* Update side is protected by irqfds.lock */
 	struct kvm_kernel_irq_routing_entry irq_entry;
 	seqcount_t irq_entry_sc;
-	/* Used for level IRQ fast-path */
+	/* Used for level IRQ fast-path
+	 *
+	 * 对应的中断号
+	 */
 	int gsi;
 	/*
-	 * irqfd_inject
+	 * irqfd_inject，
+	 * 将中断gsi注入到guest os中去
+	 * 在irqfd_wakeup()中唤醒
 	 */
 	struct work_struct inject;
 	/* The resampler used by this irqfd (resampler-only) */

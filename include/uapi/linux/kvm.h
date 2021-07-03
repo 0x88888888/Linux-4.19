@@ -1003,7 +1003,12 @@ struct kvm_irq_routing_hv_sint {
 #define KVM_IRQ_ROUTING_HV_SINT 4
 
 struct kvm_irq_routing_entry {
+    //中断号
 	__u32 gsi;
+	/*
+	 * KVM_IRQ_ROUTING_MSI
+	 * KVM_IRQ_ROUTING_IRQCHIP
+	 */ 
 	__u32 type;
 	__u32 flags;
 	__u32 pad;

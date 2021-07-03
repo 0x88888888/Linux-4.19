@@ -174,6 +174,14 @@ void kvm_inject_pending_timer_irqs(struct kvm_vcpu *vcpu)
 }
 EXPORT_SYMBOL_GPL(kvm_inject_pending_timer_irqs);
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ *    vcpu_run()
+ *     vcpu_enter_guest()
+ *      __kvm_migrate_timers()
+ */
 void __kvm_migrate_timers(struct kvm_vcpu *vcpu)
 {
 	__kvm_migrate_apic_timer(vcpu);

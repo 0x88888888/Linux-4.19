@@ -35,11 +35,20 @@ struct kvm_timer {
 	bool hv_timer_in_use;
 };
 
+/*
+ * vcpu->arch.apic指向这个对象
+ * 所以每个vCPU都有这么一个kvm_lapic对象咯
+ */
 struct kvm_lapic {
+    /*
+     * ==apic->vcpu->arch.apic_base
+     */
 	unsigned long base_address;
+	//对应的apic_mmio_ops操作
 	struct kvm_io_device dev;
 	struct kvm_timer lapic_timer;
 	u32 divide_count;
+	//和这个lapic关联的vCPU
 	struct kvm_vcpu *vcpu;
 	bool sw_enabled;
 	bool irr_pending;
@@ -52,8 +61,14 @@ struct kvm_lapic {
 	 * APIC register page.  The layout matches the register layout seen by
 	 * the guest 1:1, because it is accessed by the vmx microcode.
 	 * Note: Only one register, the TPR, is used by the microcode.
+	 *
+	 * 在kvm_create_lapic()中分配
+	 * 设置到vmcs的VIRTUAL_APIC_PAGE_ADDR
+	 * 访问lapic 的register的时候，会访问到这个页面来
+	 *
 	 */
 	void *regs;
+	//对应host os的虚拟地址
 	gpa_t vapic_addr;
 	struct gfn_to_hva_cache vapic_cache;
 	unsigned long pending_events;

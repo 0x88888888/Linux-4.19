@@ -22,8 +22,14 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 
+/*
+ * 对应的 file_operations->f_op=eventfd_fops
+ */
 struct eventfd_ctx {
 	struct kref kref;
+	/* 
+	 *write调用和eventfd_signal的时候,会唤醒wqh上的进程
+	 */
 	wait_queue_head_t wqh;
 	/*
 	 * Every time that a write(2) is performed on an eventfd, the
@@ -32,6 +38,9 @@ struct eventfd_ctx {
 	 * value to userspace, and will reset "count" to zero. The kernel
 	 * side eventfd_signal() also, adds to the "count" counter and
 	 * issue a wakeup.
+	 *
+	 * eventfd_signal或者write的时候，会向count加上被写入的值,并唤醒等待队列wqh中的元素
+	 * read的时候,会向用户空间返回count的值,并且count会被清0.
 	 */
 	__u64 count;
 	unsigned int flags;

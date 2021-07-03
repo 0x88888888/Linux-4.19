@@ -432,9 +432,11 @@ int kvm_ioapic_set_irq(struct kvm_ioapic *ioapic, int irq, int irq_source_id,
 	BUG_ON(irq < 0 || irq >= IOAPIC_NUM_PINS);
 
 	spin_lock(&ioapic->lock);
+	//确定中断引脚状态
 	irq_level = __kvm_irq_line_state(&ioapic->irq_states[irq],
 					 irq_source_id, level);
-	
+
+	//想VMCS注入中断信息
 	ret = ioapic_set_irq(ioapic, irq, irq_level, line_status);
 
 	spin_unlock(&ioapic->lock);
@@ -669,6 +671,8 @@ static const struct kvm_io_device_ops ioapic_mmio_ops = {
  *  kvm_vm_ioctl()
  *   kvm_arch_vm_ioctl()
  *    kvm_ioapic_init()
+ *
+ * 创建IO APIC中断控制器
  */
 int kvm_ioapic_init(struct kvm *kvm)
 {
@@ -680,11 +684,14 @@ int kvm_ioapic_init(struct kvm *kvm)
 		return -ENOMEM;
 	spin_lock_init(&ioapic->lock);
 	INIT_DELAYED_WORK(&ioapic->eoi_inject, kvm_ioapic_eoi_inject_work);
+	
 	kvm->arch.vioapic = ioapic;
+	//设置ioapic->base_address= IOAPIC_DEFAULT_BASE_ADDRESS
 	kvm_ioapic_reset(ioapic);
 	kvm_iodevice_init(&ioapic->dev, &ioapic_mmio_ops);
 	ioapic->kvm = kvm;
 	mutex_lock(&kvm->slots_lock);
+	//kvm->buses[KVM_MMIO_BUS]=new(kvm_io_bus)
 	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, ioapic->base_address,
 				      IOAPIC_MEM_LENGTH, &ioapic->dev);
 	mutex_unlock(&kvm->slots_lock);

@@ -198,8 +198,16 @@ void vhost_poll_init(struct vhost_poll *poll, vhost_work_fn_t fn,
 }
 EXPORT_SYMBOL_GPL(vhost_poll_init);
 
-/* Start polling a file. We add ourselves to file's wait queue. The caller must
- * keep a reference to a file until after vhost_poll_stop is called. */
+/*
+ * vhost_net_compat_ioctl()
+ *  vhost_net_ioctl()
+ *   vhost_net_set_backend()
+ *    vhost_net_enable_vq()
+ *     vhost_poll_start()
+ *
+ * Start polling a file. We add ourselves to file's wait queue. The caller must
+ * keep a reference to a file until after vhost_poll_stop is called. 
+ */
 int vhost_poll_start(struct vhost_poll *poll, struct file *file)
 {
 	__poll_t mask;
@@ -208,6 +216,7 @@ int vhost_poll_start(struct vhost_poll *poll, struct file *file)
 	if (poll->wqh)
 		return 0;
 
+    //tap设备如果接受到数据会去调用handle_rx_net
 	mask = vfs_poll(file, &poll->table);
 	if (mask)
 		vhost_poll_wakeup(&poll->wait, 0, 0, poll_to_key(mask));
@@ -1846,6 +1855,13 @@ static int vhost_update_avail_event(struct vhost_virtqueue *vq, u16 avail_event)
 	return 0;
 }
 
+/*
+ * vhost_net_compat_ioctl()
+ *  vhost_net_ioctl()
+ *   vhost_net_set_backend()
+ *    vhost_vq_init_access()
+ * 
+ */
 int vhost_vq_init_access(struct vhost_virtqueue *vq)
 {
 	__virtio16 last_used_idx;
@@ -1866,6 +1882,8 @@ int vhost_vq_init_access(struct vhost_virtqueue *vq)
 		r = -EFAULT;
 		goto err;
 	}
+
+	//到下面设置vhost_virtqueue->last_used_idx
 	r = vhost_get_used(vq, last_used_idx, &vq->used->idx);
 	if (r) {
 		vq_err(vq, "Can't access used idx at %p\n",

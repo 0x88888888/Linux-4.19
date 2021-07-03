@@ -107,6 +107,10 @@ module_param(emulate_invalid_guest_state, bool, S_IRUGO);
 static bool __read_mostly fasteoi = 1;
 module_param(fasteoi, bool, S_IRUGO);
 
+/*
+ * 是否有VM自己来处理对lapic的访问，不产生VM_EXIT
+ * 如果不由VM自己来处理对lapic的访问，有KVM模拟设备或者QEMU模拟设备来处理
+ */
 static bool __read_mostly enable_apicv = 1;
 module_param(enable_apicv, bool, S_IRUGO);
 
@@ -437,6 +441,9 @@ struct loaded_vmcs {
 	 * 默认读写所有的MSR都要产生VM Exit
 	 */
 	unsigned long *msr_bitmap;
+	/*
+	 * 链接到loaded_vmcss_on_cpu
+	 */
 	struct list_head loaded_vmcss_on_cpu_link;
 	struct vmcs_host_state host_state;
 };
@@ -910,13 +917,17 @@ struct nested_vmx {
 #define POSTED_INTR_ON  0
 #define POSTED_INTR_SN  1
 
-/* Posted-Interrupt Descriptor */
+/* Posted-Interrupt Descriptor 
+ *
+ * vcpu_vmx->pi_desc成员
+ */
 struct pi_desc {
+    //一共32*8位,每一位表示一个中断向量号
 	u32 pir[8];     /* Posted interrupt requested */
 	union {
 		struct {
 				/* bit 256 - Outstanding Notification */
-			u16	on	: 1,
+			u16	on	: 1,//表示pi_desc->pir中有中断需要处理
 				/* bit 257 - Suppress Notification */
 				sn	: 1,
 				/* bit 271:258 - Reserved */
@@ -1054,6 +1065,8 @@ struct vcpu_vmx {
 	} segment_cache;
 	/*
 	 * 切换vCPU的时候，根据这个值可以不必将tlb中所有的数据清洗掉
+	 *
+	 * 设置到vmcs的VIRTUAL_PROCESSOR_IDs
 	 */
 	int vpid;
 	bool emulation_required;
@@ -5582,10 +5595,14 @@ static void vmx_set_cr0(struct kvm_vcpu *vcpu, unsigned long cr0)
 	vmx->emulation_required = emulation_required(vcpu);
 }
 
+/*
+ * 获取ept页表的层级
+ */
 static int get_ept_level(struct kvm_vcpu *vcpu)
 {
 	if (cpu_has_vmx_ept_5levels() && (cpuid_maxphyaddr(vcpu) > 48))
 		return 5;
+	//通常4级
 	return 4;
 }
 
@@ -5603,7 +5620,15 @@ static u64 construct_eptp(struct kvm_vcpu *vcpu, unsigned long root_hpa)
 	return eptp;
 }
 
-//给guest设置cr3,nest 的情况下用 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ *    vcpu_run()
+ *     vcpu_enter_guest()
+ *      kvm_mmu_load_cr3()
+ *       vmx_set_cr3()
+ */
 static void vmx_set_cr3(struct kvm_vcpu *vcpu, unsigned long cr3)
 {
 	struct kvm *kvm = vcpu->kvm;
@@ -5612,6 +5637,7 @@ static void vmx_set_cr3(struct kvm_vcpu *vcpu, unsigned long cr3)
 
 	guest_cr3 = cr3;
 	if (enable_ept) {
+		//构建ept,写入vmcs->eptp
 		eptp = construct_eptp(vcpu, cr3);
 		vmcs_write64(EPT_POINTER, eptp);
 
@@ -5631,7 +5657,7 @@ static void vmx_set_cr3(struct kvm_vcpu *vcpu, unsigned long cr3)
 		ept_load_pdptrs(vcpu);
 	}
 
-    //写进去
+    //写进去vmcs->guest_cr3
 	vmcs_writel(GUEST_CR3, guest_cr3);
 }
 
@@ -6163,6 +6189,7 @@ static void seg_setup(int seg)
  *     vmx_create_vcpu()
  *      alloc_apic_access_page()
  *  
+ * 分配APIC-access page
  */
 static int alloc_apic_access_page(struct kvm *kvm)
 {
@@ -6423,6 +6450,8 @@ static void vmx_update_msr_bitmap(struct kvm_vcpu *vcpu)
  *      kvm_vcpu_init()
  *       kvm_arch_vcpu_init()
  *        vmx_get_enable_apicv()
+ *
+ * 确定是否有VM自己直接处理lapic的访问，不产生VM EXIT
  */
 static bool vmx_get_enable_apicv(struct kvm_vcpu *vcpu)
 {
@@ -6723,7 +6752,7 @@ static u32 vmx_exec_control(struct vcpu_vmx *vmx)
 	if (vmx->vcpu.arch.switch_db_regs & KVM_DEBUGREG_WONT_EXIT)
 		exec_control &= ~CPU_BASED_MOV_DR_EXITING;
 
-	if (!cpu_need_tpr_shadow(&vmx->vcpu)) {
+	if (!cpu_need_tpr_shadow(&vmx->vcpu)) { //中断不直接发送到虚拟机内部处理，需要kvm或者qemu来模拟
 		exec_control &= ~CPU_BASED_TPR_SHADOW;
 #ifdef CONFIG_X86_64
 		exec_control |= CPU_BASED_CR8_STORE_EXITING |
@@ -6941,6 +6970,7 @@ static void vmx_vcpu_setup(struct vcpu_vmx *vmx)
 	vmcs_write32(PIN_BASED_VM_EXEC_CONTROL, vmx_pin_based_exec_ctrl(vmx));
 	vmx->hv_deadline_tsc = -1;
 
+    //设置VM_EXEC_CONTROL
 	vmcs_write32(CPU_BASED_VM_EXEC_CONTROL, vmx_exec_control(vmx));
 
 	if (cpu_has_secondary_exec_ctrls()) {
@@ -7198,7 +7228,7 @@ static void vmx_inject_irq(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
 	uint32_t intr;
-	//中断号
+	//中断向量号
 	int irq = vcpu->arch.interrupt.nr;
 
 	trace_kvm_inj_virq(irq);
@@ -7315,6 +7345,12 @@ static int vmx_nmi_allowed(struct kvm_vcpu *vcpu)
 		   | GUEST_INTR_STATE_NMI));
 }
 
+/*
+ * tdp_page_fault()
+ *  try_async_pf(prefault==false)
+ *   kvm_can_do_async_pf()
+ *    vmx_interrupt_allowed()
+ */
 static int vmx_interrupt_allowed(struct kvm_vcpu *vcpu)
 {
 	return (!to_vmx(vcpu)->nested.nested_run_pending &&
@@ -10369,6 +10405,9 @@ static void vmx_flush_pml_buffer(struct kvm_vcpu *vcpu)
 }
 
 /*
+ * vmx_flush_log_dirty()
+ *  kvm_flush_pml_buffers()
+ *
  * Flush all vcpus' PML buffer and update logged GPAs to dirty_bitmap.
  * Called before reporting dirty_bitmap to userspace.
  */
@@ -10787,6 +10826,11 @@ static void vmx_set_virtual_apic_mode(struct kvm_vcpu *vcpu)
 	vmx_update_msr_bitmap(vcpu);
 }
 
+/*
+ * vcpu_enter_guest() [KVM_REQ_APIC_PAGE_RELOAD]
+ *  kvm_vcpu_reload_apic_access_page()
+ *   vmx_set_apic_access_page_addr()
+ */
 static void vmx_set_apic_access_page_addr(struct kvm_vcpu *vcpu, hpa_t hpa)
 {
 	if (!is_guest_mode(vcpu)) {
@@ -11639,6 +11683,7 @@ static struct kvm_vcpu *vmx_create_vcpu(struct kvm *kvm, unsigned int id)
 		goto free_msrs;
 
 	msr_bitmap = vmx->vmcs01.msr_bitmap;
+	//读写这些寄存器，不产生VM_EXIT
 	vmx_disable_intercept_for_msr(msr_bitmap, MSR_FS_BASE, MSR_TYPE_RW);
 	vmx_disable_intercept_for_msr(msr_bitmap, MSR_GS_BASE, MSR_TYPE_RW);
 	vmx_disable_intercept_for_msr(msr_bitmap, MSR_KERNEL_GS_BASE, MSR_TYPE_RW);
@@ -11649,7 +11694,8 @@ static struct kvm_vcpu *vmx_create_vcpu(struct kvm *kvm, unsigned int id)
 
 	vmx->loaded_vmcs = &vmx->vmcs01;
 	cpu = get_cpu();
-	
+
+	//切换vcpu对应的vmcs到cpu
 	vmx_vcpu_load(&vmx->vcpu, cpu);
 	vmx->vcpu.cpu = cpu;
 
@@ -12034,6 +12080,14 @@ static void vmx_inject_page_fault_nested(struct kvm_vcpu *vcpu,
 static inline bool nested_vmx_prepare_msr_bitmap(struct kvm_vcpu *vcpu,
 						 struct vmcs12 *vmcs12);
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ *    vcpu_run()
+ *     vcpu_enter_guest()
+ *      nested_get_vmcs12_pages()
+ */ 
 static void nested_get_vmcs12_pages(struct kvm_vcpu *vcpu)
 {
 	struct vmcs12 *vmcs12 = get_vmcs12(vcpu);
@@ -14282,6 +14336,13 @@ static int vmx_write_pml_buffer(struct kvm_vcpu *vcpu)
 	return 0;
 }
 
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl_get_dirty_log()
+ *   kvm_get_dirty_log_protect()
+ *    kvm_arch_mmu_enable_log_dirty_pt_masked()
+ *     vmx_enable_log_dirty_pt_masked()
+ */
 static void vmx_enable_log_dirty_pt_masked(struct kvm *kvm,
 					   struct kvm_memory_slot *memslot,
 					   gfn_t offset, unsigned long mask)

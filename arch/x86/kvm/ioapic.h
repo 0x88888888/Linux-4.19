@@ -61,33 +61,62 @@ struct rtc_status {
 union kvm_ioapic_redirect_entry {
 	u64 bits;
 	struct {
+		//中断对应的向量号
 		u8 vector;
+		//APIC_DM_LOWEST, APIC_DM_FIXED,APIC_DM_NMI
 		u8 delivery_mode:3;
+		//决定dest_id的含义,如果为0，表示dest_id为local apic id.
 		u8 dest_mode:1;
+		//表示中断状态,0，表示空闲,1表示发送被挂起了
 		u8 delivery_status:1;
+		//0表示高电平触发,1表示低电平触发
 		u8 polarity:1;
+		//用于level触发,当lapic接受中断后,这个值为1，当接受到eoi后，这个为0
 		u8 remote_irr:1;
+		//1表示level触发,0表示edge触发
 		u8 trig_mode:1;
+		//1表示屏蔽该中断
 		u8 mask:1;
 		u8 reserve:7;
 		u8 reserved[4];
+		/*
+		 * LAPIC 的id,根据dest_mode来解释
+		 * 1表示local apic id
+		 * 0表示一组cpu 
+		 */
 		u8 dest_id;
 	} fields;
 };
 
+/*
+ * 模拟io apic中断控制器
+ *
+ * 在ioctl(KVM_CREATE_IRQCHIP)->kvm_ioapic_init中创建
+ */
 struct kvm_ioapic {
+    //IO apic设备的 mmio 的地址,IOAPIC_DEFAULT_BASE_ADDRESS
 	u64 base_address;
 	u32 ioregsel;
 	u32 id;
 	u32 irr;
 	u32 pad;
+	/* 
+	 * IO APIC重定向表,
+	 * 与pic的中断号与中断向量是固定映射不同, IO APIC的每个中断号
+	 * 都可以通过编程设置其对应的中断向量号,这里的redirtbl保存的就是24项中断重定向表
+	 * 每一个kvm_ioapic_redirect_entry中有对应的中断向量号,触发模式,发送到Local APIC的id等
+	 */
 	union kvm_ioapic_redirect_entry redirtbl[IOAPIC_NUM_PINS];
+	//中断线的状态
 	unsigned long irq_states[IOAPIC_NUM_PINS];
+	// I/O apic对应的设备,操作函数ioapic_mmio_ops
 	struct kvm_io_device dev;
+	//对应的虚拟机
 	struct kvm *kvm;
 	void (*ack_notifier)(void *opaque, int irq);
 	spinlock_t lock;
 	struct rtc_status rtc_status;
+	//kvm_ioapic_eoi_inject_work
 	struct delayed_work eoi_inject;
 	u32 irq_eoi[IOAPIC_NUM_PINS];
 	u32 irr_delivered;

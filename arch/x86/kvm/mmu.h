@@ -108,9 +108,18 @@ static inline unsigned long kvm_get_active_pcid(struct kvm_vcpu *vcpu)
 	return kvm_get_pcid(vcpu, kvm_read_cr3(vcpu));
 }
 
+/*
+ * kvm_vcpu_compat_ioctl()
+ *  kvm_vcpu_ioctl()
+ *   kvm_arch_vcpu_ioctl_run()
+ *    vcpu_run()
+ *     vcpu_enter_guest()
+ *      kvm_mmu_load_cr3()
+ */
 static inline void kvm_mmu_load_cr3(struct kvm_vcpu *vcpu)
 {
 	if (VALID_PAGE(vcpu->arch.mmu.root_hpa))
+		//vmx_set_cr3
 		vcpu->arch.mmu.set_cr3(vcpu, vcpu->arch.mmu.root_hpa |
 					     kvm_get_active_pcid(vcpu));
 }

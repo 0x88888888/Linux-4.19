@@ -51,12 +51,16 @@ irqfd_inject(struct work_struct *work)
 		container_of(work, struct kvm_kernel_irqfd, inject);
 	struct kvm *kvm = irqfd->kvm;
 
+    /*
+     * 该irqfd配置的中断为边沿触发，则调用2次kvm_set_irq，
+     * 形成一个中断脉冲，以便kvm中的中断芯片(irqchip)能够感知到这个中断
+     */
 	if (!irqfd->resampler) {
 		kvm_set_irq(kvm, KVM_USERSPACE_IRQ_SOURCE_ID, irqfd->gsi, 1,
 				false);
 		kvm_set_irq(kvm, KVM_USERSPACE_IRQ_SOURCE_ID, irqfd->gsi, 0,
 				false);
-	} else
+	} else/* 如果该irqfd配置的中断为电平触发，则调用一次kvm_set_irq，将中断拉至高电平，使irqchip感知到，电平触发的中断信号拉低动作会由后续的irqchip的EOI触发。 */
 		kvm_set_irq(kvm, KVM_IRQFD_RESAMPLE_IRQ_SOURCE_ID,
 			    irqfd->gsi, 1, false);
 }
@@ -245,19 +249,32 @@ irqfd_ptable_queue_proc(struct file *file, wait_queue_head_t *wqh,
 	add_wait_queue(wqh, &irqfd->wait);
 }
 
-/* Must be called under irqfds.lock */
+/*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()  KVM_CREATE_IRQCHIP
+ *   kvm_arch_vm_ioctl()
+ *    kvm_setup_default_irq_routing()
+ *     kvm_set_irq_routing(kvm, default_routing, , 0)
+ *      kvm_irq_routing_update()
+ *       irqfd_update()
+ *
+ * Must be called under irqfds.lock 
+ */
 static void irqfd_update(struct kvm *kvm, struct kvm_kernel_irqfd *irqfd)
 {
 	struct kvm_kernel_irq_routing_entry *e;
 	struct kvm_kernel_irq_routing_entry entries[KVM_NR_IRQCHIPS];
 	int n_entries;
 
+    /*
+     * 得到entries=kvm->irq_routing[irqfd->gsi]
+     */
 	n_entries = kvm_irq_map_gsi(kvm, entries, irqfd->gsi);
 
 	write_seqcount_begin(&irqfd->irq_entry_sc);
 
 	e = entries;
-	if (n_entries == 1)
+	if (n_entries == 1)//只有一项
 		irqfd->irq_entry = *e;
 	else
 		irqfd->irq_entry.type = 0;
@@ -286,7 +303,7 @@ int  __attribute__((weak)) kvm_arch_update_irqfd_routing(
 
 /*
  * kvm_vm_compat_ioctl()
- *  kvm_vm_ioctl()
+ *  kvm_vm_ioctl() [KVM_IRQFD]
  *   kvm_irqfd()
  *    kvm_irqfd_assign()
  *
@@ -310,7 +327,7 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
 		return -ENOMEM;
 
 	irqfd->kvm = kvm;
-	irqfd->gsi = args->gsi;//中断好
+	irqfd->gsi = args->gsi;//中断号
 	INIT_LIST_HEAD(&irqfd->list);
 	
 	INIT_WORK(&irqfd->inject, irqfd_inject);
@@ -323,6 +340,7 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
 		goto out;
 	}
 
+    //f.file->private_data
 	eventfd = eventfd_ctx_fileget(f.file);
 	if (IS_ERR(eventfd)) {
 		ret = PTR_ERR(eventfd);
@@ -348,6 +366,7 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
 
 		list_for_each_entry(resampler,
 				    &kvm->irqfds.resampler_list, link) {
+				    
 			if (resampler->notifier.gsi == irqfd->gsi) {
 				irqfd->resampler = resampler;
 				break;
@@ -384,7 +403,10 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
 	 * Install our own custom wake-up handling so we are notified via
 	 * a callback whenever someone signals the underlying eventfd
 	 */
+	//设置irqfd->wait->func=irqfd_wakeup
 	init_waitqueue_func_entry(&irqfd->wait, irqfd_wakeup);
+
+	//设置irqfd->pt->_qproc=irqfd_ptable_queue_proc
 	init_poll_funcptr(&irqfd->pt, irqfd_ptable_queue_proc);
 
 	spin_lock_irq(&kvm->irqfds.lock);
@@ -410,12 +432,12 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
 	 * Check if there was an event already pending on the eventfd
 	 * before we registered, and trigger it as if we didn't miss it.
 	 *
-	 * 会调用到eventfd_poll
+	 * 会调用到eventfd_poll,会导致等待
 	 */
 	events = vfs_poll(f.file, &irqfd->pt);
 
 	if (events & EPOLLIN)
-		schedule_work(&irqfd->inject);
+		schedule_work(&irqfd->inject);//搞一个worker出来，去inject中断到VM
 
 /* 
  * 有定义
@@ -540,6 +562,11 @@ kvm_eventfd_init(struct kvm *kvm)
 //有定义
 #ifdef CONFIG_HAVE_KVM_IRQFD
 /*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl() [KVM_IRQFD]
+ *   kvm_irqfd()
+ *    kvm_irqfd_deassign()
+ * 
  * shutdown any irqfd's that match fd+gsi
  */
 static int
@@ -565,6 +592,7 @@ kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd *args)
 			write_seqcount_begin(&irqfd->irq_entry_sc);
 			irqfd->irq_entry.type = 0;
 			write_seqcount_end(&irqfd->irq_entry_sc);
+			//删除
 			irqfd_deactivate(irqfd);
 		}
 	}
@@ -584,7 +612,7 @@ kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd *args)
 
 /*
  * kvm_vm_compat_ioctl()
- *  kvm_vm_ioctl()
+ *  kvm_vm_ioctl() [KVM_IRQFD]
  *   kvm_irqfd()
  *
  * irqfd 是用host主机通知vm的一种方式
@@ -627,6 +655,13 @@ kvm_irqfd_release(struct kvm *kvm)
 }
 
 /*
+ * kvm_vm_compat_ioctl()
+ *  kvm_vm_ioctl()  KVM_CREATE_IRQCHIP
+ *   kvm_arch_vm_ioctl()
+ *    kvm_setup_default_irq_routing()
+ *     kvm_set_irq_routing(kvm, default_routing, , 0)
+ *      kvm_irq_routing_update()
+ *
  * Take note of a change in irq routing.
  * Caller must invoke synchronize_srcu(&kvm->irq_srcu) afterwards.
  */

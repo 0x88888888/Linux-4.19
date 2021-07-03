@@ -2923,6 +2923,11 @@ static inline bool kvm_can_mwait_in_guest(void)
 		boot_cpu_has(X86_FEATURE_ARAT);
 }
 
+/* 
+ * kvm_dev_ioctl()
+ *  kvm_vm_ioctl_check_extension_generic()
+ *   kvm_vm_ioctl_check_extension()
+ */
 int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 {
 	int r = 0;
@@ -3482,6 +3487,7 @@ static void kvm_set_hflags(struct kvm_vcpu *vcpu, unsigned emul_flags);
 static int kvm_vcpu_ioctl_x86_set_vcpu_events(struct kvm_vcpu *vcpu,
 					      struct kvm_vcpu_events *events)
 {
+    //只能设置这几个 events,除此之外，都不行哦
 	if (events->flags & ~(KVM_VCPUEVENT_VALID_NMI_PENDING
 			      | KVM_VCPUEVENT_VALID_SIPI_VECTOR
 			      | KVM_VCPUEVENT_VALID_SHADOW
@@ -3847,14 +3853,15 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
 		r = -EFAULT;
 		if (copy_from_user(&irq, argp, sizeof irq))
 			goto out;
+		//注入一个普通的中断
 		r = kvm_vcpu_ioctl_interrupt(vcpu, &irq);
 		break;
 	}
-	case KVM_NMI: {
+	case KVM_NMI: {//注入nmi中断
 		r = kvm_vcpu_ioctl_nmi(vcpu);
 		break;
 	}
-	case KVM_SMI: {
+	case KVM_SMI: {//注入smi中断
 		r = kvm_vcpu_ioctl_smi(vcpu);
 		break;
 	}
@@ -3937,6 +3944,7 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
 		if (copy_from_user(&va, argp, sizeof va))
 			goto out;
 		idx = srcu_read_lock(&vcpu->kvm->srcu);
+		//设置vcpu->arch.apic->vapic_addr= va.vapic_addr
 		r = kvm_lapic_set_vapic_addr(vcpu, va.vapic_addr);
 		srcu_read_unlock(&vcpu->kvm->srcu, idx);
 		break;
@@ -4358,7 +4366,7 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
 	/*
 	 * Flush potentially hardware-cached dirty pages to dirty_bitmap.
 	 */
-	if (kvm_x86_ops->flush_log_dirty)
+	if (kvm_x86_ops->flush_log_dirty) //vmx_flush_log_dirty
 		kvm_x86_ops->flush_log_dirty(kvm);
 
 	r = kvm_get_dirty_log_protect(kvm, log, &is_dirty);
@@ -4512,7 +4520,7 @@ set_identity_unlock:
 	case KVM_GET_NR_MMU_PAGES:
 		r = kvm_vm_ioctl_get_nr_mmu_pages(kvm);
 		break;
-	case KVM_CREATE_IRQCHIP: {//创建pic,ioapic
+	case KVM_CREATE_IRQCHIP: {//在KVM中模拟中断控制器,创建pic,ioapic
 		mutex_lock(&kvm->lock);
 
 		r = -EEXIST;
@@ -4522,12 +4530,12 @@ set_identity_unlock:
 		r = -EINVAL;
 		if (kvm->created_vcpus)
 			goto create_irqchip_unlock;
-        //创建kvm_pic对象
+        //创建kvm_pic对象,pic中断控制器
 		r = kvm_pic_init(kvm);
 		if (r) //创建失败
 			goto create_irqchip_unlock;
 
-        //创建kvm_ipapic
+        //创建kvm_ipapic, io apic中断控制器
 		r = kvm_ioapic_init(kvm);
 		if (r) { //创建失败
 			kvm_pic_destroy(kvm);
@@ -5552,6 +5560,9 @@ static int emulator_pio_in_out(struct kvm_vcpu *vcpu, int size,
 	vcpu->arch.pio.size = size;
 
 
+    /*
+     * kernel_pio会调用kvm_io_bus_read, kvm_io_bus_write
+     */
 	if (!kernel_pio(vcpu, vcpu->arch.pio_data)) {//在内核态处理了，无需返回用户态的QEMU去处理这个IO了
 		vcpu->arch.pio.count = 0;
 		return 1;
@@ -6411,6 +6422,8 @@ int x86_emulate_instruction(struct kvm_vcpu *vcpu,
 
 		ctxt->ud = emulation_type & EMULTYPE_TRAP_UD;
 
+
+		//对指令进行解码
 		r = x86_decode_insn(ctxt, insn, insn_len);
 
 		trace_kvm_emulate_insn_start(vcpu);
@@ -6418,6 +6431,7 @@ int x86_emulate_instruction(struct kvm_vcpu *vcpu,
 		if (r != EMULATION_OK)  {
 			if (emulation_type & EMULTYPE_TRAP_UD)
 				return EMULATE_FAIL;
+			//执行指令,io指令会走到 emulator_pio_out_emulated
 			if (reexecute_instruction(vcpu, cr2, write_fault_to_spt,
 						emulation_type))
 				return EMULATE_DONE;
@@ -7237,6 +7251,8 @@ static void update_cr8_intercept(struct kvm_vcpu *vcpu)
  *    vcpu_run()
  *     vcpu_enter_guest()
  *      inject_pending_event()
+ *
+ * 处理需要注入到vm中的event
  */
 static int inject_pending_event(struct kvm_vcpu *vcpu, bool req_int_win)
 {
@@ -7330,8 +7346,14 @@ static int inject_pending_event(struct kvm_vcpu *vcpu, bool req_int_win)
 				return r;
 		}
 		if (kvm_x86_ops->interrupt_allowed(vcpu)) {
+			/*
+			 * 设置vcpu->arch.interrupt.injected
+			 *     vcpu->arch.interrupt.soft
+			 *     vcpu->arch.interrupt.nr
+			 */
 			kvm_queue_interrupt(vcpu, kvm_cpu_get_interrupt(vcpu),
 					    false);
+			//vmx_inject_irq
 			kvm_x86_ops->set_irq(vcpu);
 		}
 	}
@@ -7655,6 +7677,10 @@ int kvm_arch_mmu_notifier_invalidate_range(struct kvm *kvm,
 	return 0;
 }
 
+/*
+ * vcpu_enter_guest() [KVM_REQ_APIC_PAGE_RELOAD]
+ *  kvm_vcpu_reload_apic_access_page()
+ */
 void kvm_vcpu_reload_apic_access_page(struct kvm_vcpu *vcpu)
 {
 	struct page *page = NULL;
@@ -7665,9 +7691,11 @@ void kvm_vcpu_reload_apic_access_page(struct kvm_vcpu *vcpu)
 	if (!kvm_x86_ops->set_apic_access_page_addr)
 		return;
 
+   //APIC_DEFAULT_PHYS_BASE对应的gfn到host相应的page
 	page = gfn_to_page(vcpu->kvm, APIC_DEFAULT_PHYS_BASE >> PAGE_SHIFT);
 	if (is_error_page(page))
 		return;
+	//vmx_set_apic_access_page_addr
 	kvm_x86_ops->set_apic_access_page_addr(vcpu, page_to_phys(page));
 
 	/*
@@ -7708,8 +7736,9 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 
     //看是否有vcpu->request哦，如果有，就处理掉
 	if (kvm_request_pending(vcpu)) {
-		if (kvm_check_request(KVM_REQ_GET_VMCS12_PAGES, vcpu))
-			kvm_x86_ops->get_vmcs12_pages(vcpu);
+		
+		if (kvm_check_request(KVM_REQ_GET_VMCS12_PAGES, vcpu))//嵌套虚拟化,跳过
+			kvm_x86_ops->get_vmcs12_pages(vcpu); //nested_get_vmcs12_pages
 		
 		if (kvm_check_request(KVM_REQ_MMU_RELOAD, vcpu))
 			kvm_mmu_unload(vcpu);
@@ -7728,6 +7757,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 			if (unlikely(r))
 				goto out;
 		}
+		
 		if (kvm_check_request(KVM_REQ_MMU_SYNC, vcpu))
 			kvm_mmu_sync_roots(vcpu);
 		
@@ -7750,6 +7780,10 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 			r = 0;
 			goto out;
 		}
+
+		/*
+		 * 在try_async_pf()中设置
+		 */
 		if (kvm_check_request(KVM_REQ_APF_HALT, vcpu)) {
 			/* Page is swapped out. Do synthetic halt */
 			vcpu->arch.apf.halted = true;
@@ -7764,11 +7798,13 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 		
 		if (kvm_check_request(KVM_REQ_NMI, vcpu))
 			process_nmi(vcpu);
+		
 		if (kvm_check_request(KVM_REQ_PMU, vcpu))
 			kvm_pmu_handle_event(vcpu);
 		
 		if (kvm_check_request(KVM_REQ_PMI, vcpu))
 			kvm_pmu_deliver_pmi(vcpu);
+		
 		if (kvm_check_request(KVM_REQ_IOAPIC_EOI_EXIT, vcpu)) {
 			BUG_ON(vcpu->arch.pending_ioapic_eoi > 255);
 			if (test_bit(vcpu->arch.pending_ioapic_eoi,
@@ -7780,12 +7816,14 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 				goto out;
 			}
 		}
+		
 		if (kvm_check_request(KVM_REQ_SCAN_IOAPIC, vcpu))
 			vcpu_scan_ioapic(vcpu);
 		
 		if (kvm_check_request(KVM_REQ_LOAD_EOI_EXITMAP, vcpu))
 			vcpu_load_eoi_exitmap(vcpu);
-		
+
+		//设置APIC_ACCESS_ADDR
 		if (kvm_check_request(KVM_REQ_APIC_PAGE_RELOAD, vcpu))
 			kvm_vcpu_reload_apic_access_page(vcpu);
 		
@@ -7968,6 +8006,8 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 	 * If we don't have active breakpoints in the host, we don't
 	 * care about the messed up debug address registers. But if
 	 * we have some of them active, restore the old state.
+	 *
+	 *  
 	 */
 	if (hw_breakpoint_active())
 		hw_breakpoint_restore();
@@ -8874,6 +8914,7 @@ struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm,
  */
 int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
 {
+    //初始化链表vcpu->arch.mtrr_state.head
 	kvm_vcpu_mtrr_init(vcpu);
 
 	//
@@ -8932,7 +8973,10 @@ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
  *  kvm_vm_ioctl()
  *   kvm_vm_ioctl_create_vcpu()
  *    kvm_arch_vcpu_setup()
- *     kvm_vcpu_reset()
+ *     kvm_vcpu_reset(init_event==false)
+ *
+ * kvm_apic_accept_events()
+ *  kvm_vcpu_reset(init_event==true)
  */
 void kvm_vcpu_reset(struct kvm_vcpu *vcpu, bool init_event)
 {
@@ -8977,6 +9021,7 @@ void kvm_vcpu_reset(struct kvm_vcpu *vcpu, bool init_event)
 		 */
 		if (init_event)
 			kvm_put_guest_fpu(vcpu);
+		
 		mpx_state_buffer = get_xsave_addr(&vcpu->arch.guest_fpu.state.xsave,
 					XFEATURE_MASK_BNDREGS);
 		if (mpx_state_buffer)
@@ -9005,6 +9050,7 @@ void kvm_vcpu_reset(struct kvm_vcpu *vcpu, bool init_event)
 
 	vcpu->arch.ia32_xss = 0;
 
+    //vmx_vcpu_reset
 	kvm_x86_ops->vcpu_reset(vcpu, init_event);
 }
 
@@ -9262,7 +9308,9 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
 
 	vcpu->arch.pat = MSR_IA32_CR_PAT_DEFAULT;
 
+    //vcpu->arch.apf.gfns[]=~0;
 	kvm_async_pf_hash_reset(vcpu);
+	//监控用性能计数器
 	kvm_pmu_init(vcpu);
 
 	vcpu->arch.pending_external_vector = -1;
@@ -9320,6 +9368,8 @@ void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu)
  *  kvm_dev_ioctl_create_vm()
  *   kvm_create_vm()
  *    kvm_arch_init_vm()
+ *
+ * 初始化kvm->arch成员
  */
 int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 {
@@ -9514,6 +9564,8 @@ void kvm_arch_free_memslot(struct kvm *kvm, struct kvm_memory_slot *free,
  *    kvm_set_memory_region()
  *     __kvm_set_memory_region()
  *      kvm_arch_create_memslot()
+ *
+ * 填写好slot->arch.rmap[]和slot->arch.lpage_info[]
  */
 int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
 			    unsigned long npages)
@@ -9524,7 +9576,7 @@ int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
 	for (i = 0; i < KVM_NR_PAGE_SIZES /*3*/; ++i) {
 		struct kvm_lpage_info *linfo;
 		unsigned long ugfn;
-		int lpages;
+		int lpages;//page的个数
 		int level = i + 1;
 
         //gfn_to_index得到在页表中的某个索引位置
@@ -9547,6 +9599,7 @@ int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
 		if (i == 0)//是4k的正常page，不要走到下面去分配linfo了
 			continue;
 
+        //有lpages个page，每个page需要一个kvm_lpage_info来表示
 		linfo = kvcalloc(lpages, sizeof(*linfo), GFP_KERNEL);
 		if (!linfo)
 			goto out_free;
@@ -9688,7 +9741,7 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
 	if (!kvm->arch.n_requested_mmu_pages)//mmu所需要的物理页面数量,所以页表映射到这些物理页面的 页表也需要变
 		nr_mmu_pages = kvm_mmu_calculate_mmu_pages(kvm);
 
-	if (nr_mmu_pages)
+	if (nr_mmu_pages)//设置好kvm->arch.n_max_mmu_pages=nr_mmu_pages
 		kvm_mmu_change_mmu_pages(kvm, nr_mmu_pages);
 
 	/*
@@ -9964,6 +10017,7 @@ void kvm_arch_async_page_present(struct kvm_vcpu *vcpu,
 		work->arch.token = ~0; /* broadcast wakeup */
 	else
 		kvm_del_async_pf_gfn(vcpu, work->arch.gfn);
+	
 	trace_kvm_async_pf_ready(work->arch.token, work->gva);
 
 	if (vcpu->arch.apf.msr_val & KVM_ASYNC_PF_ENABLED &&

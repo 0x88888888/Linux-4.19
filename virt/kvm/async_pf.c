@@ -32,6 +32,7 @@
 static inline void kvm_async_page_present_sync(struct kvm_vcpu *vcpu,
 					       struct kvm_async_pf *work)
 {
+//没有定义
 #ifdef CONFIG_KVM_ASYNC_PF_SYNC
 	kvm_arch_async_page_present(vcpu, work);
 #endif
@@ -39,6 +40,7 @@ static inline void kvm_async_page_present_sync(struct kvm_vcpu *vcpu,
 static inline void kvm_async_page_present_async(struct kvm_vcpu *vcpu,
 						struct kvm_async_pf *work)
 {
+//没有定义
 #ifndef CONFIG_KVM_ASYNC_PF_SYNC
 	kvm_arch_async_page_present(vcpu, work);
 #endif
@@ -190,6 +192,12 @@ void kvm_check_async_pf_completion(struct kvm_vcpu *vcpu)
 	}
 }
 
+/*
+ * tdp_page_fault()
+ *	try_async_pf(prefault==false)
+ *   kvm_arch_setup_async_pf()
+ *    kvm_setup_async_pf()
+ */
 int kvm_setup_async_pf(struct kvm_vcpu *vcpu, gva_t gva, unsigned long hva,
 		       struct kvm_arch_async_pf *arch)
 {
@@ -222,6 +230,7 @@ int kvm_setup_async_pf(struct kvm_vcpu *vcpu, gva_t gva, unsigned long hva,
 	if (unlikely(kvm_is_error_hva(work->addr)))
 		goto retry_sync;
 
+    //创建一个worker,读取换出去的page
 	INIT_WORK(&work->work, async_pf_execute);
 	if (!schedule_work(&work->work))
 		goto retry_sync;
