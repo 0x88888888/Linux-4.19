@@ -136,7 +136,11 @@ struct virtio_pci_notify_cap {
 	__le32 notify_off_multiplier;	/* Multiplier for queue_notify_off. */
 };
 
-/* Fields in VIRTIO_PCI_CAP_COMMON_CFG: */
+/*
+ * Fields in VIRTIO_PCI_CAP_COMMON_CFG: 
+ *
+ * 
+ */
 struct virtio_pci_common_cfg {
 	/* About the whole device. */
 	__le32 device_feature_select;	/* read-write */

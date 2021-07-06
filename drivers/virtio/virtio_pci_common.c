@@ -44,7 +44,10 @@ void vp_synchronize_vectors(struct virtio_device *vdev)
 bool vp_notify(struct virtqueue *vq)
 {
 	/* we write the queue's selector into the notification register to
-	 * signal the other end */
+	 * signal the other end
+	 *
+	 * 产生vm_exit
+	 */
 	iowrite16(vq->index, (void __iomem *)vq->priv);
 	return true;
 }
@@ -568,13 +571,12 @@ static void virtio_pci_release_dev(struct device *_d)
 }
 
 /*
- * start_kernel()
- *  do_basic_setup()
- *   do_initcalls()
- *    ....
- *     virtio_pci_driver_init(这个函数由宏生成)
- *      ....
- *       virtio_pci_probe()
+ * do_basic_setup()
+ *  do_initcalls()
+ *   ....
+ *    virtio_pci_driver_init(这个函数由宏生成)
+ *     ....
+ *      virtio_pci_probe()
  */
 static int virtio_pci_probe(struct pci_dev *pci_dev,
 			    const struct pci_device_id *id)
@@ -625,7 +627,7 @@ static int virtio_pci_probe(struct pci_dev *pci_dev,
 
 	pci_set_master(pci_dev);
 
-    //注册设备到系统中
+    //设置virtio_pci_device->vdev的总线,注册设备到系统中
 	rc = register_virtio_device(&vp_dev->vdev);
 	reg_dev = vp_dev;
 	if (rc)

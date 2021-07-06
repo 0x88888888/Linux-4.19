@@ -405,6 +405,7 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
 			err = -EINVAL;
 			goto err_map_notify;
 		}
+			
 		vq->priv = (void __force *)vp_dev->notify_base +
 			off * vp_dev->notify_offset_multiplier;
 	} else {

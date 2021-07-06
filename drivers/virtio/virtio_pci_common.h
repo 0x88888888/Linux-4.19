@@ -48,7 +48,11 @@ struct virtio_pci_vq_info {
 	unsigned msix_vector;
 };
 
-/* Our device structure */
+/*
+ * 这个struct在qemu中对应 VirtIOBalloonPCI ?
+ * Our device structure 
+ *
+ */
 struct virtio_pci_device {
 	struct virtio_device vdev;
 	struct pci_dev *pci_dev;

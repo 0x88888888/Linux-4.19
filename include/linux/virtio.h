@@ -45,6 +45,9 @@ struct virtqueue {
 	 * virtqueue所属的virtio_device
 	 */
 	struct virtio_device *vdev;
+	/* 
+	 * 将index写入到保存在virtqueue->private这个地址,产生VM exit
+	 */
 	unsigned int index;
 	unsigned int num_free;
 	/*私有指针,看vp_notify()*/
@@ -158,7 +161,7 @@ struct virtio_device {
 	const struct virtio_config_ops *config;
 	const struct vringh_config_ops *vringh_config;
 	/*
-	 * 设备virtio_queue，一个设备可以多个，用于数据传输
+	 * 本virtio_device的virtio_queue，一个设备可以多个，用于数据传输
 	 *
 	 * 在__vring_new_virtqueue()中设置
 	 *

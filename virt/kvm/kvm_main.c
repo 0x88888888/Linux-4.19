@@ -2911,7 +2911,7 @@ out_free1:
 		kfree(kvm_regs);
 		break;
 	}
-	case KVM_SET_REGS: {//设置vCPU的寄存器信息
+	case KVM_SET_REGS: {//qemu在run kvm的vCPU之前，会调用这个
 		struct kvm_regs *kvm_regs;
 
 		r = -ENOMEM;
@@ -2938,7 +2938,7 @@ out_free1:
 		r = 0;
 		break;
 	}
-	case KVM_SET_SREGS: {
+	case KVM_SET_SREGS: {//qemu在run kvm的vCPU之前，会调用这个
 		kvm_sregs = memdup_user(argp, sizeof(*kvm_sregs));
 		if (IS_ERR(kvm_sregs)) {
 			r = PTR_ERR(kvm_sregs);
@@ -2969,7 +2969,7 @@ out_free1:
 		r = kvm_arch_vcpu_ioctl_set_mpstate(vcpu, &mp_state);
 		break;
 	}
-	case KVM_TRANSLATE: {
+	case KVM_TRANSLATE: { //将gva转成gpa
 		struct kvm_translation tr;
 
 		r = -EFAULT;
@@ -2993,7 +2993,7 @@ out_free1:
 		r = kvm_arch_vcpu_ioctl_set_guest_debug(vcpu, &dbg);
 		break;
 	}
-	case KVM_SET_SIGNAL_MASK: {
+	case KVM_SET_SIGNAL_MASK: { //给vCPU的线程设置signal
 		struct kvm_signal_mask __user *sigmask_arg = argp;
 		struct kvm_signal_mask kvm_sigmask;
 		sigset_t sigset, *p;

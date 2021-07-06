@@ -29,6 +29,10 @@
  *         operations documented below
  * @mmap: Perform mmap(2) on a region of the device file descriptor
  * @request: Request for the bus driver to release the device
+ *
+ * vfio_mdev_dev_ops
+ * vfio_pci_ops
+ * vfio_platform_ops
  */
 struct vfio_device_ops {
 	char	*name;
@@ -58,6 +62,9 @@ extern void *vfio_device_data(struct vfio_device *device);
 
 /**
  * struct vfio_iommu_driver_ops - VFIO IOMMU driver callbacks
+ *
+ * vfio_noiommu_ops
+ * vfio_iommu_driver_ops_type1
  */
 struct vfio_iommu_driver_ops {
 	char		*name;
