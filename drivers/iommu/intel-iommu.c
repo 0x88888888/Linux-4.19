@@ -4846,6 +4846,8 @@ const struct attribute_group *intel_iommu_groups[] = {
  * do_initcalls()
  *  pci_iommu_init()
  *   intel_iommu_init()
+ *
+ * set current PCI device to device iommu group
  */
 int __init intel_iommu_init(void)
 {
