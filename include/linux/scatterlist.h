@@ -9,11 +9,16 @@
 #include <asm/io.h>
 
 struct scatterlist {
+    //指示该内存块所在的页面
 	unsigned long	page_link;
+	//指示该内存块在页面中的偏移（起始位置）
 	unsigned int	offset;
+	//该内存块的长度
 	unsigned int	length;
+	//该内存块实际的起始地址（PA，相比page更接近我们人类的语言）
 	dma_addr_t	dma_address;
 #ifdef CONFIG_NEED_SG_DMA_LENGTH
+    //相应的长度信息
 	unsigned int	dma_length;
 #endif
 };

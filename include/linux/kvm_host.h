@@ -367,7 +367,11 @@ struct kvm_memory_slot {
 	 * 一个bit对应一个page是否dirty
 	 */
 	unsigned long *dirty_bitmap;
-	// 反向映射相关的结构
+	/*
+	 * arch成员是记录反向映射相关的，当主机上需要回收内存页时，
+	 * 如果这块内存被虚机使用，需要将EPT页表上记录的页状态从存在改为不存在。
+	 * 我们需要定位指向同一物理页框号的所有EPT页表项
+	 */
 	struct kvm_arch_memory_slot arch;
 	//内存区间对应的主机虚拟地址
 	unsigned long userspace_addr;

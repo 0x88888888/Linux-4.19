@@ -59,6 +59,8 @@ struct dmar_drhd_unit {
 	u16	segment;		/* PCI domain		*/
 	u8	ignored:1; 		/* ignore drhd		*/
 	u8	include_all:1;
+
+	//在alloc_iommu中分配和初始化
 	struct intel_iommu *iommu;
 };
 

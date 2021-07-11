@@ -166,10 +166,15 @@ static __init int iommu_setup(char *p)
 }
 early_param("iommu", iommu_setup);
 
+/*
+ * do_initcalls()
+ *  pci_iommu_init()
+ */
 static int __init pci_iommu_init(void)
 {
 	struct iommu_table_entry *p;
 
+    //intel_iommu_init
 	x86_init.iommu.iommu_init();
 
 	for (p = __iommu_table; p < __iommu_table_end; p++) {

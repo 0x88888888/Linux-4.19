@@ -1000,6 +1000,7 @@ struct device {
 
 	struct list_head	dma_pools;	/* dma pools (if dma'ble) */
 
+    //设备自己的物理内存，用于dma,在dma_assign_coherent_memory()中设定
 	struct dma_coherent_mem	*dma_mem; /* internal for coherent mem
 					     override */
 #ifdef CONFIG_DMA_CMA

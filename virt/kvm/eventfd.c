@@ -832,6 +832,9 @@ ioeventfd_destructor(struct kvm_io_device *this)
 	ioeventfd_release(p);
 }
 
+/*
+ * kvm_io_bus_write的调用链中会分派到这个函数
+ */
 static const struct kvm_io_device_ops ioeventfd_ops = {
 	.write      = ioeventfd_write,
 	.destructor = ioeventfd_destructor,

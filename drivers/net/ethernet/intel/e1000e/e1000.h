@@ -124,6 +124,8 @@ struct e1000_ps_page {
 
 /* wrappers around a pointer to a socket buffer,
  * so a DMA handle can be stored along with the buffer
+ *
+ * Tx/Rx描述符所包含的数据缓冲区
  */
 struct e1000_buffer {
 	dma_addr_t dma;
@@ -147,16 +149,32 @@ struct e1000_buffer {
 	};
 };
 
+/*
+ * 描述一个Rx/Tx环形缓冲区
+ */
 struct e1000_ring {
+    //所属网卡
 	struct e1000_adapter *adapter;	/* back pointer to adapter */
 	void *desc;			/* pointer to ring memory  */
 	dma_addr_t dma;			/* phys address of ring    */
+
+	//ring中的数据总量
 	unsigned int size;		/* length of ring in bytes */
+	//ring中desc的个数
 	unsigned int count;		/* number of desc. in ring */
 
 	u16 next_to_use;
 	u16 next_to_clean;
 
+    // desc链表
+    /*
+     * HEAD和TAIL两个指针是硬件维护的，对于发送，
+     * 其值保存在TDH/TDT寄存器，对于接收，其值保存在RDH/RDT寄存器。
+     * HEAD指针指向网卡处理完毕，即将移出Ring的描述符，
+     * TAIL指针指向驱动即将往Ring里面填入的描述符，
+     * 因此HEAD和TAIL之间的描述符是硬件拥有的，
+     * 同理，之外的是软件拥有的
+     */
 	void __iomem *head;
 	void __iomem *tail;
 
@@ -185,14 +203,22 @@ struct e1000_phy_regs {
 };
 
 /* board specific private data structure */
+//描述一块e1000,e1000e网卡
 struct e1000_adapter {
+    /* 
+     * 看门狗定时器
+     */ 
 	struct timer_list watchdog_timer;
 	struct timer_list phy_info_timer;
 	struct timer_list blink_timer;
-
+	/*
+	 * 看门狗watchdog_timer的工作项
+	 */
 	struct work_struct reset_task;
+   
 	struct work_struct watchdog_task;
 
+    //驱动层面的信息
 	const struct e1000_info *ei;
 
 	unsigned long active_vlans[BITS_TO_LONGS(VLAN_N_VID)];
@@ -230,6 +256,9 @@ struct e1000_adapter {
 	u32 tx_int_delay;
 	u32 tx_abs_int_delay;
 
+    /*
+     * 统计收发的数据量
+     */
 	unsigned int total_tx_bytes;
 	unsigned int total_tx_packets;
 	unsigned int total_rx_bytes;
@@ -274,10 +303,13 @@ struct e1000_adapter {
 	u32 min_frame_size;
 
 	/* OS defined structs */
+    //与具体硬件无关的部分
 	struct net_device *netdev;
+	//与pci/PCIe相关的信息
 	struct pci_dev *pdev;
 
 	/* structs defined in e1000_hw.h */
+	//硬件寄存器描述
 	struct e1000_hw hw;
 
 	spinlock_t stats64_lock;	/* protects statistics counters */
@@ -288,13 +320,31 @@ struct e1000_adapter {
 	/* Snapshot of PHY registers */
 	struct e1000_phy_regs phy_regs;
 
+    /*
+     * 发送和接收的环形缓冲区
+     */
 	struct e1000_ring test_tx_ring;
 	struct e1000_ring test_rx_ring;
 	u32 test_icr;
 
 	u32 msg_enable;
+	/*
+	 * 中断向量个数
+	 * 使用Legacy中断和MSI中断时，num_vectors为1；
+	 * 使用MSI-X中断时，num_vectors为3
+	 */
 	unsigned int num_vectors;
+	/*
+	 * 如果使用了MSI-X中断模式，
+	 * 则msix_entries包含了所有的中断向量；否则msix_entries为空
+	 */
 	struct msix_entry *msix_entries;
+	/*
+	 * 中断模式
+	 * E1000E_INT_MODE_LEGACY
+	 * E1000E_INT_MODE_MSI
+	 * E1000E_INT_MODE_MSIX
+	 */
 	int int_mode;
 	u32 eiac_mask;
 
@@ -313,6 +363,9 @@ struct e1000_adapter {
 
 	int phy_hang_count;
 
+    /*
+     * 发送缓冲区和接收缓冲区ring描述符的个数
+     */
 	u16 tx_ring_count;
 	u16 rx_ring_count;
 
@@ -332,6 +385,9 @@ struct e1000_adapter {
 	u16 eee_advert;
 };
 
+/*
+ * 描述e1000e网卡驱动层面的一些信息
+ */
 struct e1000_info {
 	enum e1000_mac_type	mac;
 	unsigned int		flags;

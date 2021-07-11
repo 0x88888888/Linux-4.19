@@ -24,6 +24,8 @@
  * kvm_device_fops 虚拟设备的文件操作
  * kvm_vcpu_fops   vcpu层面的文件操作
  * kvm_vm_fops     虚拟机层面的文件操作
+ * 
+ * vhost_net_fops  /dev/vhost-net的操作
  */
 
 #include <kvm/iodev.h>
@@ -3360,6 +3362,13 @@ static long kvm_vm_ioctl(struct file *filp,
 		break;
 	}
 	case KVM_IOEVENTFD: {//事件ioevent fd操作
+	/*
+	 * 这个命令字的功能是将一个eventfd绑定到一段客户机的地址空间，
+	 * 这个空间可以是mmio，也可以是pio。当guest写这段地址空间时，
+	 * 会触发EPT_MISCONFIGURATION缺页异常，
+	 * KVM处理时如果发现这段地址落在了已注册的ioeventfd地址区间里，
+	 * 会通过写关联eventfd通知qemu，从而节约一次内核态到用户态的切换开销
+	 */
 		struct kvm_ioeventfd data;
 
 		r = -EFAULT;

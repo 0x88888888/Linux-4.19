@@ -441,6 +441,7 @@ struct intel_iommu {
 	unsigned char 	name[13];    /* Device Name */
 
 #ifdef CONFIG_INTEL_IOMMU
+    //a bitmap used for the domain id,在iommu_init_domains中分配
 	unsigned long 	*domain_ids; /* bitmap of domains */
 	struct dmar_domain ***domains; /* ptr to domains */
 	spinlock_t	lock; /* protect context, domain ids */

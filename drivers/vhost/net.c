@@ -715,6 +715,7 @@ static void handle_tx_zerocopy(struct vhost_net *net, struct socket *sock)
 			vhost_add_used_and_signal(&net->dev, vq, head, 0);
 		else
 			vhost_zerocopy_signal_used(net, vq);
+		
 		vhost_net_tx_packet(net);
 		if (unlikely(vhost_exceeds_weight(++sent_pkts, total_len))) {
 			vhost_poll_queue(&vq->poll);
@@ -1149,6 +1150,7 @@ static int vhost_net_open(struct inode *inode, struct file *f)
 		n->vqs[i].rx_ring = NULL;
 		vhost_net_buf_init(&n->vqs[i].rxq);
 	}
+	
 	//初始化vhost_dev，和vqs
 	vhost_dev_init(dev, vqs, VHOST_NET_VQ_MAX);
 
@@ -1320,7 +1322,7 @@ static struct socket *get_socket(int fd)
 
 /*
  * vhost_net_compat_ioctl()
- *  vhost_net_ioctl()
+ *  vhost_net_ioctl() [VHOST_NET_SET_BACKEND]
  *   vhost_net_set_backend()
  *
  * 设置tap为virtio vhost_net方案的后端(将tap设备的fd告知vhost)
@@ -1539,7 +1541,7 @@ static long vhost_net_set_owner(struct vhost_net *n)
 	r = vhost_net_set_ubuf_info(n);
 	if (r)
 		goto out;
-	
+	//创建一个vhost-d进程,设置n->dev->worker=vhost-{d}进程
 	r = vhost_dev_set_owner(&n->dev);
 	if (r)
 		vhost_net_clear_ubuf_info(n);

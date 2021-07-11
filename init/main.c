@@ -1182,6 +1182,7 @@ static void __init do_initcalls(void)
      * 1. core_initcall(cgroup_wq_init)
      * 1. core_initcall(init_zero_pfn)
      * 1. core_initcall(virtio_init)
+     * 1. core_initcall(dma_init_reserved_memory)
      *
      * 3. arch_initcall(bts_init) perf性能监控使用
      *
@@ -1206,9 +1207,10 @@ static void __init do_initcalls(void)
      *
      * 6. module_init(virtio_net_driver_init)
      * 6. module_init(vhost_init)
+     * 6. module_init(vhost_net_init)
      *
      * 6. rootfs_initcall(populate_rootfs) ,会调用 populate_rootfs,
-     *  
+     * 6. rootfs_initcall(pci_iommu_init) 
      *
      * 7. late_initcall(debugfs_kprobe_init)
      *

@@ -518,6 +518,9 @@ static struct dmar_domain *to_dmar_domain(struct iommu_domain *dom)
 	return container_of(dom, struct dmar_domain, domain);
 }
 
+/*
+ * qemu传进来的参数intel_iommu=on,设置iommu
+ */
 static int __init intel_iommu_setup(char *str)
 {
 	if (!str)
@@ -1668,7 +1671,15 @@ static void iommu_disable_translation(struct intel_iommu *iommu)
 	raw_spin_unlock_irqrestore(&iommu->register_lock, flag);
 }
 
-
+/*
+ * do_initcalls()
+ *  pci_iommu_init()
+ *   intel_iommu_init()
+ *    init_dmars()
+ *     iommu_init_domains()
+ *
+ * 分配iommu->domain_ids,iommu->domains,iommu->domains[0] 
+ */
 static int iommu_init_domains(struct intel_iommu *iommu)
 {
 	u32 ndomains, nlongs;
@@ -1681,6 +1692,9 @@ static int iommu_init_domains(struct intel_iommu *iommu)
 
 	spin_lock_init(&iommu->lock);
 
+    /*
+     *  allocates a bitmap used for the domain id
+     */
 	iommu->domain_ids = kcalloc(nlongs, sizeof(unsigned long), GFP_KERNEL);
 	if (!iommu->domain_ids) {
 		pr_err("%s: Allocating domain id array failed\n",
@@ -1865,6 +1879,15 @@ static int domain_detach_iommu(struct dmar_domain *domain,
 static struct iova_domain reserved_iova_list;
 static struct lock_class_key reserved_rbtree_key;
 
+/*
+ * do_initcalls()
+ *  pci_iommu_init()
+ *   intel_iommu_init()
+ *    dmar_init_reserved_ranges()
+ *
+ * 预留‘IOAPIC’ and all PCI MMIO address,
+ * 然后PCI device’s DMA 就不会用 these IOVA
+ */
 static int dmar_init_reserved_ranges(void)
 {
 	struct pci_dev *pdev = NULL;
@@ -3037,6 +3060,16 @@ static int __init iommu_prepare_static_identity_mapping(int hw)
 	return 0;
 }
 
+/*
+ * do_initcalls()
+ *  pci_iommu_init()
+ *   intel_iommu_init()
+ *    init_dmars()
+ *     intel_iommu_init_qi()
+ *
+ * allocates the queued invalidation interface’s ring buffer, 
+ * store it in ‘iommu->qi’ and write the ‘iommu->qi’ physical address to iommu device’s register ‘DMAR_IQA_REG’
+ */
 static void intel_iommu_init_qi(struct intel_iommu *iommu)
 {
 	/*
@@ -3256,6 +3289,12 @@ out_unmap:
 	return ret;
 }
 
+/*
+ * do_initcalls()
+ *  pci_iommu_init()
+ *   intel_iommu_init()
+ *    init_dmars()
+ */
 static int __init init_dmars(void)
 {
 	struct dmar_drhd_unit *drhd;
@@ -3270,6 +3309,8 @@ static int __init init_dmars(void)
 	 *    allocate root
 	 *    initialize and program root entry to not present
 	 * endfor
+	 *
+	 * 遍历一下dmar_drhd_units,得到iommu的数量,保存在g_num_of_iommus
 	 */
 	for_each_drhd_unit(drhd) {
 		/*
@@ -3288,6 +3329,7 @@ static int __init init_dmars(void)
 	if (g_num_of_iommus < DMAR_UNITS_SUPPORTED)
 		g_num_of_iommus = DMAR_UNITS_SUPPORTED;
 
+    //分配g_num_of_iommus个intel_iommu对象
 	g_iommus = kcalloc(g_num_of_iommus, sizeof(struct intel_iommu *),
 			GFP_KERNEL);
 	if (!g_iommus) {
@@ -3296,6 +3338,7 @@ static int __init init_dmars(void)
 		goto error;
 	}
 
+    //遍历每个drhd->iommu
 	for_each_active_iommu(iommu, drhd) {
 		/*
 		 * Find the max pasid size of all IOMMU's in the system.
@@ -3311,8 +3354,14 @@ static int __init init_dmars(void)
 
 		g_iommus[iommu->seq_id] = iommu;
 
+        /*
+         * 初始化iommu     queued invalidation interface
+         */
 		intel_iommu_init_qi(iommu);
 
+        /*
+         * 
+         */
 		ret = iommu_init_domains(iommu);
 		if (ret)
 			goto free_iommu;
@@ -3330,6 +3379,8 @@ static int __init init_dmars(void)
 		 * TBD:
 		 * we could share the same root & context tables
 		 * among all IOMMU's. Need to Split it later.
+		 *
+		 * 分配root table
 		 */
 		ret = iommu_alloc_root_entry(iommu);
 		if (ret)
@@ -3372,9 +3423,12 @@ static int __init init_dmars(void)
 	 * Now that qi is enabled on all iommus, set the root entry and flush
 	 * caches. This is required on some Intel X58 chipsets, otherwise the
 	 * flush_context function will loop forever and the boot hangs.
+	 *
+	 * 遍历dmar_drhd_units->drhd->iommu
 	 */
 	for_each_active_iommu(iommu, drhd) {
 		iommu_flush_write_buffer(iommu);
+		//设置iommu->reg+DMAR_RTADDR_REG = PA(iommu->root_entry)
 		iommu_set_root_entry(iommu);
 		iommu->flush.flush_context(iommu, 0, 0, 0, DMA_CCMD_GLOBAL_INVL);
 		iommu->flush.flush_iotlb(iommu, 0, 0, 0, DMA_TLB_GLOBAL_FLUSH);
@@ -3908,6 +3962,13 @@ const struct dma_map_ops intel_dma_ops = {
 #endif
 };
 
+/*
+ * do_initcalls()
+ *  pci_iommu_init()
+ *   intel_iommu_init()
+ *    iommu_init_mempool()
+ *     iommu_domain_cache_init()
+ */
 static inline int iommu_domain_cache_init(void)
 {
 	int ret = 0;
@@ -3926,6 +3987,13 @@ static inline int iommu_domain_cache_init(void)
 	return ret;
 }
 
+/*
+ * do_initcalls()
+ *  pci_iommu_init()
+ *   intel_iommu_init()
+ *    iommu_init_mempool()
+ *     iommu_devinfo_cache_init()
+ */
 static inline int iommu_devinfo_cache_init(void)
 {
 	int ret = 0;
@@ -3943,17 +4011,30 @@ static inline int iommu_devinfo_cache_init(void)
 	return ret;
 }
 
+/*
+ * do_initcalls()
+ *  pci_iommu_init()
+ *   intel_iommu_init()
+ *    iommu_init_mempool()
+ */
 static int __init iommu_init_mempool(void)
 {
 	int ret;
+	//确定iova_cache创建
 	ret = iova_cache_get();
 	if (ret)
 		return ret;
 
+    /*
+     * 创建iommu_domain_cache
+     */
 	ret = iommu_domain_cache_init();
 	if (ret)
 		goto domain_error;
 
+    /*
+     * 创建iommu_devinfo_cache
+     */
 	ret = iommu_devinfo_cache_init();
 	if (!ret)
 		return ret;
@@ -4000,6 +4081,12 @@ static void quirk_ioat_snb_local_iommu(struct pci_dev *pdev)
 }
 DECLARE_PCI_FIXUP_ENABLE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_IOAT_SNB, quirk_ioat_snb_local_iommu);
 
+/*
+ * do_initcalls()
+ *  pci_iommu_init()
+ *   intel_iommu_init()
+ *    init_no_remapping_devices()
+ */
 static void __init init_no_remapping_devices(void)
 {
 	struct dmar_drhd_unit *drhd;
@@ -4755,6 +4842,11 @@ const struct attribute_group *intel_iommu_groups[] = {
 	NULL,
 };
 
+/*
+ * do_initcalls()
+ *  pci_iommu_init()
+ *   intel_iommu_init()
+ */
 int __init intel_iommu_init(void)
 {
 	int ret = -ENODEV;
@@ -4764,6 +4856,9 @@ int __init intel_iommu_init(void)
 	/* VT-d is required for a TXT/tboot launch, so enforce that */
 	force_on = tboot_force_iommu();
 
+    /*
+     * 创建几个cache
+     */
 	if (iommu_init_mempool()) {
 		if (force_on)
 			panic("tboot: Failed to initialize iommu memory\n");
@@ -4771,12 +4866,19 @@ int __init intel_iommu_init(void)
 	}
 
 	down_write(&dmar_global_lock);
+
+	/*
+	 * 解析dmar表
+	 */
 	if (dmar_table_init()) {
 		if (force_on)
 			panic("tboot: Failed to initialize DMAR table\n");
 		goto out_free_dmar;
 	}
 
+    /*
+     * does some initialization for the ‘Device Scope’ in DRHD
+     */
 	if (dmar_dev_scope_init() < 0) {
 		if (force_on)
 			panic("tboot: Failed to initialize DMAR device scope\n");
@@ -4822,6 +4924,9 @@ int __init intel_iommu_init(void)
 	if (list_empty(&dmar_atsr_units))
 		pr_info("No ATSR found\n");
 
+    /*
+     * reserves all PCI MMIO adress to avoid peer-to-peer access
+     */
 	if (dmar_init_reserved_ranges()) {
 		if (force_on)
 			panic("tboot: Failed to reserve iommu ranges\n");
@@ -4847,6 +4952,9 @@ int __init intel_iommu_init(void)
 
 	init_iommu_pm_ops();
 
+    /*
+     *  For every iommu device, iommu_device_create creates a sysfs device
+     */ 
 	for_each_active_iommu(iommu, drhd) {
 		iommu_device_sysfs_add(&iommu->iommu, NULL,
 				       intel_iommu_groups,
@@ -4855,6 +4963,9 @@ int __init intel_iommu_init(void)
 		iommu_device_register(&iommu->iommu);
 	}
 
+    /*
+     *  add current PCI device to the appropriated iommu group and also register notifier to get the device add notification
+     */
 	bus_set_iommu(&pci_bus_type, &intel_iommu_ops);
 	bus_register_notifier(&pci_bus_type, &device_nb);
 	if (si_domain && !hw_pass_through)

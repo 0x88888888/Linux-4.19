@@ -7020,12 +7020,21 @@ static const struct net_device_ops e1000e_netdev_ops = {
  * e1000_probe initializes an adapter identified by a pci_dev structure.
  * The OS initialization, configuring of the adapter private structure,
  * and a hardware reset occur.
+ *
+ * 给e1000e网卡实际的初始化工作
+ * 
  **/
 static int e1000_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	struct net_device *netdev;
 	struct e1000_adapter *adapter;
 	struct e1000_hw *hw;
+
+	/*
+	 * 根据PCI ID匹配驱动数据，然后从e1000_info_tbl[]数组中
+	 * 得到类型为struct e1000_info的网卡驱动信息ei
+	 * （比如Intel82574网卡将得到e1000_82574_info）
+	 */
 	const struct e1000_info *ei = e1000_info_tbl[ent->driver_data];
 	resource_size_t mmio_start, mmio_len;
 	resource_size_t flash_start, flash_len;
@@ -7048,6 +7057,9 @@ static int e1000_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		return err;
 
 	pci_using_dac = 0;
+	/*
+	 * 
+	 */
 	err = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
 	if (!err) {
 		pci_using_dac = 1;
@@ -7060,6 +7072,7 @@ static int e1000_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		}
 	}
 
+    //设置pci配置空间的bar信息
 	bars = pci_select_bars(pdev, IORESOURCE_MEM);
 	err = pci_request_selected_regions_exclusive(pdev, bars,
 						     e1000e_driver_name);
@@ -7080,8 +7093,10 @@ static int e1000_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (!netdev)
 		goto err_alloc_etherdev;
 
+    //
 	SET_NETDEV_DEV(netdev, &pdev->dev);
 
+    //中断号
 	netdev->irq = pdev->irq;
 
 	pci_set_drvdata(pdev, netdev);
@@ -7135,6 +7150,7 @@ static int e1000_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	e1000e_check_options(adapter);
 
 	/* setup adapter struct */
+	//
 	err = e1000_sw_init(adapter);
 	if (err)
 		goto err_sw_init;

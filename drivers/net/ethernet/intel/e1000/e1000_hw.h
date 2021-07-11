@@ -503,7 +503,10 @@ struct e1000_rx_desc {
 	__le16 special;
 };
 
-/* Receive Descriptor - Extended */
+/* Receive Descriptor - Extended 
+ *
+ * 一个非分片型接收描述符
+ */
 union e1000_rx_desc_extended {
 	struct {
 		__le64 buffer_addr;
@@ -529,7 +532,10 @@ union e1000_rx_desc_extended {
 };
 
 #define MAX_PS_BUFFERS 4
-/* Receive Descriptor - Packet Split */
+/* Receive Descriptor - Packet Split
+ *
+ * 描述一个分片型接收描述符
+ */
 union e1000_rx_desc_packet_split {
 	struct {
 		/* one buffer for protocol header(s), three data buffers */

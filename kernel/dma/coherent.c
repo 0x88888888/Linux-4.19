@@ -207,6 +207,7 @@ err:
 int dma_alloc_from_dev_coherent(struct device *dev, ssize_t size,
 		dma_addr_t *dma_handle, void **ret)
 {
+
 	struct dma_coherent_mem *mem = dev_get_coherent_memory(dev);
 
 	if (!mem)
@@ -417,6 +418,8 @@ static int __init dma_init_reserved_memory(void)
 	/*
 	 * We rely on rmem_dma_device_init() does not propagate error of
 	 * dma_assign_coherent_memory() for "NULL" device.
+	 *
+	 * rmem_dma_ops->device_init == rmem_dma_device_init
 	 */
 	ret = ops->device_init(dma_reserved_default_memory, NULL);
 

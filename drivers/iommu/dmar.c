@@ -76,6 +76,13 @@ static void free_iommu(struct intel_iommu *iommu);
 
 extern const struct iommu_ops intel_iommu_ops;
 
+/*
+ * parse_dmar_table()
+ *  dmar_walk_dmar_table()
+ *   ......
+ *    dmar_parse_one_drhd()
+ *     dmar_register_drhd_unit()
+ */
 static void dmar_register_drhd_unit(struct dmar_drhd_unit *drhd)
 {
 	/*
@@ -383,6 +390,13 @@ dmar_find_dmaru(struct acpi_dmar_hardware_unit *drhd)
 }
 
 /**
+ * parse_dmar_table()
+ *  dmar_walk_dmar_table()
+ *   ......
+ *    dmar_parse_one_drhd()
+ *
+ * 解析DMAR table ,创建 ‘dmar_drhd_unit’ struct,
+ *
  * dmar_parse_one_drhd - parses exactly one DMA remapping hardware definition
  * structure which uniquely represent one DMA remapping hardware unit
  * present in the platform
@@ -419,6 +433,10 @@ static int dmar_parse_one_drhd(struct acpi_dmar_header *header, void *arg)
 		return -ENOMEM;
 	}
 
+    /*
+     * 化分配和初始化dmaru->iommu
+     * 映射dmaru->reg_base_addr这个mmio地址
+     */
 	ret = alloc_iommu(dmaru);
 	if (ret) {
 		dmar_free_dev_scope(&dmaru->devices,
@@ -426,6 +444,7 @@ static int dmar_parse_one_drhd(struct acpi_dmar_header *header, void *arg)
 		kfree(dmaru);
 		return ret;
 	}
+	//添加‘dmar_drhd_unit’ 到 ‘dmar_drhd_units’ list
 	dmar_register_drhd_unit(dmaru);
 
 out:
@@ -537,6 +556,9 @@ dmar_table_print_dmar_entry(struct acpi_dmar_header *header)
 }
 
 /**
+ * detect_intel_iommu()
+ *  dmar_table_detect()
+ *
  * dmar_table_detect - checks to see if the platform supports DMAR devices
  */
 static int __init dmar_table_detect(void)
@@ -554,6 +576,11 @@ static int __init dmar_table_detect(void)
 	return ACPI_SUCCESS(status) ? 0 : -ENOENT;
 }
 
+/*
+ * detect_intel_iommu()
+ *	dmar_walk_dmar_table()
+ *   dmar_walk_remapping_entries()
+ */
 static int dmar_walk_remapping_entries(struct acpi_dmar_header *start,
 				       size_t len, struct dmar_res_callback *cb)
 {
@@ -595,6 +622,13 @@ static int dmar_walk_remapping_entries(struct acpi_dmar_header *start,
 	return 0;
 }
 
+/*
+ * detect_intel_iommu()
+ *  dmar_walk_dmar_table()
+ *
+ * parse_dmar_table()
+ *  dmar_walk_dmar_table()
+ */
 static inline int dmar_walk_dmar_table(struct acpi_table_dmar *dmar,
 				       struct dmar_res_callback *cb)
 {
@@ -611,10 +645,14 @@ parse_dmar_table(void)
 	struct acpi_table_dmar *dmar;
 	int drhd_count = 0;
 	int ret;
+	/*
+	 * 对每种‘Remapping structure’都有一个dmar_res_handler_t来处理
+	 */
 	struct dmar_res_callback cb = {
 		.print_entry = true,
 		.ignore_unhandled = true,
 		.arg[ACPI_DMAR_TYPE_HARDWARE_UNIT] = &drhd_count,
+		//这个
 		.cb[ACPI_DMAR_TYPE_HARDWARE_UNIT] = &dmar_parse_one_drhd,
 		.cb[ACPI_DMAR_TYPE_RESERVED_MEMORY] = &dmar_parse_one_rmrr,
 		.cb[ACPI_DMAR_TYPE_ROOT_ATS] = &dmar_parse_one_atsr,
@@ -644,6 +682,10 @@ parse_dmar_table(void)
 	}
 
 	pr_info("Host address width %d\n", dmar->width + 1);
+
+	/*
+	 * map the DMAR ACPI table 到 ‘dmar_tbl’
+	 */
 	ret = dmar_walk_dmar_table(dmar, &cb);
 	if (ret == 0 && drhd_count == 0)
 		pr_warn(FW_BUG "No DRHD structure found in DMAR table\n");
@@ -741,6 +783,13 @@ static void __init dmar_acpi_insert_dev_scope(u8 device_number,
 		device_number, dev_name(&adev->dev));
 }
 
+/*
+ * do_initcalls()
+ *  pci_iommu_init()
+ *   intel_iommu_init()
+ *    dmar_dev_scope_init()
+ *     dmar_acpi_dev_scope_init()
+ */
 static int __init dmar_acpi_dev_scope_init(void)
 {
 	struct acpi_dmar_andd *andd;
@@ -773,6 +822,14 @@ static int __init dmar_acpi_dev_scope_init(void)
 	return 0;
 }
 
+/*
+ * do_initcalls()
+ *  pci_iommu_init()
+ *   intel_iommu_init()
+ *    dmar_dev_scope_init()
+ *
+ * initialize the Decie Scope Entries in DRHD, 
+ */
 int __init dmar_dev_scope_init(void)
 {
 	struct pci_dev *dev = NULL;
@@ -811,13 +868,22 @@ void __init dmar_register_bus_notifier(void)
 	bus_register_notifier(&pci_bus_type, &dmar_pci_bus_nb);
 }
 
-
+/*
+ * do_initcalls()
+ *  pci_iommu_init()
+ *   intel_iommu_init()
+ *    dmar_table_init()
+ */
 int __init dmar_table_init(void)
 {
 	static int dmar_table_initialized;
 	int ret;
 
 	if (dmar_table_initialized == 0) {
+
+	    /*
+	     * 解析dmar表
+	     */
 		ret = parse_dmar_table();
 		if (ret < 0) {
 			if (ret != -ENODEV)
@@ -886,6 +952,9 @@ dmar_validate_one_drhd(struct acpi_dmar_header *entry, void *arg)
 	return 0;
 }
 
+/*
+ *
+ */
 int __init detect_intel_iommu(void)
 {
 	int ret;
@@ -895,6 +964,9 @@ int __init detect_intel_iommu(void)
 	};
 
 	down_write(&dmar_global_lock);
+	/*
+	 * dmar_tble指向进行iommu的设备
+	 */
 	ret = dmar_table_detect();
 	if (!ret)
 		ret = dmar_walk_dmar_table((struct acpi_table_dmar *)dmar_tbl,
@@ -926,6 +998,15 @@ static void unmap_iommu(struct intel_iommu *iommu)
 }
 
 /**
+ * parse_dmar_table()
+ *  dmar_walk_dmar_table()
+ *   ......
+ *    dmar_parse_one_drhd()
+ *     alloc_iommu()
+ *      map_iommu()
+ *
+ * 映射一段设备物理地址到cpu的物理地址空间
+ *
  * map_iommu: map the iommu's registers
  * @iommu: the iommu to map
  * @phys_addr: the physical address of the base resgister
@@ -1016,6 +1097,15 @@ static void dmar_free_seq_id(struct intel_iommu *iommu)
 	}
 }
 
+/*
+ * parse_dmar_table()
+ *  dmar_walk_dmar_table()
+ *   ......
+ *    dmar_parse_one_drhd()
+ *     alloc_iommu()
+ *
+ *  map the MMIO of iommu device and do some initialization work according to the BAR
+ */
 static int alloc_iommu(struct dmar_drhd_unit *drhd)
 {
 	struct intel_iommu *iommu;

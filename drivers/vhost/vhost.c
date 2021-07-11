@@ -184,7 +184,18 @@ void vhost_work_init(struct vhost_work *work, vhost_work_fn_t fn)
 }
 EXPORT_SYMBOL_GPL(vhost_work_init);
 
-/* Init poll structure */
+/*
+ * vfs_open()
+ *  vhost_net_open()
+ *   vhost_poll_init( n->poll + VHOST_NET_VQ_TX ,fn==handle_tx_net, EPOLLOUT)
+ *   vhost_poll_init( n->poll + VHOST_NET_VQ_RX ,fn==handle_rx_net, EPOLLIN)
+ *
+ * vhost_net_open()
+ *  vhost_dev_init() 
+ *   vhost_poll_init(&vq->poll, vq->handle_kick, EPOLLIN)   
+ *
+ * Init poll structure 
+ */
 void vhost_poll_init(struct vhost_poll *poll, vhost_work_fn_t fn,
 		     __poll_t mask, struct vhost_dev *dev)
 {
@@ -194,6 +205,7 @@ void vhost_poll_init(struct vhost_poll *poll, vhost_work_fn_t fn,
 	poll->dev = dev;
 	poll->wqh = NULL;
 
+    //fn==handle_rx_net,或者fn=handle_tx_net
 	vhost_work_init(&poll->work, fn);
 }
 EXPORT_SYMBOL_GPL(vhost_poll_init);
@@ -218,7 +230,7 @@ int vhost_poll_start(struct vhost_poll *poll, struct file *file)
 
     //tap设备如果接受到数据会去调用handle_rx_net
 	mask = vfs_poll(file, &poll->table);
-	if (mask)
+	if (mask)//说明有POLLIN,POLLOUT事件,唤醒worker去处理
 		vhost_poll_wakeup(&poll->wait, 0, 0, poll_to_key(mask));
 	if (mask & EPOLLERR) {
 		vhost_poll_stop(poll);
@@ -502,6 +514,13 @@ static void vhost_attach_cgroups_work(struct vhost_work *work)
 	s->ret = cgroup_attach_task_all(s->owner, current);
 }
 
+/*
+ * vhost_net_compat_ioctl()
+ *  vhost_net_ioctl()
+ *   vhost_net_set_owner()
+ *    vhost_dev_set_owner()
+ *     vhost_attach_cgroups()
+ */
 static int vhost_attach_cgroups(struct vhost_dev *dev)
 {
 	struct vhost_attach_cgroups_struct attach;
@@ -1354,6 +1373,8 @@ static struct vhost_umem *vhost_umem_alloc(void)
  * vhost_net_ioctl()
  *  vhost_dev_ioctl() [VHOST_SET_MEM_TABLE]
  *   vhost_set_memory()
+ *
+ * 设置vhost_dev->umem,vm物理地址与qemu虚拟地址的关系
  */
 static long vhost_set_memory(struct vhost_dev *d, struct vhost_memory __user *m)
 {
@@ -1451,7 +1472,7 @@ long vhost_vring_ioctl(struct vhost_dev *d, unsigned int ioctl, void __user *arg
 	mutex_lock(&vq->mutex);
 
 	switch (ioctl) {
-	case VHOST_SET_VRING_NUM:
+	case VHOST_SET_VRING_NUM: // 设置vhost_virtqueue->num== s.num
 		/* Resizing ring with an active backend?
 		 * You don't want to do that. */
 		if (vq->private_data) {
@@ -1468,7 +1489,7 @@ long vhost_vring_ioctl(struct vhost_dev *d, unsigned int ioctl, void __user *arg
 		}
 		vq->num = s.num;
 		break;
-	case VHOST_SET_VRING_BASE:
+	case VHOST_SET_VRING_BASE: //设置vring_virtqueue->last_avail_idx, vring_virtqueue->avail_idx
 		/* Moving base with an active backend?
 		 * You don't want to do that. */
 		if (vq->private_data) {
@@ -1483,6 +1504,7 @@ long vhost_vring_ioctl(struct vhost_dev *d, unsigned int ioctl, void __user *arg
 			r = -EINVAL;
 			break;
 		}
+		
 		vq->last_avail_idx = s.num;
 		/* Forget the cached index value. */
 		vq->avail_idx = vq->last_avail_idx;
@@ -1550,6 +1572,9 @@ long vhost_vring_ioctl(struct vhost_dev *d, unsigned int ioctl, void __user *arg
 		vq->used = (void __user *)(unsigned long)a.used_user_addr;
 		break;
 	case VHOST_SET_VRING_KICK: //告诉前端virtio 驱动发送通知的时候触发的eventfd
+        /*
+         * vhost_vring_file
+         */
 		if (copy_from_user(&f, argp, sizeof f)) {
 			r = -EFAULT;
 			break;
@@ -1574,12 +1599,13 @@ long vhost_vring_ioctl(struct vhost_dev *d, unsigned int ioctl, void __user *arg
 			r = -EFAULT;
 			break;
 		}
+		//eventfd对应的eventfd_ctx对象
 		ctx = f.fd == -1 ? NULL : eventfd_ctx_fdget(f.fd);
 		if (IS_ERR(ctx)) {
 			r = PTR_ERR(ctx);
 			break;
 		}
-		//交换
+		//可能ctx==NULL,为什么用swap?,说明有两个eventfd_ctx轮换着用?
 		swap(ctx, vq->call_ctx);
 		break;
 	case VHOST_SET_VRING_ERR:
@@ -1620,8 +1646,9 @@ long vhost_vring_ioctl(struct vhost_dev *d, unsigned int ioctl, void __user *arg
 	if (pollstop && vq->handle_kick)
 		vhost_poll_stop(&vq->poll);
 
-	if (!IS_ERR_OR_NULL(ctx))
+	if (!IS_ERR_OR_NULL(ctx))//ctx!=NULL,ctx!=ERROR,ctx有正常值
 		eventfd_ctx_put(ctx);
+	
 	if (filep)
 		fput(filep);
 
@@ -1632,6 +1659,7 @@ long vhost_vring_ioctl(struct vhost_dev *d, unsigned int ioctl, void __user *arg
 
 	if (pollstop && vq->handle_kick)
 		vhost_poll_flush(&vq->poll);
+	
 	return r;
 }
 EXPORT_SYMBOL_GPL(vhost_vring_ioctl);
@@ -1688,7 +1716,7 @@ long vhost_dev_ioctl(struct vhost_dev *d, unsigned int ioctl, void __user *argp)
 		goto done;
 
 	switch (ioctl) {
-	case VHOST_SET_MEM_TABLE://设置vhost_dev->umem
+	case VHOST_SET_MEM_TABLE://设置vhost_dev->umem,vm物理地址与qemu虚拟地址的关系
 		r = vhost_set_memory(d, argp);
 		break;
 	case VHOST_SET_LOG_BASE:
@@ -1701,6 +1729,7 @@ long vhost_dev_ioctl(struct vhost_dev *d, unsigned int ioctl, void __user *argp)
 			break;
 		}
 		for (i = 0; i < d->nvqs; ++i) {
+			
 			struct vhost_virtqueue *vq;
 			void __user *base = (void __user *)(unsigned long)p;
 			vq = d->vqs[i];
@@ -2350,7 +2379,11 @@ static bool vhost_notify(struct vhost_dev *dev, struct vhost_virtqueue *vq)
 /* This actually signals the guest, using eventfd. */
 void vhost_signal(struct vhost_dev *dev, struct vhost_virtqueue *vq)
 {
-	/* Signal the Guest tell them we used something up. */
+	/*
+	 * Signal the Guest tell them we used something up. 
+	 *
+	 * vhost通知到guest
+     */
 	if (vq->call_ctx && vhost_notify(dev, vq))
 		eventfd_signal(vq->call_ctx, 1);
 }

@@ -1234,6 +1234,8 @@ struct dev_ifalias {
  *	that got dropped are freed/returned via xdp_return_frame().
  *	Returns negative number, means general error invoking ndo, meaning
  *	no frames were xmit'ed and core-caller will free all frames.
+ *
+ * 网络设备的通用操作函数集
  */
 struct net_device_ops {
 	int			(*ndo_init)(struct net_device *dev);
@@ -1747,8 +1749,9 @@ enum netdev_priv_flags {
  *
  *	FIXME: cleanup struct net_device such that network protocol info
  *	moves out.
+ *
+ * 描述一个网络设备
  */
-
 struct net_device {
 	char			name[IFNAMSIZ];
 	struct hlist_node	name_hlist;

@@ -282,7 +282,10 @@ struct pci_vpd;
 struct pci_sriov;
 struct pci_ats;
 
-/* The pci_dev structure describes PCI devices */
+/* The pci_dev structure describes PCI devices 
+ *
+ * 在软件层面上，内核中的PCIe设备也是PCI设备，不过带有一些扩展功能
+ */
 struct pci_dev {
 	struct list_head bus_list;	/* Node in per-bus list */
 	struct pci_bus	*bus;		/* Bus this device is on */
@@ -749,6 +752,9 @@ struct pci_error_handlers {
 
 
 struct module;
+/* 
+ * pci设备的通用驱动框架
+ */
 struct pci_driver {
 	struct list_head	node;
 	const char		*name;

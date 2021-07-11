@@ -261,7 +261,10 @@ union e1000_rx_desc_packet_split {
 	} wb; /* writeback */
 };
 
-/* Transmit Descriptor */
+/* Transmit Descriptor 
+ *
+ * 描述一个发送描述符 
+ */
 struct e1000_tx_desc {
 	__le64 buffer_addr;      /* Address of the descriptor's data buffer */
 	union {
@@ -667,6 +670,9 @@ struct e1000_dev_spec_ich8lan {
 	enum e1000_ulp_state ulp_state;
 };
 
+/*
+ * e1000e网卡的寄存器
+ */
 struct e1000_hw {
 	struct e1000_adapter *adapter;
 

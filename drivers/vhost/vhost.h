@@ -93,6 +93,9 @@ struct vhost_virtqueue {
 	const struct vhost_umem_node *meta_iotlb[VHOST_NUM_ADDRS];
 	//eventfd对应的file对象
 	struct file *kick;
+	/*
+	 * vhost-net后端到虚拟机virtio前端的中断通知
+	 */
 	struct eventfd_ctx *call_ctx;
 	struct eventfd_ctx *error_ctx;
 	struct eventfd_ctx *log_ctx;
@@ -171,7 +174,13 @@ struct vhost_dev {
 	int nvqs;
 	struct eventfd_ctx *log_ctx;
 	struct llist_head work_list;
+	/*
+	 * "vhost-%d"进程
+	 */
 	struct task_struct *worker;
+	/*
+	 * vm物理地址与qemu虚拟地址的关系
+	 */
 	struct vhost_umem *umem;
 	struct vhost_umem *iotlb;
 	spinlock_t iotlb_lock;
