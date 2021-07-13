@@ -5689,14 +5689,14 @@ int kvm_mmu_page_fault(struct kvm_vcpu *vcpu, gva_t cr2, u64 error_code,
 	}
 
 	if (r == RET_PF_INVALID) { //通常走这里
-		//tdp_page_fault
+		//tdp_page_fault ,如果是try_async_pf处理，返回RET_PF_RETRY
 		r = vcpu->arch.mmu.page_fault(vcpu, cr2, lower_32_bits(error_code),
 					      false);
 		WARN_ON(r == RET_PF_INVALID);
 	}
 
 	if (r == RET_PF_RETRY)
-		return 1;
+		return 1; //返回1,vCPU继续执行
 	if (r < 0)
 		return r;
 

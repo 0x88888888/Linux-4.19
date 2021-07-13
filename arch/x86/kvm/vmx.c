@@ -1013,6 +1013,7 @@ struct vcpu_vmx {
 	struct shared_msr_entry *guest_msrs;
 	int                   nmsrs;
 	int                   save_nmsrs;
+	//host 的interrupt descriptor table 的 address
 	unsigned long	      host_idt_base;
 #ifdef CONFIG_X86_64
 	u64 		      msr_host_kernel_gs_base;
@@ -11020,7 +11021,7 @@ static void vmx_handle_external_intr(struct kvm_vcpu *vcpu)
 #endif
 			"pushf\n\t"
 			__ASM_SIZE(push) " $%c[cs]\n\t"
-			CALL_NOSPEC
+			CALL_NOSPEC  /* 调用desc */
 			:
 #ifdef CONFIG_X86_64
 			[sp]"=&r"(tmp),

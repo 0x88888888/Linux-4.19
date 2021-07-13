@@ -8159,6 +8159,10 @@ static int vcpu_run(struct kvm_vcpu *vcpu)
 			break;
 		}
 
+        /*
+         *guest os被host swap out出去的page，现在已经被host swap in了
+         * 
+         */
 		kvm_check_async_pf_completion(vcpu);
 
         /*是否有阻塞的signal*/

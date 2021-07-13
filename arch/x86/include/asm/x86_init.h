@@ -56,6 +56,9 @@ struct x86_init_resources {
 struct x86_init_irqs {
 	void (*pre_vector_init)(void);
 	void (*intr_init)(void);
+	/*
+	 * kvm_apf_trap_init
+	 */ 
 	void (*trap_init)(void);
 	void (*intr_mode_init)(void);
 };
@@ -128,7 +131,9 @@ struct x86_init_pci {
  * @init_after_bootmem:		guest init after boot allocator is finished
  */
 struct x86_hyper_init {
+    //kvm_init_platform
 	void (*init_platform)(void);
+	//kvm_guest_init
 	void (*guest_late_init)(void);
 	bool (*x2apic_available)(void);
 	void (*init_mem_mapping)(void);

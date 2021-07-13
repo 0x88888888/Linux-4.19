@@ -403,7 +403,7 @@ struct dmar_domain {
 
 	bool has_iotlb_device;
 	struct list_head devices;	/* all devices' list */
-	struct iova_domain iovad;	/* iova's that belong to this domain */
+	struct iova_domain iovad;	/* 红黑树,包含属于这个domain的iova,iova's that belong to this domain */
 
 	struct dma_pte	*pgd;		/* virtual address */
 	int		gaw;		/* max guest address width */

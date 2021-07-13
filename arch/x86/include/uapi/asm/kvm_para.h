@@ -109,6 +109,9 @@ struct kvm_mmu_op_release_pt {
 #define KVM_PV_REASON_PAGE_READY 2
 
 struct kvm_vcpu_pv_apf_data {
+    /*
+     * KVM_PV_REASON_PAGE_NOT_PRESENT或者KVM_PV_REASON_PAGE_READY
+     */
 	__u32 reason;
 	__u8 pad[60];
 	__u32 enabled;

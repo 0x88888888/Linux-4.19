@@ -986,6 +986,9 @@ struct device {
 #ifdef CONFIG_NUMA
 	int		numa_node;	/* NUMA node this device is close to */
 #endif
+    /*
+     * 在intel_iomu_init中被赋值为intel_dma_ops
+     */
 	const struct dma_map_ops *dma_ops;
 	u64		*dma_mask;	/* dma mask (if dma'able device) */
 	u64		coherent_dma_mask;/* Like dma_mask, but for

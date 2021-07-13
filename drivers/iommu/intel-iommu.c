@@ -2026,6 +2026,15 @@ static void domain_exit(struct dmar_domain *domain)
 	free_domain_mem(domain);
 }
 
+/*
+ * get_domain_for_dev()
+ *  set_domain_for_dev()
+ *   dmar_insert_one_dev_info()
+ *    domain_context_mapping()
+ *     domain_context_mapping_one()
+ *
+ * 做好setup the IOMMU DAM remapping page table
+ */
 static int domain_context_mapping_one(struct dmar_domain *domain,
 				      struct intel_iommu *iommu,
 				      u8 bus, u8 devfn)
@@ -2052,6 +2061,7 @@ static int domain_context_mapping_one(struct dmar_domain *domain,
 	spin_lock(&iommu->lock);
 
 	ret = -ENOMEM;
+	//得到context entry 
 	context = iommu_context_addr(iommu, bus, devfn, 1);
 	if (!context)
 		goto out_unlock;
@@ -2105,6 +2115,7 @@ static int domain_context_mapping_one(struct dmar_domain *domain,
 		else
 			translation = CONTEXT_TT_MULTI_LEVEL;
 
+		//设置context entry’s to the domain’s pgd physical address
 		context_set_address_root(context, virt_to_phys(pgd));
 		context_set_address_width(context, iommu->agaw);
 	} else {
@@ -2161,6 +2172,13 @@ static int domain_context_mapping_cb(struct pci_dev *pdev,
 					  PCI_BUS_NUM(alias), alias & 0xff);
 }
 
+/*
+ * get_domain_for_dev()
+ *  set_domain_for_dev()
+ *   dmar_insert_one_dev_info()
+ *    domain_context_mapping()
+ *
+ */
 static int
 domain_context_mapping(struct dmar_domain *domain, struct device *dev)
 {
@@ -2479,6 +2497,11 @@ dmar_search_domain_by_dev_info(int segment, int bus, int devfn)
 	return NULL;
 }
 
+/*
+ * get_domain_for_dev()
+ *  set_domain_for_dev()
+ *   dmar_insert_one_dev_info()
+ */
 static struct dmar_domain *dmar_insert_one_dev_info(struct intel_iommu *iommu,
 						    int bus, int devfn,
 						    struct device *dev,
@@ -2570,6 +2593,7 @@ static struct dmar_domain *dmar_insert_one_dev_info(struct intel_iommu *iommu,
 	}
 	spin_unlock_irqrestore(&device_domain_lock, flags);
 
+    //做好iommu dma remapping的table
 	if (dev && domain_context_mapping(domain, dev)) {
 		pr_err("Domain context map for %s failed\n", dev_name(dev));
 		dmar_remove_one_dev_info(domain, dev);
@@ -2632,6 +2656,10 @@ out:
 	return domain;
 }
 
+/*
+ * get_domain_for_dev()
+ *  set_domain_for_dev()
+ */
 static struct dmar_domain *set_domain_for_dev(struct device *dev,
 					      struct dmar_domain *domain)
 {
@@ -2653,6 +2681,7 @@ static struct dmar_domain *set_domain_for_dev(struct device *dev,
 
 		/* register PCI DMA alias device */
 		if (req_id != dma_alias) {
+			
 			tmp = dmar_insert_one_dev_info(iommu, PCI_BUS_NUM(dma_alias),
 					dma_alias & 0xff, NULL, domain);
 
@@ -2668,6 +2697,9 @@ static struct dmar_domain *set_domain_for_dev(struct device *dev,
 	return domain;
 }
 
+/*
+ * get_domain_for_dev()
+ */
 static struct dmar_domain *get_domain_for_dev(struct device *dev, int gaw)
 {
 	struct dmar_domain *domain, *tmp;
@@ -3551,7 +3583,15 @@ error:
 	return ret;
 }
 
-/* This takes a number of _MM_ pages, not VTD pages */
+/*
+ * dma_alloc_coherent()
+ *  dma_alloc_attrs()
+ *   intel_alloc_coherent()
+ *    __intel_map_single()
+ *     intel_alloc_iova()
+ *
+ * This takes a number of _MM_ pages, not VTD pages 
+ */
 static unsigned long intel_alloc_iova(struct device *dev,
 				     struct dmar_domain *domain,
 				     unsigned long nrpages, uint64_t dma_mask)
@@ -3676,6 +3716,14 @@ static int iommu_no_mapping(struct device *dev)
 	return 0;
 }
 
+/*
+ * dma_alloc_coherent()
+ *  dma_alloc_attrs()
+ *   intel_alloc_coherent()
+ *    __intel_map_single()
+ *
+ * 将paddr map掉
+ */
 static dma_addr_t __intel_map_single(struct device *dev, phys_addr_t paddr,
 				     size_t size, int dir, u64 dma_mask)
 {
@@ -3699,6 +3747,7 @@ static dma_addr_t __intel_map_single(struct device *dev, phys_addr_t paddr,
 	iommu = domain_get_iommu(domain);
 	size = aligned_nrpages(paddr, size);
 
+    //分配IO virtual address的 pfn
 	iova_pfn = intel_alloc_iova(dev, domain, dma_to_mm_pfn(size), dma_mask);
 	if (!iova_pfn)
 		goto error;
@@ -3795,6 +3844,11 @@ static void intel_unmap_page(struct device *dev, dma_addr_t dev_addr,
 	intel_unmap(dev, dev_addr, size);
 }
 
+/*
+ * dma_alloc_coherent()
+ *  dma_alloc_attrs()
+ *   intel_alloc_coherent()
+ */
 static void *intel_alloc_coherent(struct device *dev, size_t size,
 				  dma_addr_t *dma_handle, gfp_t flags,
 				  unsigned long attrs)
@@ -3817,6 +3871,7 @@ static void *intel_alloc_coherent(struct device *dev, size_t size,
 	if (gfpflags_allow_blocking(flags)) {
 		unsigned int count = size >> PAGE_SHIFT;
 
+        //分配page
 		page = dma_alloc_from_contiguous(dev, count, order,
 						 flags & __GFP_NOWARN);
 		if (page && iommu_no_mapping(dev) &&

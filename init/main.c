@@ -1184,7 +1184,11 @@ static void __init do_initcalls(void)
      * 1. core_initcall(virtio_init)
      * 1. core_initcall(dma_init_reserved_memory)
      *
+     * 2. postcore_initcall()
+     *
      * 3. arch_initcall(bts_init) perf性能监控使用
+     * 3. arch_initcall(activate_jump_labels)
+     * 3. arch_initcall(kvm_setup_pv_tlb_flush)
      *
      * 4. subsys_initcall(cgroup_sysfs_init)
      * 4. subsys_initcall(cgroup_namespaces_init)     
@@ -1195,6 +1199,7 @@ static void __init do_initcalls(void)
      *
      *
      * 5. fs_initcall(inet_init)
+     * 
      * 
      * 
      * 6. __initcall(cpucache_init)

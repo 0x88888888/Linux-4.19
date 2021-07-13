@@ -616,6 +616,11 @@ static void kvm_flush_tlb_others(const struct cpumask *cpumask,
 	native_flush_tlb_others(flushmask, info);
 }
 
+/*
+ * start_kernel()
+ *   setup_arch()
+ *	  kvm_guest_init()
+ */
 static void __init kvm_guest_init(void)
 {
 	int i;
@@ -627,6 +632,7 @@ static void __init kvm_guest_init(void)
 	register_reboot_notifier(&kvm_pv_reboot_nb);
 	for (i = 0; i < KVM_TASK_SLEEP_HASHSIZE; i++)
 		raw_spin_lock_init(&async_pf_sleepers[i].lock);
+	
 	if (kvm_para_has_feature(KVM_FEATURE_ASYNC_PF))
 		x86_init.irqs.trap_init = kvm_apf_trap_init;
 
@@ -648,6 +654,7 @@ static void __init kvm_guest_init(void)
 #ifdef CONFIG_SMP
 	smp_ops.smp_prepare_cpus = kvm_smp_prepare_cpus;
 	smp_ops.smp_prepare_boot_cpu = kvm_smp_prepare_boot_cpu;
+	
 	if (cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN, "x86/kvm:online",
 				      kvm_cpu_online, kvm_cpu_down_prepare) < 0)
 		pr_err("kvm_guest: Failed to install cpu hotplug callbacks\n");
@@ -675,6 +682,14 @@ static noinline uint32_t __kvm_cpuid_base(void)
 	return 0;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   init_hypervisor_platform()
+ *    detect_hypervisor_vendor()
+ *     kvm_detect()
+ *      kvm_cpuid_base()
+ */
 static inline uint32_t kvm_cpuid_base(void)
 {
 	static int kvm_cpuid_base = -1;
@@ -701,6 +716,13 @@ unsigned int kvm_arch_para_hints(void)
 	return cpuid_edx(kvm_cpuid_base() | KVM_CPUID_FEATURES);
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   init_hypervisor_platform()
+ *    detect_hypervisor_vendor()
+ *     kvm_detect()
+ */
 static uint32_t __init kvm_detect(void)
 {
 	return kvm_cpuid_base();
@@ -713,6 +735,7 @@ static void __init kvm_apic_init(void)
 		kvm_setup_pv_ipi();
 #endif
 }
+
 
 static void __init kvm_init_platform(void)
 {
@@ -748,6 +771,7 @@ static __init int kvm_setup_pv_tlb_flush(void)
 	if (kvm_para_has_feature(KVM_FEATURE_PV_TLB_FLUSH) &&
 	    !kvm_para_has_hint(KVM_HINTS_REALTIME) &&
 	    kvm_para_has_feature(KVM_FEATURE_STEAL_TIME)) {
+	    
 		for_each_possible_cpu(cpu) {
 			zalloc_cpumask_var_node(per_cpu_ptr(&__pv_tlb_mask, cpu),
 				GFP_KERNEL, cpu_to_node(cpu));

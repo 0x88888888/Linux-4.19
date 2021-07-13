@@ -322,6 +322,13 @@ static int kvmclock_setup_percpu(unsigned int cpu)
 	return p ? 0 : -ENOMEM;
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   init_hypervisor_platform()
+ *    kvm_init_platform()
+ *     kvmclock_init()
+ */
 void __init kvmclock_init(void)
 {
 	u8 flags;

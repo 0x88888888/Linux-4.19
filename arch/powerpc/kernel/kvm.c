@@ -716,6 +716,7 @@ static __init void kvm_free_tmp(void)
 			   &kvm_tmp[ARRAY_SIZE(kvm_tmp)], -1, NULL);
 }
 
+
 static int __init kvm_guest_init(void)
 {
 	if (!kvm_para_available())

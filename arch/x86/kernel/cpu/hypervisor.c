@@ -44,6 +44,7 @@ static const __initconst struct hypervisor_x86 * const hypervisors[] =
 	&x86_hyper_vmware,
 	&x86_hyper_ms_hyperv,
 #ifdef CONFIG_KVM_GUEST
+    //这个
 	&x86_hyper_kvm,
 #endif
 #ifdef CONFIG_JAILHOUSE_GUEST
@@ -54,6 +55,12 @@ static const __initconst struct hypervisor_x86 * const hypervisors[] =
 enum x86_hypervisor_type x86_hyper_type;
 EXPORT_SYMBOL(x86_hyper_type);
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   init_hypervisor_platform()
+ *    detect_hypervisor_vendor()
+ */
 static inline const struct hypervisor_x86 * __init
 detect_hypervisor_vendor(void)
 {
@@ -61,7 +68,7 @@ detect_hypervisor_vendor(void)
 	uint32_t pri, max_pri = 0;
 
 	for (p = hypervisors; p < hypervisors + ARRAY_SIZE(hypervisors); p++) {
-		pri = (*p)->detect();
+		pri = (*p)->detect(); //kvm_detect
 		if (pri > max_pri) {
 			max_pri = pri;
 			h = *p;
@@ -85,6 +92,11 @@ static void __init copy_array(const void *src, void *target, unsigned int size)
 			to[i] = from[i];
 }
 
+/*
+ * start_kernel()  [init/main.c]
+ *  setup_arch()
+ *   init_hypervisor_platform()
+ */
 void __init init_hypervisor_platform(void)
 {
 	const struct hypervisor_x86 *h;
@@ -98,5 +110,7 @@ void __init init_hypervisor_platform(void)
 	copy_array(&h->runtime, &x86_platform.hyper, sizeof(h->runtime));
 
 	x86_hyper_type = h->type;
+
+	//kvm_init_platform
 	x86_init.hyper.init_platform();
 }

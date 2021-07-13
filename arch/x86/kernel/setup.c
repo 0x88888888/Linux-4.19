@@ -1045,6 +1045,8 @@ void __init setup_arch(char **cmdline_p)
 	/*
 	 * VMware detection requires dmi to be available, so this
 	 * needs to be done after dmi_scan_machine(), for the boot CPU.
+	 *
+	 * 
 	 */
 	init_hypervisor_platform();
 
@@ -1283,6 +1285,7 @@ void __init setup_arch(char **cmdline_p)
 
 	io_apic_init_mappings();
 
+    //kvm_guest_init
 	x86_init.hyper.guest_late_init();
 
 	e820__reserve_resources();
