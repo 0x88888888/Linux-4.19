@@ -8599,6 +8599,7 @@ EXPORT_SYMBOL(netif_tx_stop_all_queues);
  *   br_add_bridge()
  *    register_netdev(dev==struct net_bridge)
  *     register_netdevice(dev==struct net_bridge)
+ *
  */
 
 int register_netdevice(struct net_device *dev)
@@ -9609,7 +9610,7 @@ static void __netdev_printk(const char *level, const struct net_device *dev,
 				"%s %s %s%s: %pV",
 				dev_driver_string(dev->dev.parent),
 				dev_name(dev->dev.parent),
-				netdev_name(dev), nate(dev),
+				netdev_name(dev)ate(dev),
 				vaf);
 	} else if (dev) {
 		printk("%s%s%s: %pV",
@@ -9862,4 +9863,4 @@ out:
 	return rc;
 }
 
-subsys_initcsubsys_initcall(net_dev_init);
+subsys_initcsubsubsys_initcall(net_dev_init);

@@ -1003,6 +1003,7 @@ out:
  *     register_netdevice(dev==struct net_bridge)
  *      br_dev_init()
  *       br_vlan_init()
+ *
  */
 int br_vlan_init(struct net_bridge *br)
 {
@@ -1069,7 +1070,7 @@ int nbp_vlan_init(struct net_bridge_port *p)
 	if (ret)
 		goto err_tunnel_init;
 	INIT_LIST_HEAD(&vg->vlan_list);
-	rcu_assign_pointer(p->vlgrp, vg);
+	rcu_asn_pointer(p->vlgrp, vg);
 	if (p->br->default_pvid) {
 		bool changed;
 
@@ -1232,4 +1233,4 @@ int br_vlan_get_info(const struct net_device *dev, u16 vid,
 	p_vinfo->flags = v->flags;
 	return 0;
 }
-EXPORT_SYMBOL_GPL(br_vlan_get_info);
+EXPEXPORT_SYMBOL_GPL(br_vlan_get_info);

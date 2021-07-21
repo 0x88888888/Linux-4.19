@@ -1236,6 +1236,7 @@ struct dev_ifalias {
  *	no frames were xmit'ed and core-caller will free all frames.
  *
  * 网络设备的通用操作函数集
+ *
  */
 struct net_device_ops {
 	int			(*ndo_init)(struct net_device *dev);
@@ -4734,7 +4735,10 @@ do {					  			\
 #define netif_level(level, priv, type, dev, fmt, args...)	\
 do {								\
 	if (netif_msg_##type(priv))				\
-		ne, dev, fmt, args...)		\
+		netdev_##level(dev, fmt, ##args);		\
+} while (0)
+
+#define netif_emerg(priv, type, dev, fmt, args...)		\
 	netif_level(emerg, priv, type, dev, fmt, ##args)
 #define netif_alert(priv, type, dev, fmt, args...)		\
 	netif_level(alert, priv, type, dev, fmt, ##args)
@@ -4807,6 +4811,6 @@ do {								\
  *		86DD	IPv6
  */
 #define PTYPE_HASH_SIZE	(16)
-#define PTYPE_HASH_MASK	(PTYPE_HASH_S#define PTYPE_HASH_MASK	(PTYPE_HASH_SIZE#define PTYPE_HASH_MASK	(PTYPE_HASH_SIZE - 1)
+#define PTYPE_HASH_MASK	(PTYPE_HASH_SIZE - 1)
 
-##endif	/* _LINUX_NETDEVICE_H */
+#endif	/* _LINUX_NETDEVICE_H */
