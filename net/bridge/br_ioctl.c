@@ -402,3 +402,4 @@ int br_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	return -EOPNOTSUPP;
 }
 }
+}

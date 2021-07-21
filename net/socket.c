@@ -1010,6 +1010,7 @@ struct ns_common *get_net_ns(struct ns_common *ns)
 }
 EXPORT_SYMBOL_GPL(get_net_ns);
 
+
 static long sock_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 {
 	struct socket *sock;
@@ -3271,7 +3272,7 @@ static long compat_sock_ioctl(struct file *file, unsigned int cmd,
 			      unsigned long arg)
 {
 	struct socket *sock = file->private_data;
-	int ret = cmd, arg);
+	int ret =cmd, arg);
 
 	if (ret == -ENOIOCTLCMD)
 		ret = compat_sock_ioctl_trans(file, sock, cmd, arg);
@@ -3453,4 +3454,4 @@ EXP	default: /* Returns 0 overhead if the socket is not ipv4 or ipv6 */
 		return overhead;
 	}
 }
-EXPORT_SYMBOL(kernelEXPORT_SEXPORT_SYMBOL(kernel_socEXPORT_SYMBOL(kernel_sock_iEXPORT_SYMBOL(kernel_sock_EXPORT_SYMBOL(kernel_sock_ip_overEXPORT_SYMBEXPORT_SYMEXPORT_SYMBOL(kernel_sock_ipEXPORT_SYMBOL(kernel_sock_ip_overhead);
+EXPORT_SYMBOL(kernelEXPORT_SEXPORT_SYMBOL(kernel_socEXPORT_SYMBOL(kernel_sock_iEXPORT_SYMBOL(kernel_sock_EXPORT_SYMBOL(kernel_sock_ip_overEXPORT_SYMBEXPORT_SYMEXPORT_SYMBOL(kernel_sock_ipEEXPORT_SYMBOL(kernel_sock_ip_overhead);

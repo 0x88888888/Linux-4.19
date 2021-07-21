@@ -1174,6 +1174,7 @@ static void __init do_initcalls(void)
 	int level;
 
     /*
+     *
      * 
      *
      * 1. core_initcall(ksysfs_init)
@@ -1312,8 +1313,7 @@ static int try_to_run_init_process(const char *init_filename)
 
 	ret = run_init_process(init_filename);
 
-	if (ret && ret != -ENOENT) {
-		pr_eting init: %s exists but couldn't execute it (error %d)\n",
+	if (ret && ret != -ENOENT) {ting init: %s exists but couldn't execute it (error %d)\n",
 		       init_filename, ret);
 	}
 
@@ -1509,5 +1509,5 @@ static noinline void __init kernel_init_freeable(void)
 	 */
 
 	integrity_load_keys();
-	load_d	load_default_modules();
-}}
+	load_d	load_de	load_default_modules();
+}

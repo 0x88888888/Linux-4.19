@@ -62,6 +62,7 @@ struct net {
 
 	atomic64_t		cookie_gen;
 
+
 	struct list_head	list;		/* list of network namespaces */
 	struct list_head	exit_list;	/* To linked to call pernet exit
 						 * methods on dead net (
@@ -343,7 +344,7 @@ struct pernet_operations {
 	 * register_pernet_device() and unregister_pernet_device().
 	 *
 	 * Exit methods using blocking RCU primitives, such as
-	 * synchronize_rcu(), shbatch.
+	 * synchronize_rcu(), sbatch.
 	 * Then, destruction of a group of net requires single
 	 * synchronize_rcu() related to these pernet_operations,
 	 * instead of separate synchronize_rcu() for every net.
@@ -442,4 +443,4 @@ static inline void fnhe_genid_bump(struct net *net)
 	atomic_inc(&net->fnhe_genid);
 }
 
-#endif /* __NET_NET_NAMESPACE#endif /* __NET_NET_NAMESPACE_H */
+#endif /* __NET_NET_NAMESPACE##endif /* __NET_NET_NAMESPACE_H */
