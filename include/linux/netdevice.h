@@ -1810,7 +1810,13 @@ struct net_device {
 	const struct iw_handler_def *wireless_handlers;
 	struct iw_public_data	*wireless_data;
 #endif
+   /*
+    * 虚拟网桥时:br_netdev_ops,在br_dev_setup中设置
+    */
 	const struct net_device_ops *netdev_ops;
+    /*
+     * 虚拟网桥时:br_ethtool_ops,在br_dev_setup中设置
+     */
 	const struct ethtool_ops *ethtool_ops;
 #ifdef CONFIG_NET_SWITCHDEV
 	const struct switchdev_ops *switchdev_ops;
@@ -2006,6 +2012,9 @@ struct net_device {
 	const struct attribute_group *sysfs_groups[4];
 	const struct attribute_group *sysfs_rx_queue_group;
 
+    /*
+     * 虚拟网桥设备时br_link_ops
+     */
 	const struct rtnl_link_ops *rtnl_link_ops;
 
 	/* for setting kernel sock attribute on TCP connection setup */
@@ -4018,6 +4027,12 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 int dev_get_valid_name(struct net *net, struct net_device *dev,
 		       const char *name);
 
+/*
+ * sock_ioctl()
+ *  br_ioctl_deviceless_stub()
+ *   br_add_bridge()
+ *    alloc_netdev(setup==br_dev_setup)
+ */
 #define alloc_netdev(sizeof_priv, name, name_assign_type, setup) \
 	alloc_netdev_mqs(sizeof_priv, name, name_assign_type, setup, 1, 1)
 
@@ -4719,10 +4734,7 @@ do {					  			\
 #define netif_level(level, priv, type, dev, fmt, args...)	\
 do {								\
 	if (netif_msg_##type(priv))				\
-		netdev_##level(dev, fmt, ##args);		\
-} while (0)
-
-#define netif_emerg(priv, type, dev, fmt, args...)		\
+		ne, dev, fmt, args...)		\
 	netif_level(emerg, priv, type, dev, fmt, ##args)
 #define netif_alert(priv, type, dev, fmt, args...)		\
 	netif_level(alert, priv, type, dev, fmt, ##args)
@@ -4795,6 +4807,6 @@ do {								\
  *		86DD	IPv6
  */
 #define PTYPE_HASH_SIZE	(16)
-#define PTYPE_HASH_MASK	(PTYPE_HASH_SIZE - 1)
+#define PTYPE_HASH_MASK	(PTYPE_HASH_S#define PTYPE_HASH_MASK	(PTYPE_HASH_SIZE#define PTYPE_HASH_MASK	(PTYPE_HASH_SIZE - 1)
 
-#endif	/* _LINUX_NETDEVICE_H */
+##endif	/* _LINUX_NETDEVICE_H */

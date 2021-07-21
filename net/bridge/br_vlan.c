@@ -200,6 +200,16 @@ static void br_vlan_put_master(struct net_bridge_vlan *masterv)
  *    global entry is used for global per-vlan features, but not for filtering
  * 4. same as 3 but with both master and brentry flags set so the entry
  *    will be used for filtering in both the port and the bridge
+ *
+ * sock_ioctl()
+ *  br_ioctl_deviceless_stub()
+ *   br_add_bridge()
+ *    register_netdev(dev==struct net_bridge)
+ *     register_netdevice(dev==struct net_bridge)
+ *      br_dev_init()
+ *       br_vlan_init()
+ *        br_vlan_add()
+ *         __vlan_add()
  */
 static int __vlan_add(struct net_bridge_vlan *v, u16 flags)
 {
@@ -607,6 +617,15 @@ err_flags:
 /* Must be protected by RTNL.
  * Must be called with vid in range from 1 to 4094 inclusive.
  * changed must be true only if the vlan was created or updated
+ *
+ * sock_ioctl()
+ *  br_ioctl_deviceless_stub()
+ *   br_add_bridge()
+ *    register_netdev(dev==struct net_bridge)
+ *     register_netdevice(dev==struct net_bridge)
+ *      br_dev_init()
+ *       br_vlan_init()
+ *        br_vlan_add()
  */
 int br_vlan_add(struct net_bridge *br, u16 vid, u16 flags, bool *changed)
 {
@@ -637,6 +656,7 @@ int br_vlan_add(struct net_bridge *br, u16 vid, u16 flags, bool *changed)
 	vlan->br = br;
 	if (flags & BRIDGE_VLAN_INFO_BRENTRY)
 		refcount_set(&vlan->refcnt, 1);
+	
 	ret = __vlan_add(vlan, flags);
 	if (ret) {
 		free_percpu(vlan->stats);
@@ -975,6 +995,15 @@ out:
 	return err;
 }
 
+/*
+ * sock_ioctl()
+ *  br_ioctl_deviceless_stub()
+ *   br_add_bridge()
+ *    register_netdev(dev==struct net_bridge)
+ *     register_netdevice(dev==struct net_bridge)
+ *      br_dev_init()
+ *       br_vlan_init()
+ */
 int br_vlan_init(struct net_bridge *br)
 {
 	struct net_bridge_vlan_group *vg;
@@ -994,6 +1023,7 @@ int br_vlan_init(struct net_bridge *br)
 	br->vlan_proto = htons(ETH_P_8021Q);
 	br->default_pvid = 1;
 	rcu_assign_pointer(br->vlgrp, vg);
+	
 	ret = br_vlan_add(br, 1,
 			  BRIDGE_VLAN_INFO_PVID | BRIDGE_VLAN_INFO_UNTAGGED |
 			  BRIDGE_VLAN_INFO_BRENTRY, &changed);

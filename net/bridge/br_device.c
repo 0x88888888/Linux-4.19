@@ -116,6 +116,14 @@ static void br_set_lockdep_class(struct net_device *dev)
 	lockdep_set_class(&dev->addr_list_lock, &bridge_netdev_addr_lock_key);
 }
 
+/*
+ * sock_ioctl()
+ *  br_ioctl_deviceless_stub()
+ *   br_add_bridge()
+ *    register_netdev(dev==struct net_bridge)
+ *     register_netdevice(dev==struct net_bridge)
+ *      br_dev_init()
+ */
 static int br_dev_init(struct net_device *dev)
 {
 	struct net_bridge *br = netdev_priv(dev);
@@ -335,7 +343,7 @@ fail:
 	goto out;
 }
 
-void br_netpoll_disable(struct net_bridge_port *p)
+void br_netpoll_dridge_port *p)
 {
 	struct netpoll *np = p->np;
 
@@ -403,6 +411,14 @@ static struct device_type br_type = {
 	.name	= "bridge",
 };
 
+/*
+ * sock_ioctl()
+ *  br_ioctl_deviceless_stub()
+ *   br_add_bridge()
+ *    alloc_netdev(setup==br_dev_setup)
+ *     alloc_netdev_mqs(setup==br_dev_setup)
+ *      br_dev_setup(dev=struct net_bridge)
+ */
 void br_dev_setup(struct net_device *dev)
 {
 	struct net_bridge *br = netdev_priv(dev);
@@ -447,5 +463,6 @@ void br_dev_setup(struct net_device *dev)
 	br_netfilter_rtable_init(br);
 	br_stp_timer_init(br);
 	br_multicast_init(br);
-	INIT_DELAYED_WORK(&br->gc_work, br_fdb_cleanup);
+	INIT_DELAYED_WOR	INIT_DELAYED_WORK(&br->gc_work, br_fdb_cleanup);
+}
 }

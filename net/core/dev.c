@@ -8592,6 +8592,13 @@ EXPORT_SYMBOL(netif_tx_stop_all_queues);
  *	BUGS:
  *	The locking appears insufficient to guarantee two parallel registers
  *	will not get the same name.
+ *
+ *
+ * sock_ioctl()
+ *  br_ioctl_deviceless_stub()
+ *   br_add_bridge()
+ *    register_netdev(dev==struct net_bridge)
+ *     register_netdevice(dev==struct net_bridge)
  */
 
 int register_netdevice(struct net_device *dev)
@@ -8618,7 +8625,7 @@ int register_netdevice(struct net_device *dev)
 		goto out;
 
 	/* Init, if this function is available */
-	if (dev->netdev_ops->ndo_init) {
+	if (dev->netdev_ops->ndo_init) { //  br_dev_init
 		ret = dev->netdev_ops->ndo_init(dev);
 		if (ret) {
 			if (ret > 0)
@@ -8637,7 +8644,7 @@ int register_netdevice(struct net_device *dev)
 	}
 
 	ret = -EBUSY;
-	if (!dev->ifindex)
+	if (!dev->ifindex)//分配网络设备索引号
 		dev->ifindex = dev_new_index(net);
 	else if (__dev_get_by_index(net, dev->ifindex))
 		goto err_uninit;
@@ -8665,10 +8672,13 @@ int register_netdevice(struct net_device *dev)
 	 */
 	if (dev->hw_features & NETIF_F_TSO)
 		dev->hw_features |= NETIF_F_TSO_MANGLEID;
+	
 	if (dev->vlan_features & NETIF_F_TSO)
 		dev->vlan_features |= NETIF_F_TSO_MANGLEID;
+	
 	if (dev->mpls_features & NETIF_F_TSO)
 		dev->mpls_features |= NETIF_F_TSO_MANGLEID;
+	
 	if (dev->hw_enc_features & NETIF_F_TSO)
 		dev->hw_enc_features |= NETIF_F_TSO_MANGLEID;
 
@@ -8797,6 +8807,12 @@ EXPORT_SYMBOL_GPL(init_dummy_netdev);
  *	This is a wrapper around register_netdevice that takes the rtnl semaphore
  *	and expands the device name if you passed a format string to
  *	alloc_netdev.
+ *
+ *
+ * sock_ioctl()
+ *  br_ioctl_deviceless_stub()
+ *   br_add_bridge()
+ *    register_netdev(dev==struct net_bridge)
  */
 int register_netdev(struct net_device *dev)
 {
@@ -8804,6 +8820,7 @@ int register_netdev(struct net_device *dev)
 
 	if (rtnl_lock_killable())
 		return -EINTR;
+	
 	err = register_netdevice(dev);
 	rtnl_unlock();
 	return err;
@@ -9068,6 +9085,11 @@ void netdev_freemem(struct net_device *dev)
  * for each queue on the device.
  *
  *
+ * sock_ioctl()
+ *  br_ioctl_deviceless_stub()
+ *   br_add_bridge()
+ *    alloc_netdev(setup==br_dev_setup)
+ *     alloc_netdev_mqs(setup==br_dev_setup)
  */
 struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 		unsigned char name_assign_type,
@@ -9134,6 +9156,7 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 	hash_init(dev->qdisc_hash);
 #endif
 	dev->priv_flags = IFF_XMIT_DST_RELEASE | IFF_XMIT_DST_RELEASE_PERM;
+    //br_dev_setup
 	setup(dev);
 
 	if (!dev->tx_queue_len) {
@@ -9586,7 +9609,7 @@ static void __netdev_printk(const char *level, const struct net_device *dev,
 				"%s %s %s%s: %pV",
 				dev_driver_string(dev->dev.parent),
 				dev_name(dev->dev.parent),
-				netdev_name(dev), netdev_reg_state(dev),
+				netdev_name(dev), nate(dev),
 				vaf);
 	} else if (dev) {
 		printk("%s%s%s: %pV",
@@ -9839,4 +9862,4 @@ out:
 	return rc;
 }
 
-subsys_initcall(net_dev_init);
+subsys_initcsubsys_initcall(net_dev_init);

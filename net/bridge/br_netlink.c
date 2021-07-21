@@ -1645,5 +1645,14 @@ void br_netlink_fini(void)
 {
 	br_mdb_uninit();
 	rtnl_af_unregister(&br_af_ops);
-	rtnl_link_unregister(&br_link_ops);
+	rtnl_link_unregivoid br_netlink_fini(void)
+{
+	br_mdb_uninit();
+	rtnl_af_unregister(&br_af_ops);
+	rtnl_link_unregister(&b	rtnl_link_unregister(&br_link_ops);
+}
+	rtnl_af_unregister(&br_af_ops);
+	rtnl_link_unregister(&b	rtnl_link_unregister(&b	rtnl_link_unregister(&br_link_ops);
+}
+}
 }

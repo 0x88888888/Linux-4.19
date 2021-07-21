@@ -1207,6 +1207,8 @@ static void __init do_initcalls(void)
      *
      * 6. module_init(init_kprobes)
      * 6. module_init(tun_init)
+     * 
+     * 6. module_init(br_init)
      * 6. module_pci_driver(virtio_pci_driver)
      * 6. module_virtio_driver(virtio_balloon_driver)
      *
@@ -1311,7 +1313,7 @@ static int try_to_run_init_process(const char *init_filename)
 	ret = run_init_process(init_filename);
 
 	if (ret && ret != -ENOENT) {
-		pr_err("Starting init: %s exists but couldn't execute it (error %d)\n",
+		pr_eting init: %s exists but couldn't execute it (error %d)\n",
 		       init_filename, ret);
 	}
 
@@ -1507,5 +1509,5 @@ static noinline void __init kernel_init_freeable(void)
 	 */
 
 	integrity_load_keys();
-	load_default_modules();
-}
+	load_d	load_default_modules();
+}}

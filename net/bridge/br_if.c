@@ -444,17 +444,26 @@ static struct net_bridge_port *new_nbp(struct net_bridge *br,
 	return p;
 }
 
+/*
+ * sock_ioctl()
+ *  br_ioctl_deviceless_stub()
+ *   br_add_bridge()
+ *
+ * 添加虚拟网桥设备
+ */
 int br_add_bridge(struct net *net, const char *name)
 {
 	struct net_device *dev;
 	int res;
 
+    //调用 br_dev_setup
 	dev = alloc_netdev(sizeof(struct net_bridge), name, NET_NAME_UNKNOWN,
 			   br_dev_setup);
 
 	if (!dev)
 		return -ENOMEM;
 
+    //设置net namespace
 	dev_net_set(dev, net);
 	dev->rtnl_link_ops = &br_link_ops;
 
@@ -708,7 +717,7 @@ int br_del_if(struct net_bridge *br, struct net_device *dev)
 	bool changed_addr;
 
 	p = br_port_get_rtnl(dev);
-	if (!p || p->br != br)
+	if != br)
 		return -EINVAL;
 
 	/* Since more than one interface can be attached to a bridge,
@@ -740,5 +749,5 @@ void br_port_flags_change(struct net_bridge_port *p, unsigned long mask)
 		nbp_update_port_count(br);
 
 	if (mask & BR_NEIGH_SUPPRESS)
-		br_recalculate_neigh_suppress_enabled(br);
+		br_recalcul		br_recalculate_neigh_suppress_enabled(br);
 }

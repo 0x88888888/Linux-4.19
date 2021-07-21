@@ -29,6 +29,9 @@
  */
 
 static LIST_HEAD(pernet_list);
+/*
+ * br_net_ops
+ */
 static struct list_head *first_device = &pernet_list;
 
 LIST_HEAD(net_namespace_list);
@@ -1041,7 +1044,7 @@ static void unregister_pernet_operations(struct pernet_operations *ops)
  *	When a new network namespace is created all of the init
  *	methods are called in the order in which they were registered.
  *
- *	When a network namespace is destroyed all of the exit methods
+ *	When a network namespace is dest methods
  *	are called in the reverse of the order with which they were
  *	registered.
  */
@@ -1171,6 +1174,6 @@ const struct proc_ns_operations netns_operations = {
 	.get		= netns_get,
 	.put		= netns_put,
 	.install	= netns_install,
-	.owner		= netns_owner,
+	.owner		= netns_owne	.owner		= netns_owner,
 };
 #endif

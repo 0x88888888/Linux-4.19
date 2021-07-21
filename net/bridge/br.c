@@ -198,6 +198,13 @@ static const struct stp_proto br_stp_proto = {
 	.rcv	= br_stp_rcv,
 };
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    ......
+ *     br_init()
+ */
 static int __init br_init(void)
 {
 	int err;
@@ -285,4 +292,6 @@ module_init(br_init)
 module_exit(br_deinit)
 MODULE_LICENSE("GPL");
 MODULE_VERSION(BR_VERSION);
-MODULE_ALIAS_RTNL_LINK("bridge");
+MODULE_ALIAS_RTNMODULE_LICENSE("GPL");
+MODULE_VERSION(BR_VERSION);
+MODULE_ALIAS_RTNL_LINK("bridMOMODULE_ALIAS_RTNL_LINK("bridge");

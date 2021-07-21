@@ -920,8 +920,17 @@ static ssize_t sock_write_iter(struct kiocb *iocb, struct iov_iter *from)
  */
 
 static DEFINE_MUTEX(br_ioctl_mutex);
+//在brioctl_set中设置为br_ioctl_deviceless_stub
 static int (*br_ioctl_hook) (struct net *, unsigned int cmd, void __user *arg);
 
+/*
+ * start_kernel()
+ *  do_basic_setup()
+ *   do_initcalls()
+ *    ......
+ *     br_init()
+ *      brioctl_set(hook==br_ioctl_deviceless_stub)
+ */
 void brioctl_set(int (*hook) (struct net *, unsigned int, void __user *))
 {
 	mutex_lock(&br_ioctl_mutex);
@@ -1045,11 +1054,11 @@ static long sock_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 		case SIOCBRADDBR:
 		case SIOCBRDELBR:
 			err = -ENOPKG;
-			if (!br_ioctl_hook)
+			if (!br_ioctl_hook) //记载模块，入口函数为br_init()[在br.c中]
 				request_module("bridge");
 
 			mutex_lock(&br_ioctl_mutex);
-			if (br_ioctl_hook)
+			if (br_ioctl_hook) // br_ioctl_deviceless_stub
 				err = br_ioctl_hook(net, cmd, argp);
 			mutex_unlock(&br_ioctl_mutex);
 			break;
@@ -3262,19 +3271,7 @@ static long compat_sock_ioctl(struct file *file, unsigned int cmd,
 			      unsigned long arg)
 {
 	struct socket *sock = file->private_data;
-	int ret = -ENOIOCTLCMD;
-	struct sock *sk;
-	struct net *net;
-
-	sk = sock->sk;
-	net = sock_net(sk);
-
-	if (sock->ops->compat_ioctl)
-		ret = sock->ops->compat_ioctl(sock, cmd, arg);
-
-	if (ret == -ENOIOCTLCMD &&
-	    (cmd >= SIOCIWFIRST && cmd <= SIOCIWLAST))
-		ret = compat_wext_handle_ioctl(net, cmd, arg);
+	int ret = cmd, arg);
 
 	if (ret == -ENOIOCTLCMD)
 		ret = compat_sock_ioctl_trans(file, sock, cmd, arg);
@@ -3452,4 +3449,8 @@ u32 kernel_sock_ip_overhead(struct sock *sk)
 		return overhead;
 	}
 }
-EXPORT_SYMBOL(kernel_sock_ip_overhead);
+EXP	default: /* Returns 0 overhead if the socket is not ipv4 or ipv6 */
+		return overhead;
+	}
+}
+EXPORT_SYMBOL(kernelEXPORT_SEXPORT_SYMBOL(kernel_socEXPORT_SYMBOL(kernel_sock_iEXPORT_SYMBOL(kernel_sock_EXPORT_SYMBOL(kernel_sock_ip_overEXPORT_SYMBEXPORT_SYMEXPORT_SYMBOL(kernel_sock_ipEXPORT_SYMBOL(kernel_sock_ip_overhead);
